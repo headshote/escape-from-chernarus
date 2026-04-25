@@ -116,6 +116,74 @@ class CfgFunctions {
     };
 };
 
+// UI control bases for dialog classes included below.
+// Addon Builder/CfgConvert requires these base classes to exist at parse time.
+class RscText {
+    access = 0;
+    type = 0;
+    idc = -1;
+    style = 0;
+    linespacing = 1;
+    colorBackground[] = {0,0,0,0};
+    colorText[] = {1,1,1,1};
+    text = "";
+    shadow = 2;
+    font = "RobotoCondensed";
+    SizeEx = 0.03;
+    fixedWidth = 0;
+};
+
+class RscSlider {
+    access = 0;
+    type = 43;
+    style = 1024;
+    idc = -1;
+    color[] = {1,1,1,0.8};
+    colorActive[] = {1,1,1,1};
+};
+
+class RscCheckBox {
+    access = 0;
+    type = 77;
+    style = 0;
+    idc = -1;
+    checked = 0;
+    color[] = {1,1,1,0.7};
+    colorFocused[] = {1,1,1,1};
+    colorHover[] = {1,1,1,1};
+    colorPressed[] = {1,1,1,1};
+    colorDisabled[] = {1,1,1,0.2};
+    colorBackground[] = {0,0,0,0};
+};
+
+class RscButton {
+    access = 0;
+    type = 1;
+    style = 2;
+    idc = -1;
+    text = "";
+    font = "RobotoCondensed";
+    sizeEx = 0.03;
+    colorText[] = {1,1,1,1};
+    colorDisabled[] = {0.4,0.4,0.4,1};
+    colorBackground[] = {0.2,0.2,0.2,0.8};
+    colorBackgroundActive[] = {0.3,0.3,0.3,1};
+    colorBackgroundDisabled[] = {0,0,0,0.5};
+    colorFocused[] = {0.3,0.3,0.3,1};
+    colorShadow[] = {0,0,0,0};
+    colorBorder[] = {0,0,0,1};
+    borderSize = 0;
+    soundEnter[] = {"\A3\ui_f\data\sound\RscButton\soundEnter",0.09,1};
+    soundPush[] = {"\A3\ui_f\data\sound\RscButton\soundPush",0.09,1};
+    soundClick[] = {"\A3\ui_f\data\sound\RscButton\soundClick",0.09,1};
+    soundEscape[] = {"\A3\ui_f\data\sound\RscButton\soundEscape",0.09,1};
+    shadow = 2;
+    offsetX = 0;
+    offsetY = 0;
+    offsetPressedX = 0;
+    offsetPressedY = 0;
+};
+
 // Include UI dialog definitions
 #include "ui\lockpick_dialog.hpp"
 #include "ui\wrangle_dialog.hpp"
