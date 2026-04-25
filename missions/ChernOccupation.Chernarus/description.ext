@@ -1,0 +1,31 @@
+author = "YourName";
+onLoadName = "Chernarus Occupation";
+onLoadMission = "Survive. Evade. Escape.";
+loadScreen = "";
+
+respawn = "BASE";
+respawnDelay = 15;
+respawnTemplates[] = {"MenuPosition", "Counter"};
+
+
+// Two respawn positions: civilian start, resistance start (gated by variable)
+class RespawnPositions {
+    class CivStart {
+        name = "Civilian";
+        position[] = {6400, 2400, 0}; // Chernogorsk
+    };
+    class ResistStart {
+        name = "Resistance Fighter";
+        position[] = {2100, 12800, 0}; // NW, near airfield — gated in scripts
+        condition = "profileNamespace getVariable ['CO_escaped_' + getPlayerUID player, false]";
+    };
+};
+
+disabledAI = 0;
+enableDebugConsole = 1;  // SET TO 0 WHEN RELEASING — lets you run commands while testing
+
+class Header {
+    gameType = COOP;
+    minPlayers = 1;
+    maxPlayers = 32;
+};	
