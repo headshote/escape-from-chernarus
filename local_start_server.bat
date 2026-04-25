@@ -9,6 +9,7 @@ set "ARMA_SERVER_ROOT=C:\Steam\steamapps\common\Arma 3 Server"
 set "ARMA_CLIENT_ROOT=C:\Steam\steamapps\common\Arma 3"
 set "WORKSHOP_ROOT=C:\Steam\steamapps\workshop\content\107410"
 set "CO_MOD_ROOT=%~dp0"
+if "%CO_MOD_ROOT:~-1%"=="\" set "CO_MOD_ROOT=%CO_MOD_ROOT:~0,-1%"
 
 REM Optional: Workshop IDs (used only if local @mod folders are missing)
 set "WS_CBA=450814997"
@@ -60,6 +61,12 @@ if not exist "%MOD_CO%\addons\co_main.pbo" (
     echo Build and copy your addon PBO to @ChernOccupation\addons\co_main.pbo first.
     exit /b 1
 )
+if exist "%MOD_CO%\addons\main.pbo" (
+    echo [ERROR] Found stale duplicate addon PBO: %MOD_CO%\addons\main.pbo
+    echo Arma loads every PBO in the addons folder. Remove or rename main.pbo,
+    echo then keep only co_main.pbo for this mod before launching.
+    exit /b 1
+)
 if not exist "%MOD_CBA%\addons" (
     echo [ERROR] CBA not found at: %MOD_CBA%
     exit /b 1
@@ -107,7 +114,7 @@ echo verifySignatures = 0;
 echo BattlEye = 0;
 echo voteMissionPlayers = 1;
 echo disableVoN = 0;
-echo
+echo(
 echo class Missions
 echo {
 echo     class CO
