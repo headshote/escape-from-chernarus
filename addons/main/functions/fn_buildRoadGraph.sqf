@@ -25,17 +25,19 @@ CO_settlements = [
     ["Mogilevka",      [8500,  8100,  0], "small"],
 ];
 
-// Build pairs: for every settlement, connect to those within 3500m
+// Build pairs: for every settlement, connect to those within 3800m
 CO_roadGraph = [];
 {
     private _a = _x;
     {
         private _b = _x;
-        if (_a select 0 == _b select 0) then { continue };
-        private _dist = (_a select 1) distance (_b select 1);
+        if ((_a select 0) == (_b select 0)) then { continue };
+        private _aPosATL = _a select 1;
+        private _bPosATL = _b select 1;
+        private _dist = _aPosATL distance _bPosATL;
         if (_dist < 3800 && _dist > 400) then {
             // Check a road exists between them (sample midpoint)
-            private _mid = (_a select 1) vectorMultiply 0.5 vectorAdd ((_b select 1) vectorMultiply 0.5);
+            private _mid = _aPosATL vectorMultiply 0.5 vectorAdd (_bPosATL vectorMultiply 0.5);
             private _road = roadAt _mid;
             if (!isNull _road) then {
                 CO_roadGraph pushBackUnique [[_a select 0, _b select 0, _mid, _a select 2, _b select 2]];

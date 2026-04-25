@@ -2,7 +2,7 @@
 // Called when a kidnapping attempt occurs in a crowd.
 params ["_pos", "_hostileGrp", "_target"];
 
-private _nearCivs = _pos nearEntities [["C_man_polo_1_F", "C_man_polo_2_F"], 30];
+private _nearCivs = _pos nearEntities [["Man"], 30] select { side _x == civilian && !(_x getVariable ["CO_isFemale", false]) };
 private _crowdSize = count _nearCivs;
 private _hostileCount = count units _hostileGrp;
 

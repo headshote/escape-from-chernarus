@@ -1,4 +1,6 @@
 // fn_spawnRussianWave.sqf
+if (isNil "CO_rus_waveCount") then { CO_rus_waveCount = 0; };
+
 private _spawnX    = 15200; // east edge
 private _spawnYMin = 2000;
 private _spawnYMax = 11000;

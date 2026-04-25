@@ -4,6 +4,12 @@ params ["_detectedUnits", "_hostileGrp"];
     private _target = _x;
     if (!(isPlayer _target) && side _target != civilian) then { continue };
 
+    // Female civilians are never targeted first
+    if (_target getVariable ["CO_isFemale", false]) then { continue };
+
+    // Check crowd resistance first
+    [getPosATL _target, _hostileGrp, _target] call co_main_fnc_crowdResistance;
+
     // Order whole group to move on target
     {
         _x doTarget _target;
@@ -15,20 +21,34 @@ params ["_detectedUnits", "_hostileGrp"];
     // Capture check loop — run on server
     [_target, _hostileGrp] spawn {
         params ["_target", "_grp"];
-        private _captured = false;
         while { alive _target && !captive _target } do {
-            private _nearest = [units _grp, [], { _x distance _target }, "ASCEND"] call BIS_fnc_sortBy;
+            private _liveUnits = units _grp select { alive _x };
+            if (count _liveUnits == 0) exitWith {}; // all guards killed
+            private _nearest = [_liveUnits, [], { _x distance _target }, "ASCEND"] call BIS_fnc_sortBy;
             if ((_nearest select 0) distance _target < 2.5) then {
-                // Trigger wrangle minigame on the player's machine
-                [_target] remoteExecCall ["co_main_fnc_wrangleMinigame", _target];
-                waitUntil { !isNil { _target getVariable "CO_wrangleResult" } };
-                private _result = _target getVariable ["CO_wrangleResult", "captured"];
-                _target setVariable ["CO_wrangleResult", nil, true];
+                // Increase wanted level
+                private _wl = (_target getVariable ["CO_wantedLevel", 0]) + 30;
+                _target setVariable ["CO_wantedLevel", _wl min 100, true];
 
-                if (_result == "captured") then {
+                // Trigger wrangle minigame on the player's machine
+                if (isPlayer _target) then {
+                    [_target] remoteExecCall ["co_main_fnc_wrangleMinigame", _target];
+                    waitUntil { sleep 0.3; !isNil { _target getVariable "CO_wrangleResult" } };
+                    private _result = _target getVariable ["CO_wrangleResult", "captured"];
+                    _target setVariable ["CO_wrangleResult", nil, true];
+
+                    if (_result == "captured") then {
+                        _target setCaptive true;
+                        [_target, _grp] call co_main_fnc_transportToDetention;
+                        break;
+                    };
+                    // Escaped: give brief head-start
+                    sleep 3;
+                } else {
+                    // NPC civilian: auto-capture
                     _target setCaptive true;
                     [_target, _grp] call co_main_fnc_transportToDetention;
-                    _captured = true;
+                    break;
                 };
             };
             sleep 0.5;

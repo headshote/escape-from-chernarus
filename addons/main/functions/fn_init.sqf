@@ -1,19 +1,5 @@
-// ---- Admin-tunable globals (overridden by admin panel / CBA settings) ----
-CO_checkpoint_hostilesPerPost = 4;
-CO_bus_totalCruising           = 30;
-CO_bus_hostilesPerBus          = 5;
-CO_bus_townGuaranteed          = 3;   // min buses in Cherno/Elektro/Berezino
-CO_border_patrolDensity        = 1.0; // multiplier
-CO_police_carStopChance        = 0.05;
-CO_police_active               = true;
-
-// ---- Spawn systems ----
-[] spawn co_main_fnc_checkpoints;
-[] spawn co_main_fnc_buses;
-[] spawn co_main_fnc_borderPatrol;
-[] spawn co_main_fnc_civilianAI;
-[] spawn co_main_fnc_trafficSystem;
-
-publicVariable "CO_checkpoint_hostilesPerPost";
-publicVariable "CO_bus_totalCruising";
-// ... broadcast rest
+// fn_init.sqf — shared pre-init (called from initServer/initClient/initHC)
+// Globals are loaded from CO_adminDefaults.sqf on server.
+// Clients wait for broadcast via publicVariable in initServer.
+// This file is intentionally minimal \u2014 real init is split by machine role.
+diag_log "[CO] fn_init executed";

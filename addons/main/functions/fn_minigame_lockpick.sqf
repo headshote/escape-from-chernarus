@@ -38,8 +38,8 @@ private _startT  = time;
 if (!_failed) then {
     hint "Lock picked!";
     _door animate ["Door_1_rot", 1]; // open door
-    [_player] call co_main_fnc_prisonEscape;
+    [_player] remoteExec ["co_main_fnc_prisonEscape", 2]; // server-side escape logic
 } else {
     hint "Guard alerted!";
-    [getPos _player] call co_main_fnc_alertNearbyGuards;
+    [getPos _player] remoteExec ["co_main_fnc_alertNearbyGuards", 2];
 };

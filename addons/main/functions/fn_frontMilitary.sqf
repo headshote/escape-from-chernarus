@@ -13,7 +13,7 @@ CO_frontDefensePositions = [
 
 {
     private _pos = _x;
-    private _grp = createGroup east;
+    private _grp = createGroup west;
     _grp setVariable ["CO_faction", "CRN_FRONT"];
 
     for "_i" from 0 to 4 do {

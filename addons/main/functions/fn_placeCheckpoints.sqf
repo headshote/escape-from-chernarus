@@ -10,6 +10,9 @@ params [
     ["_includeSmall",  false]   // off by default; toggled in admin panel
 ];
 
+// Override with admin settings if available
+if (!isNil "CO_checkpoint_includeSmall") then { _includeSmall = CO_checkpoint_includeSmall; };
+
 CO_activeCheckpoints = []; // store refs for later cleanup/toggle
 
 {

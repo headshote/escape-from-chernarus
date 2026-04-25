@@ -1,10 +1,14 @@
 // fn_civilianAI.sqf
 // Spawns civilian NPCs that walk, react to hostiles, comply or flee.
 
-CO_civilianSpawnPoints = getMarkerPos "civ_spawn_zone"; // or explicit list
+// Use settlement positions as spawn zones
+private _civSpawnZones = CO_settlements apply { _x select 1 }; // all settlement positions
+private _totalCivs = 40;
 
-for "_i" from 1 to 40 do {
-    private _pos = [CO_civilianSpawnPoints, 300] call BIS_fnc_randomPosByGrid;
+for "_i" from 1 to _totalCivs do {
+    // Pick a random settlement, offset within it
+    private _basePos = _civSpawnZones call BIS_fnc_selectRandom;
+    private _pos = _basePos vectorAdd [random 200 - 100, random 200 - 100, 0];
     private _grp = createGroup civilian;
     private _gender = selectRandom ["C_man_polo_1_F", "C_man_polo_2_F", "C_Woman_casual_F"];
     private _civ = _grp createUnit [_gender, _pos, [], 5, "NONE"];
@@ -52,7 +56,9 @@ for "_i" from 1 to 40 do {
     [_civ] spawn {
         params ["_civ"];
         while { alive _civ } do {
-            private _nearHostiles = _civ nearEntities [["O_Soldier_F"], 40];
+            private _nearHostiles = _civ nearEntities [["Man"], 40] select {
+                side _x in [west, east] && !(isPlayer _x) && !(captive _x)
+            };
             if (count _nearHostiles > 0 && _civ getVariable "CO_civState" == "walking") then {
                 private _isFemale = _civ getVariable ["CO_isFemale", false];
                 if (_isFemale) then {
@@ -60,9 +66,10 @@ for "_i" from 1 to 40 do {
                     sleep 5;
                 } else {
                     private _roll = random 1;
-                    _civ setVariable ["CO_civState",
-                        [["fleeing", "compliant", "fighting"], [0.5, 0.35, 0.15]] call BIS_fnc_randomIndex,
-                    false];
+                    private _newState = if (_roll < 0.5) then {"fleeing"} else {
+                        if (_roll < 0.85) then {"compliant"} else {"fighting"}
+                    };
+                    _civ setVariable ["CO_civState", _newState, false];
                 };
             };
             sleep 2;

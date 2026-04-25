@@ -19,7 +19,7 @@ private _frontGrp = allGroups select { _x getVariable ["CO_faction",""] == "CRN_
 if (count _frontGrp > 0) then {
     [_conscript] joinGroup (_frontGrp select 0);
 } else {
-    private _newGrp = createGroup east;
+    private _newGrp = createGroup west;
     _newGrp setVariable ["CO_faction", "CRN_FRONT"];
     [_conscript] joinGroup _newGrp;
 };

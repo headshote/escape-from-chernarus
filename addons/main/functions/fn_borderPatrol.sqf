@@ -10,6 +10,14 @@ CO_borderZones = [
     [[0, 0, 0],      [15360, 0, 0],   "boat"],  // South coast
 ];
 
+// Helper: is _pos near any map edge?
+CO_fnc_isNearBorder = {
+    params ["_pos"];
+    private _x = _pos select 0;
+    private _y = _pos select 1;
+    _x < 200 || _y < 200 || _x > 15160 || _y > 15160
+};
+
 // Spawn ATV patrols along land edges
 {
     private _start = _x select 0;
@@ -23,36 +31,57 @@ CO_borderZones = [
         _pos = _pos vectorAdd [random 50 - 25, random 50 - 25, 0];
 
         if (_type == "land") then {
-            private _grp = createGroup east;
+            private _grp = createGroup west;
+            _grp setVariable ["CO_faction", "CRN_ENF"];
             private _atv = "O_MRAP_02_F" createVehicle _pos;
-            for "_j" from 0 to 1 do {
-                private _u = _grp createUnit ["O_Soldier_F", _pos, [], 2, "CARGO"];
-                if (_j == 0) then { _u moveInDriver _atv; } else { _u moveInCargo _atv; };
-            };
-            // Patrol along border
+            private _driver = _grp createUnit ["B_Soldier_F", _pos, [], 0, "CARGO"];
+            _driver moveInDriver _atv;
+            private _passenger = _grp createUnit ["B_Soldier_F", _pos, [], 0, "CARGO"];
+            _passenger moveInCargo _atv;
+            [_driver] call co_main_fnc_initHostileUnit;
+            [_passenger] call co_main_fnc_initHostileUnit;
             [_grp, _start, _end] call co_main_fnc_borderPatrolWaypoints;
         };
 
         if (_type == "boat") then {
-            private _grp = createGroup east;
-            private _boat = "O_Boat_Armed_01_hmg_F" createVehicle _pos;
-            private _u = _grp createUnit ["O_Soldier_F", _pos, [], 0, "CARGO"];
-            _u moveInDriver _boat;
+            private _grp = createGroup west;
+            _grp setVariable ["CO_faction", "CRN_ENF"];
+            private _boat = "B_Boat_Armed_01_minigun_F" createVehicle _pos;
+            private _driver = _grp createUnit ["B_Soldier_F", _pos, [], 0, "CARGO"];
+            _driver moveInDriver _boat;
+            private _gunner = _grp createUnit ["B_Soldier_F", _pos, [], 0, "CARGO"];
+            _gunner moveInGunner _boat;
+            [_driver] call co_main_fnc_initHostileUnit;
+            [_gunner] call co_main_fnc_initHostileUnit;
             [_grp, _start, _end] call co_main_fnc_borderPatrolWaypoints;
         };
     };
 } forEach CO_borderZones;
 
-// Become hostile only when player spotted near border (within 150m)
-addMissionEventHandler ["EachFrame", {
-    {
-        private _p = _x;
-        if (!(captive _p) && _p distance2D [0, 7680] < 150) then { // simplified edge check
-            // Alert nearest border group
-            allGroups select {
-                side _x == east &&
-                (leader _x) distance _p < 300
-            } apply { [units _x, _p] call co_main_fnc_borderAlert; };
-        };
-    } forEach allPlayers;
-}];
+// Become hostile when player spotted near any border edge (within 150m)
+[] spawn {
+    while { true } do {
+        sleep 2;
+        {
+            private _p = _x;
+            if (captive _p || !alive _p) then { continue };
+            if ([getPosATL _p] call CO_fnc_isNearBorder) then {
+                // Alert nearest border groups
+                {
+                    if (_x getVariable ["CO_faction",""] == "CRN_ENF") then {
+                        if ((leader _x) distance _p < 400) then {
+                            [units _x, _p] call co_main_fnc_borderAlert;
+                        };
+                    };
+                } forEach allGroups;
+
+                // Check escape achievement
+                private _pos = getPosATL _p;
+                if ((_pos select 0 < 50 || _pos select 1 < 50 ||
+                     _pos select 0 > 15310 || _pos select 1 > 15310)) then {
+                    [_p] call co_main_fnc_checkEscapeUnlock;
+                };
+            };
+        } forEach allPlayers;
+    };
+};

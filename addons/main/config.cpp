@@ -44,12 +44,6 @@ class CO_AdminSettings {
         displayName = "Hostiles per Checkpoint";
         category = "Occupation";
     };
-    class CO_bus_totalCruising {
-        value = 30; min = 5; max = 80;
-        typeName = "SCALAR";
-        displayName = "Total Cruising Buses";
-        category = "Occupation";
-    };
     // ... all others follow this pattern
 };
 
@@ -104,6 +98,20 @@ class CfgFunctions {
             class adminPanel       {};
             class enduranceBar     {};
             class frontMilitary    {};
+            class policePatrols    {};
+            class spawnWeaponCaches{};
+            class borderPatrolWaypoints {};
+            class enforcerRetreatFromTown {};
+            class alertEnforcers   {};
+            class alertNearbyGuards{};
+            class prisonEscape     {};
+            class initHC           {};
+            class showDetentionHUD {};
+            class showTrainingHUD  {};
+            class showFrontDeployHUD {};
+            class updateFrontLine  {};
+            class buses            {};
+            class checkpoints      {};
         };
     };
 };

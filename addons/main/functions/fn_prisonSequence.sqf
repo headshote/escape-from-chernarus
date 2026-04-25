@@ -5,6 +5,7 @@ private _isPlayer = isPlayer _captive;
 // Phase 1: Detention (5 min window)
 _captive setVariable ["CO_detainPhase", "detention", true];
 if (_isPlayer) then {
+    // Simple detention notification
     [_captive] remoteExecCall ["co_main_fnc_showDetentionHUD", _captive];
 };
 
