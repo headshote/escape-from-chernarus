@@ -50,7 +50,7 @@ class CO_AdminSettings {
 class CfgFunctions {
     class CO {
         class Main {
-            file = "co_main\functions";
+            file = "\co_main\functions";
 
             class init             {};
             class initServer       {};
