@@ -6,9 +6,9 @@
 
 params [
     ["_frontX",        13500],   // X coordinate of front line
-    ["_lineSpacingY",    200],   // meters between defense nodes N-S
-    ["_depthRows",         2],   // how many rows deep (1 = thin, 3 = fortified)
-    ["_rowSpacingX",      50]    // meters between rows west
+    ["_lineSpacingY",  missionNamespace getVariable ["CO_front_lineSpacingY", 200]],   // meters between defense nodes N-S
+    ["_depthRows",     missionNamespace getVariable ["CO_front_depthRows", 2]],         // how many rows deep (1 = thin, 3 = fortified)
+    ["_rowSpacingX",   missionNamespace getVariable ["CO_front_rowSpacing", 50]]        // meters between rows west
 ];
 
 private _yMin = 1500;

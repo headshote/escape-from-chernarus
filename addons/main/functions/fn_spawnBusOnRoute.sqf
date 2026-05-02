@@ -9,7 +9,8 @@ private _spawnPos  = _routeWps select 0;
 private _nearRoad  = _spawnPos nearRoads 20;
 if (count _nearRoad > 0) then { _spawnPos = getPos (_nearRoad select 0); };
 
-private _veh = selectRandom ["C_Van_01_transport_F", "C_Truck_02_transport_F"] createVehicle _spawnPos;
+private _vehiclePool = missionNamespace getVariable ["CO_bus_vehiclePool", ["C_Van_01_transport_F", "C_Truck_02_transport_F"]];
+private _veh = selectRandom _vehiclePool createVehicle _spawnPos;
 private _grp = createGroup west;
 _grp setVariable ["CO_faction", "CRN_ENF"];
 

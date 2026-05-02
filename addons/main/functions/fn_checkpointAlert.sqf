@@ -3,9 +3,12 @@ params ["_detectedUnits", "_hostileGrp"];
 {
     private _target = _x;
     if (!(isPlayer _target) && side _target != civilian) then { continue };
+    if (_target getVariable ["CO_captureInProgress", false]) then { continue };
 
     // Female civilians are never targeted first
     if (_target getVariable ["CO_isFemale", false]) then { continue };
+
+    _target setVariable ["CO_captureInProgress", true, true];
 
     // Check crowd resistance first
     [getPosATL _target, _hostileGrp, _target] call co_main_fnc_crowdResistance;
@@ -21,7 +24,9 @@ params ["_detectedUnits", "_hostileGrp"];
     // Capture check loop — run on server
     [_target, _hostileGrp] spawn {
         params ["_target", "_grp"];
-        while { alive _target && !captive _target } do {
+        private _finished = false;
+
+        while { alive _target && !captive _target && !_finished } do {
             private _liveUnits = units _grp select { alive _x };
             if (count _liveUnits == 0) exitWith {}; // all guards killed
             private _nearest = [_liveUnits, [], { _x distance _target }, "ASCEND"] call BIS_fnc_sortBy;
@@ -40,18 +45,23 @@ params ["_detectedUnits", "_hostileGrp"];
                     if (_result == "captured") then {
                         _target setCaptive true;
                         [_target, _grp] call co_main_fnc_transportToDetention;
-                        break;
+                        _finished = true;
                     };
                     // Escaped: give brief head-start
-                    sleep 3;
+                    if (!_finished) then {
+                        sleep 3;
+                        _finished = true;
+                    };
                 } else {
                     // NPC civilian: auto-capture
                     _target setCaptive true;
                     [_target, _grp] call co_main_fnc_transportToDetention;
-                    break;
+                    _finished = true;
                 };
             };
             sleep 0.5;
         };
+
+        _target setVariable ["CO_captureInProgress", false, true];
     };
 } forEach _detectedUnits;

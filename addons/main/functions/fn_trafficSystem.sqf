@@ -36,7 +36,7 @@ private _spawnTrafficVehicle = {
     _driver setVariable ["CO_trafficDriver", true];
 
     // Add random civilian passengers
-    private _paxCount = floor (random 3);
+    private _paxCount = 1 + floor (random 3);
     for "_p" from 1 to _paxCount do {
         private _pax = _grp createUnit [selectRandom ["C_man_polo_1_F","C_man_polo_2_F","C_Woman_casual_F"], _spawnPos, [], 0, "CARGO"];
         _pax moveInCargo _veh;
@@ -83,17 +83,22 @@ private _spawnTrafficVehicle = {
     _veh
 };
 
-// Initial spawn: 1 vehicle per route
-{ [_x] call _spawnTrafficVehicle; } forEach CO_trafficRoutes;
+// Initial spawn: 2 vehicles per route for a livelier opening state.
+{
+    [_x] call _spawnTrafficVehicle;
+    [_x] call _spawnTrafficVehicle;
+} forEach CO_trafficRoutes;
 
-// Respawn loop: maintain roughly 2 vehicles per route
+diag_log format ["[CO] Traffic system started on %1 routes.", count CO_trafficRoutes];
+
+// Respawn loop: maintain roughly 3 vehicles per route.
 [] spawn {
     while { true } do {
         sleep 120;
         {
             private _route = _x;
             private _nearVehicles = (_route select 0) nearEntities [["Car"], 500];
-            if (count _nearVehicles < 2) then {
+            if (count _nearVehicles < 3) then {
                 [_route] call _spawnTrafficVehicle;
             };
         } forEach CO_trafficRoutes;

@@ -10,6 +10,7 @@ CO_airfieldGates   = [                  // road entry angles
     [180, "Road from Vybor south"],     // south road
     [90,  "Road from east"]
 ];
+private _gateGuardCount = missionNamespace getVariable ["CO_airfield_gateGuards", 4];
 
 // --- Perimeter walls (8-point polygon around airfield) ---
 private _perimeterAngles = [0, 45, 90, 135, 180, 225, 270, 315];
@@ -26,7 +27,7 @@ private _perimeterAngles = [0, 45, 90, 135, 180, 225, 270, 315];
     private _gatePos = CO_airfieldCenter getPos [CO_airfieldRadius, _gateDir];
     [_gatePos, _gateDir + 180, "airfield_gate"] call co_main_fnc_stampFortification;
     // Gate guards
-    [_gatePos, _gateDir + 180, "CRN_ENF"] call co_main_fnc_spawnFortGuards;
+    [_gatePos, _gateDir + 180, "CRN_ENF", _gateGuardCount] call co_main_fnc_spawnFortGuards;
 } forEach CO_airfieldGates;
 
 // --- Interior guard towers (4 corners of airfield interior) ---

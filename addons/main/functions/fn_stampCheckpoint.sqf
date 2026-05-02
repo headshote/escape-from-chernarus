@@ -73,9 +73,31 @@ for "_i" from 0 to (CO_checkpoint_hostilesPerPost - 1) do {
 // Patrol within 20m of checkpoint only
 {
     private _wp = _grp addWaypoint [_pos getPos [12, _dir + (_forEachIndex * 180)], 0];
-    _wp setWaypointType "CYCLE";
+    _wp setWaypointType (if (_forEachIndex == 0) then { "MOVE" } else { "CYCLE" });
     _wp setWaypointSpeed "LIMITED";
 } forEach [0,1];
+
+// Detection loop: checkpoints actively target nearby civilian men and players.
+[_pos, _grp] spawn {
+    params ["_checkpointPos", "_checkpointGroup"];
+
+    while { ({ alive _x } count units _checkpointGroup) > 0 } do {
+        sleep 2;
+
+        private _targets = (_checkpointPos nearEntities [["Man"], 45]) select {
+            alive _x &&
+            !captive _x &&
+            side _x == civilian &&
+            !(_x getVariable ["CO_isFemale", false])
+        };
+
+        if (_targets isEqualTo []) then { continue };
+
+        private _sortedTargets = [_targets, [], { _x distance2D _checkpointPos }, "ASCEND"] call BIS_fnc_sortBy;
+        [[_sortedTargets select 0], _checkpointGroup] call co_main_fnc_checkpointAlert;
+        sleep 8;
+    };
+};
 
 // Return data struct
 [_pos, _dir, _objects, _grp]

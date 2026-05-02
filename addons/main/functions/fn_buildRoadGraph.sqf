@@ -25,23 +25,30 @@ CO_settlements = [
     ["Mogilevka",      [8500,  8100,  0], "small"]
 ];
 
-// Build pairs: for every settlement, connect to those within 3800m
+// Build unique road-linked pairs between nearby settlements.
 CO_roadGraph = [];
-{
-    private _a = _x;
-    {
-        private _b = _x;
-        if ((_a select 0) == (_b select 0)) then { continue };
-        private _aPosATL = _a select 1;
+for "_aIndex" from 0 to ((count CO_settlements) - 2) do {
+    private _a = CO_settlements select _aIndex;
+    private _aPosATL = _a select 1;
+
+    for "_bIndex" from (_aIndex + 1) to ((count CO_settlements) - 1) do {
+        private _b = CO_settlements select _bIndex;
         private _bPosATL = _b select 1;
         private _dist = _aPosATL distance _bPosATL;
-        if (_dist < 3800 && _dist > 400) then {
-            // Check a road exists between them (sample midpoint)
-            private _mid = _aPosATL vectorMultiply 0.5 vectorAdd (_bPosATL vectorMultiply 0.5);
-            private _road = roadAt _mid;
-            if (!isNull _road) then {
-                CO_roadGraph pushBackUnique [_a select 0, _b select 0, _mid, _a select 2, _b select 2];
-            };
-        };
-    } forEach CO_settlements;
-} forEach CO_settlements;
+
+        if (_dist <= 400 || _dist >= 4500) then { continue };
+
+        private _mid = [
+            ((_aPosATL select 0) + (_bPosATL select 0)) * 0.5,
+            ((_aPosATL select 1) + (_bPosATL select 1)) * 0.5,
+            0
+        ];
+        private _midRoads = _mid nearRoads 250;
+        if (_midRoads isEqualTo []) then { continue };
+
+        private _roadPos = getPosATL (_midRoads select 0);
+        CO_roadGraph pushBack [_a select 0, _b select 0, _roadPos, _a select 2, _b select 2];
+    };
+};
+
+diag_log format ["[CO] Road graph built with %1 links across %2 settlements.", count CO_roadGraph, count CO_settlements];

@@ -5,9 +5,9 @@
 // ============================================================
 
 params [
-    ["_spacing",       600],   // meters between posts
-    ["_includeCoast",  true],
-    ["_includeLand",   true]
+    ["_spacing",       missionNamespace getVariable ["CO_border_postSpacing", 600]],   // meters between posts
+    ["_includeCoast",  missionNamespace getVariable ["CO_border_includeCoast", true]],
+    ["_includeLand",   missionNamespace getVariable ["CO_border_includeLand", true]]
 ];
 
 // Border segments: [start, end, facing direction]
@@ -29,7 +29,7 @@ CO_borderSegments = [
     if (_type == "land"  && (_x select 2 == 90)) then { continue }; // skip east (Russian spawn)
 
     private _totalDist = _start distance _end;
-    private _steps     = floor (_totalDist / _spacing);
+    private _steps = (floor (_totalDist / (_spacing max 200))) max 1;
 
     for "_i" from 0 to _steps do {
         private _t   = _i / _steps;

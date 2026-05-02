@@ -23,7 +23,9 @@ CO_fnc_isNearBorder = {
     private _start = _x select 0;
     private _end   = _x select 1;
     private _type  = _x select 2;
-    private _steps = round ((_start distance _end) / 800);
+    private _density = (missionNamespace getVariable ["CO_border_patrolDensity", 1]) max 0.25;
+    private _spacing = (800 / _density) max 200;
+    private _steps = round ((_start distance _end) / _spacing);
 
     for "_i" from 0 to _steps do {
         private _t   = _i / _steps;
@@ -33,7 +35,7 @@ CO_fnc_isNearBorder = {
         if (_type == "land") then {
             private _grp = createGroup west;
             _grp setVariable ["CO_faction", "CRN_ENF"];
-            private _atv = "O_MRAP_02_F" createVehicle _pos;
+            private _atv = "B_Quadbike_01_F" createVehicle _pos;
             private _driver = _grp createUnit ["B_Soldier_F", _pos, [], 0, "CARGO"];
             _driver moveInDriver _atv;
             private _passenger = _grp createUnit ["B_Soldier_F", _pos, [], 0, "CARGO"];

@@ -36,7 +36,6 @@ class Mission
 			position[]={6400,0,2400};
 			name="respawn_civilian";
 			text="Civilian";
-			markerType="mil_start";
 			type="Empty";
 			colorName="ColorWhite";
 			a=1;

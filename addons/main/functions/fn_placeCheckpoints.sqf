@@ -11,7 +11,10 @@ params [
 ];
 
 // Override with admin settings if available
+if (!isNil "CO_checkpoint_includeLarge") then { _includeLarge = CO_checkpoint_includeLarge; };
+if (!isNil "CO_checkpoint_includeMedium") then { _includeMedium = CO_checkpoint_includeMedium; };
 if (!isNil "CO_checkpoint_includeSmall") then { _includeSmall = CO_checkpoint_includeSmall; };
+private _fortTemplate = missionNamespace getVariable ["CO_checkpoint_fortTemplate", ""];
 
 CO_activeCheckpoints = []; // store refs for later cleanup/toggle
 
@@ -35,8 +38,14 @@ CO_activeCheckpoints = []; // store refs for later cleanup/toggle
         private _roadDir    = [_snapPos, _mid] call BIS_fnc_dirTo;
 
         private _cpData = [_snapPos, _roadDir] call co_main_fnc_stampCheckpoint;
+        if (_fortTemplate != "") then {
+            private _fortObjects = [_snapPos, _roadDir, _fortTemplate] call co_main_fnc_stampFortification;
+            private _objects = _cpData select 2;
+            _objects append _fortObjects;
+            _cpData set [2, _objects];
+        };
         CO_activeCheckpoints pushBack _cpData;
     };
 } forEach CO_roadGraph;
 
-hint format ["%1 checkpoints placed.", count CO_activeCheckpoints];
+diag_log format ["[CO] %1 checkpoints placed.", count CO_activeCheckpoints];

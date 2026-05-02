@@ -17,19 +17,44 @@
 ];
 sleep 0.5;
 
-[] call co_main_fnc_factionRelations;    // setFriend calls
-[] call co_main_fnc_buildRoadGraph;      // build CO_roadGraph + CO_settlements
+private _runStep = {
+    params ["_label", "_code"];
+    diag_log format ["[CO] Init step start: %1", _label];
+    call _code;
+    diag_log format ["[CO] Init step done: %1", _label];
+};
+
+private _launchStep = {
+    params ["_label", "_code"];
+    [_label, _code] spawn {
+        params ["_stepLabel", "_stepCode"];
+        diag_log format ["[CO] Async step start: %1", _stepLabel];
+        call _stepCode;
+        diag_log format ["[CO] Async step done: %1", _stepLabel];
+    };
+};
+
+["factionRelations", { [] call co_main_fnc_factionRelations; }] call _runStep;
+["buildRoadGraph", { [] call co_main_fnc_buildRoadGraph; }] call _runStep;
 sleep 0.5;
-[] call co_main_fnc_placeCheckpoints;    // procedural checkpoints from graph
-[] call co_main_fnc_buildBorderForts;    // perimeter watchtowers + outposts
-[] call co_main_fnc_buildEasternFront;   // front defense line
-[] call co_main_fnc_buildAirfieldCamp;   // NW airfield perimeter + gates
-[] call co_main_fnc_buildBusRoutes;      // derive routes from road graph
-[] call co_main_fnc_spawnAllBuses;       // spawn buses on derived routes
-[] call co_main_fnc_civilianAI;          // civilian NPC spawner
-[] call co_main_fnc_trafficSystem;       // car traffic
-[] call co_main_fnc_frontMilitary;       // spawn initial CRN_FRONT defense line
-[] spawn co_main_fnc_russianAdvance;     // eastern front wave loop
-[] spawn co_main_fnc_desertionMonitor;   // per-player check loop
-[] spawn co_main_fnc_policePatrols;      // police car patrols in towns
-[] call co_main_fnc_spawnWeaponCaches;   // hidden weapon caches
+["placeCheckpoints", { [] call co_main_fnc_placeCheckpoints; }] call _runStep;
+["buildBusRoutes", { [] call co_main_fnc_buildBusRoutes; }] call _runStep;
+
+["spawnAllBuses", { [] call co_main_fnc_spawnAllBuses; }] call _launchStep;
+["civilianAI", { [] call co_main_fnc_civilianAI; }] call _launchStep;
+["trafficSystem", { [] call co_main_fnc_trafficSystem; }] call _launchStep;
+["policePatrols", { [] call co_main_fnc_policePatrols; }] call _launchStep;
+["spawnWeaponCaches", { [] call co_main_fnc_spawnWeaponCaches; }] call _launchStep;
+["borderSystem", {
+    [] call co_main_fnc_buildBorderForts;
+    [] call co_main_fnc_borderPatrol;
+}] call _launchStep;
+["frontSystem", {
+    [] call co_main_fnc_buildEasternFront;
+    [] call co_main_fnc_frontMilitary;
+    [] call co_main_fnc_russianAdvance;
+}] call _launchStep;
+["airfieldCamp", { [] call co_main_fnc_buildAirfieldCamp; }] call _launchStep;
+["desertionMonitor", { [] call co_main_fnc_desertionMonitor; }] call _launchStep;
+
+diag_log "[CO] Server init scheduling complete.";

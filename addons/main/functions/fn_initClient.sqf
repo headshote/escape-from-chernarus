@@ -34,6 +34,10 @@ waitUntil { !isNil "CO_checkpoint_hostilesPerPost" && !isNil "CO_police_active" 
 };
 
 // Show initial briefing
-titleText ["CHERNARUS OCCUPATION\nYou are a civilian. Survive. Avoid checkpoints. Escape.", "BLACK IN", 0.8];
-sleep 5;
-titleFadeOut 2;
+titleText [
+    "CHERNARUS OCCUPATION\nYou begin as a civilian. Avoid checkpoints, bus patrols, and police. Escape the border or risk detention, forced training, and the eastern front.",
+    "BLACK IN",
+    0.8
+];
+sleep 12;
+titleFadeOut 3;

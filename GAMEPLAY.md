@@ -5,6 +5,10 @@ under military occupation by a pro-government enforcer faction (CRN_ENF). Russia
 are advancing from the east. The player's arc is: survive the occupation → get conscripted →
 escape → join the resistance.
 
+The current runtime build is designed so that checkpoints, buses, civilians, traffic, police,
+border patrols, the airfield camp, and the eastern front are initialized as separate subsystems.
+One failing subsystem should no longer leave the whole map empty.
+
 ---
 
 ## Factions
@@ -48,6 +52,8 @@ guards (default 4).
 
 Player approach triggers `fn_checkpointAlert`:
 - Female NPC civilians are never targeted.
+- Checkpoint guards now actively scan nearby civilian men and players instead of waiting for
+  direct engine hostility.
 - Crowd resistance (`fn_crowdResistance`) can block or slow enforcers.
 - If a guard closes to 2.5 m the **wrangle minigame** fires (`fn_wrangleMinigame`).
 - Win wrangle → 3-second head-start, wanted level +30.
@@ -61,8 +67,8 @@ Buses run fixed routes derived from the road graph (nearby-settlement pairs). Ea
 carries `CO_bus_hostilesPerBus` guards (default 5). Large towns get a minimum of
 `CO_bus_townGuaranteed` buses (default 3).
 
-Bus agro loop (`fn_busAgroLoop`) detects players within range, triggers `fn_checkpointAlert`
-using the bus guard group.
+Bus agro loop (`fn_busAgroLoop`) detects nearby players and male civilian NPCs, dismounts the
+escort group, and triggers `fn_checkpointAlert` using the bus guard group.
 
 ---
 
@@ -101,6 +107,8 @@ Eastern Front (deployed as CRN_FRONT, fn_deployToFront)
 - Player within 150 m of an edge triggers alert to nearby CRN_ENF groups.
 - Player within 50 m of actual edge triggers `fn_checkEscapeUnlock`.
 - Successful cross → `fn_showEscapeUnlockScreen`, sets resistance respawn eligibility.
+- Players spawning at the unlocked resistance location now receive a personal bicycle when the
+  class exists, with a quadbike fallback on servers that do not expose a bicycle vehicle class.
 
 ---
 
@@ -142,7 +150,8 @@ Each wave (`fn_spawnRussianWave`):
 
 ## Civilian AI
 
-40 NPCs spread across `CO_settlements`. Each reacts to nearby military:
+40 NPCs spread across `CO_settlements`, with guaranteed presence in large, medium, and small
+towns so key settlements do not feel empty after server start. Each reacts to nearby military:
 - 0–0.5 random: flee.
 - 0.5–0.85: comply (stand still).
 - >0.85: resist (engage).
@@ -179,3 +188,27 @@ Sliders broadcast globals via `publicVariable` on change. Key tunables:
 | Russian wave cooldown | `CO_rus_waveCooldown` | 180 s |
 
 All defaults live in `missions/ChernOccupation.Chernarus/CO_adminDefaults.sqf`.
+
+---
+
+## Current Runtime Notes
+
+- Large towns now have guaranteed civilian presence, guaranteed hostile bus allocation, police,
+  and denser traffic so places like Chernogorsk should no longer load as empty when the world
+  population systems initialize correctly.
+- Border patrols, airfield defenses, and eastern-front fortifications are started independently
+  from the town-life systems so a failure in one subsystem does not stop civilian life, buses,
+  police, or checkpoints from spawning.
+- The opening client briefing text now stays on screen longer so the initial objective is readable.
+
+---
+
+## Known Gaps
+
+- Resistance is still implemented as an unlocked respawn path rather than a full separate
+  lobby-selectable faction with its own slot list.
+- The dedicated server still reports a long-standing `a3_characters_f` deleted-content warning
+  during startup. It was already present in earlier spawn-capable runs, but it still needs a
+  dedicated mission dependency audit.
+- This document reflects the current scripted systems, but the detention, training, front-line,
+  and town-population loops still need live in-game playtesting after this runtime pass.
