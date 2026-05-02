@@ -6,7 +6,7 @@
 @ChernOccupation/
 ├── addons/
 │   ├── main/                  ← addon source (pack to co_main.pbo)
-│   │   ├── $PBOPREFIX$        ← contains "co_main"
+│   │   ├── $PBOPREFIX$        ← contains "main"
 │   │   ├── config.cpp
 │   │   ├── functions/         ← all fn_*.sqf (60 files)
 │   │   └── ui/                ← HPP dialog definitions
@@ -34,7 +34,7 @@ Declares three major config classes:
   CUP Terrains is required at mission level, not at addon config level.
 
 **`CfgFunctions / CO / Main`**
-- `file = "\co_main\functions"` — absolute virtual path using the PBO prefix.
+- `file = "\main\functions"` — absolute virtual path using the packed PBO prefix.
 - All 60 functions registered as `class fnName {};`.
 - Naming convention: source file `fn_FOO.sqf` → function `co_main_fnc_FOO`.
 
@@ -193,18 +193,19 @@ set in `onLoad`. Example: `uiNamespace getVariable "CO_AdminPanelDlg"`.
 ## Build Process
 
 1. **Addon PBO**: pack `addons/main` → output `addons/co_main.pbo`.
-   - The `$PBOPREFIX$` file must contain exactly `co_main` (no newline issues).
+   - The `$PBOPREFIX$` file must contain exactly `main` (no newline issues).
+   - The output filename stays `co_main.pbo`, but the internal virtual prefix is `main`.
+     The function namespace remains `co_main_fnc_*`; only the file lookup root is `main`.
    - In Addon Builder, add `*.sqf;*.hpp` to **List of files to copy directly**.
      If you skip that step, the PBO will contain `config.bin` but omit the SQF
-     sources, which produces the startup error `script co_main/functions/fn_init.sqf not found`.
-   - Because the source folder is named `main`, Addon Builder will happily emit
-     `main.pbo` unless you explicitly target `co_main.pbo`. Keep the output name
-     aligned with the PBO prefix and never ship both files together.
+     sources, which produces a startup missing-script error.
+   - Keep the output filename set to `co_main.pbo`. Do not also ship `main.pbo`.
    - After every build, ensure only `co_main.pbo` is present in `addons/`.
      Any stale `main.pbo` from a mis-named build will be loaded by Arma too
      and will override the correct one with broken function paths.
    - Run `tools/validate_build.ps1` after every rebuild. It verifies the exact
-     prefix bytes, rejects duplicate PBOs, and checks that the built PBO header
+     source prefix, rejects duplicate PBOs, verifies the embedded PBO prefix,
+     checks the `CfgFunctions.file` path, and confirms that the built PBO header
      actually contains the `fn_*.sqf` filenames from `addons/main/functions/`.
 
 2. **Mission PBO**: pack `missions/ChernOccupation.Chernarus` → `ChernOccupation.Chernarus.pbo`.

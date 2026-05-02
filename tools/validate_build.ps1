@@ -11,12 +11,30 @@ function Fail {
     exit 1
 }
 
+function Get-PboPrefix {
+    param([byte[]]$Bytes)
+
+    $sampleLength = [Math]::Min($Bytes.Length, 4096)
+    $sample = $Bytes[0..($sampleLength - 1)]
+    $text = [System.Text.Encoding]::ASCII.GetString($sample)
+    $tokens = $text -split "`0+" | Where-Object { $_.Length -gt 0 }
+
+    for ($index = 0; $index -lt ($tokens.Count - 1); $index++) {
+        if ($tokens[$index] -eq 'prefix') {
+            return $tokens[$index + 1]
+        }
+    }
+
+    return $null
+}
+
 $addonRoot = Join-Path $ModRoot 'addons'
 $sourceRoot = Join-Path $addonRoot 'main'
 $pboPath = Join-Path $addonRoot 'co_main.pbo'
 $duplicatePboPath = Join-Path $addonRoot 'main.pbo'
 $prefixPath = Join-Path $sourceRoot '$PBOPREFIX$'
 $functionsPath = Join-Path $sourceRoot 'functions'
+$configPath = Join-Path $sourceRoot 'config.cpp'
 
 if (!(Test-Path -LiteralPath $pboPath)) {
     Fail "Missing addon PBO: $pboPath"
@@ -30,10 +48,11 @@ if (!(Test-Path -LiteralPath $prefixPath)) {
     Fail "Missing PBO prefix file: $prefixPath"
 }
 
-$expectedPrefix = [System.Text.Encoding]::ASCII.GetBytes('co_main')
+$expectedPrefixText = 'main'
+$expectedPrefix = [System.Text.Encoding]::ASCII.GetBytes($expectedPrefixText)
 $actualPrefix = [System.IO.File]::ReadAllBytes($prefixPath)
 if ($actualPrefix.Length -ne $expectedPrefix.Length -or (@($actualPrefix) -join ',') -ne (@($expectedPrefix) -join ',')) {
-    Fail "`$PBOPREFIX$ must contain exactly 'co_main' with no BOM, newline, or extra whitespace."
+    Fail "`$PBOPREFIX$ must contain exactly '$expectedPrefixText' with no BOM, newline, or extra whitespace."
 }
 
 $sourceFunctions = Get-ChildItem -LiteralPath $functionsPath -Filter 'fn_*.sqf' | Sort-Object Name
@@ -47,6 +66,11 @@ if ($pboLength -lt 65536) {
 }
 
 $pboBytes = [System.IO.File]::ReadAllBytes($pboPath)
+$embeddedPrefix = Get-PboPrefix -Bytes $pboBytes
+if ($embeddedPrefix -ne $expectedPrefixText) {
+    Fail "The built PBO prefix is '$embeddedPrefix'. Expected '$expectedPrefixText'. Rebuild the addon with the correct prefix before launching Arma."
+}
+
 $pboText = -join ($pboBytes | ForEach-Object {
     if ($_ -ge 32 -and $_ -le 126) {
         [char]$_
@@ -59,6 +83,11 @@ if (-not $pboText.Contains('config.bin')) {
     Fail "The built PBO does not appear to contain config.bin."
 }
 
+$configText = Get-Content -LiteralPath $configPath -Raw
+if ($configText -notmatch 'file\s*=\s*"\\main\\functions"\s*;') {
+    Fail "CfgFunctions in $configPath must use file = \"\\main\\functions\"; to match the packed addon prefix."
+}
+
 $missingFunctions = $sourceFunctions |
     Where-Object { -not $pboText.Contains($_.Name) } |
     Select-Object -ExpandProperty Name
@@ -69,4 +98,4 @@ if ($missingFunctions.Count -gt 0) {
 }
 
 Write-Host "[OK] Build validation passed for $pboPath"
-Write-Host "[OK] Prefix bytes are exact and function filenames are present in the PBO header."
+Write-Host "[OK] Embedded prefix, source prefix, config function path, and function filenames all match."
