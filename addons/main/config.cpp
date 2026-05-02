@@ -61,6 +61,7 @@ class CfgFunctions {
             class spawnFortGuards  {};
             class spawnRovingGuards{};
             class buildBorderForts {};
+            class buildWestBorderEnforcement {};
             class buildEasternFront{};
             class buildAirfieldCamp{};
             class buildBusRoutes   {};

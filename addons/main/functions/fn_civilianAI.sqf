@@ -9,6 +9,7 @@ private _weightedSettlements = [];
 {
     private _townName = _x select 0;
     private _townType = _x select 2;
+    private _femaleOnlyTowns = missionNamespace getVariable ["CO_westBorderFemaleOnlyTowns", []];
     private _guaranteed = switch (_townType) do {
         case "large":  { 18 };
         case "medium": { 8 };
@@ -68,14 +69,19 @@ if (count _settlementPlan > _totalCivs) then {
     private _emptyPos = _anchorPos findEmptyPosition [0, 20, "C_man_1"];
     private _pos = if (_emptyPos isEqualTo []) then { _anchorPos } else { _emptyPos };
     private _grp = createGroup civilian;
-    private _gender = selectRandom [
-        "C_man_polo_1_F",
-        "C_man_polo_2_F",
-        "C_man_casual_4_F",
-        "C_Man_casual_6_F",
-        "C_man_hunter_1_F",
-        "C_Woman_casual_F"
-    ];
+    private _genderPool = if (_townName in _femaleOnlyTowns) then {
+        ["C_Woman_casual_F"]
+    } else {
+        [
+            "C_man_polo_1_F",
+            "C_man_polo_2_F",
+            "C_man_casual_4_F",
+            "C_Man_casual_6_F",
+            "C_man_hunter_1_F",
+            "C_Woman_casual_F"
+        ]
+    };
+    private _gender = selectRandom _genderPool;
     private _civ = _grp createUnit [_gender, _pos, [], 5, "NONE"];
 
     _civ setVariable ["CO_isFemale", (_gender == "C_Woman_casual_F")];

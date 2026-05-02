@@ -40,3 +40,5 @@ _wp1 setWaypointSpeed "LIMITED";
 private _wp2 = _grp addWaypoint [_pos getPos [15, _dir + 270], 0];
 _wp2 setWaypointType "CYCLE";
 _wp2 setWaypointSpeed "LIMITED";
+
+_grp

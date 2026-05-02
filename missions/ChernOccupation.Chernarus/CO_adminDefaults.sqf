@@ -30,6 +30,15 @@ CO_border_postSpacing           = 600;    // meters between border posts
 CO_border_includeCoast          = true;
 CO_border_includeLand           = true;
 CO_border_patrolDensity         = 1.0;    // multiplier on guard counts
+CO_westBorderCampCount          = 7;      // number of active forest camps on west edge
+CO_westBorderCampGuardsMin      = 2;
+CO_westBorderCampGuardsMax      = 4;
+CO_westBorderTownGuardCount     = 4;
+CO_westBorderChaseRadius        = 180;    // guards chase with melee inside this distance from their post
+CO_westBorderFireRadius         = 85;     // once target gets this far from their post, guards escalate to gunfire
+CO_westRoadCheckpointGuardCount = 6;
+CO_westRoadCheckpointLethal     = true;
+CO_westBorderFemaleOnlyTowns    = ["Komarovo", "Balota", "Pavlovo"];
 
 // --- Airfield / Training Camp ---
 CO_airfield_guardCount          = 14;     // total roving guards inside
@@ -56,6 +65,9 @@ CO_adminUIDs                    = [76561198054336866];     // add Steam64 UIDs a
     "CO_rus_waveCooldown","CO_rus_unitsPerWave","CO_rus_armorFrequency",
     "CO_front_initialStrength","CO_front_lineSpacingY","CO_front_depthRows","CO_front_rowSpacing",
     "CO_border_postSpacing","CO_border_includeCoast","CO_border_includeLand","CO_border_patrolDensity",
+    "CO_westBorderCampCount","CO_westBorderCampGuardsMin","CO_westBorderCampGuardsMax",
+    "CO_westBorderTownGuardCount","CO_westBorderChaseRadius","CO_westBorderFireRadius",
+    "CO_westRoadCheckpointGuardCount","CO_westRoadCheckpointLethal","CO_westBorderFemaleOnlyTowns",
     "CO_airfield_guardCount","CO_airfield_gateGuards",
     "CO_conscript_detainTime","CO_conscript_trainTime",
     "CO_police_carStopChance","CO_police_active",

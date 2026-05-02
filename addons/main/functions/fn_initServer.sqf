@@ -10,6 +10,9 @@
     "CO_rus_waveCooldown","CO_rus_unitsPerWave","CO_rus_armorFrequency",
     "CO_front_initialStrength","CO_front_lineSpacingY","CO_front_depthRows","CO_front_rowSpacing",
     "CO_border_postSpacing","CO_border_includeCoast","CO_border_includeLand","CO_border_patrolDensity",
+    "CO_westBorderCampCount","CO_westBorderCampGuardsMin","CO_westBorderCampGuardsMax",
+    "CO_westBorderTownGuardCount","CO_westBorderChaseRadius","CO_westBorderFireRadius",
+    "CO_westRoadCheckpointGuardCount","CO_westRoadCheckpointLethal","CO_westBorderFemaleOnlyTowns",
     "CO_airfield_guardCount","CO_airfield_gateGuards",
     "CO_conscript_detainTime","CO_conscript_trainTime",
     "CO_police_carStopChance","CO_police_active",
@@ -47,6 +50,7 @@ sleep 0.5;
 ["spawnWeaponCaches", { [] call co_main_fnc_spawnWeaponCaches; }] call _launchStep;
 ["borderSystem", {
     [] call co_main_fnc_buildBorderForts;
+    [] call co_main_fnc_buildWestBorderEnforcement;
     [] call co_main_fnc_borderPatrol;
 }] call _launchStep;
 ["frontSystem", {
