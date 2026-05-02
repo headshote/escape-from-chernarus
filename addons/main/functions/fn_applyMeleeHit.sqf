@@ -44,6 +44,10 @@ if !(_pushVector isEqualTo [0, 0, 0]) then {
     _target setVelocity [(_pushVector select 0) * 0.9, (_pushVector select 1) * 0.9, 0.18];
 };
 
+if (!isPlayer _attacker) then {
+    _attacker doMove (getPosATL _target);
+};
+
 if (_hitCount >= 3) then {
     _target setVariable ["CO_meleePunchState", [0, 0], true];
     [_attacker, _target, 60, false] call co_main_fnc_applyKnockout;

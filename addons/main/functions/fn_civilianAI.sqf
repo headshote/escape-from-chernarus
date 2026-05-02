@@ -141,13 +141,23 @@ if (count _settlementPlan > _totalCivs) then {
             };
 
             if (_state isEqualTo "fighting") then {
-                // Cheap melee: civilian runs at nearest hostile and targets them.
-                private _hostile = _civ findNearestEnemy _civ;
+                // Civilians that choose to fight try to get close enough to punch the nearest hostile.
+                private _nearThreats = _civ nearEntities [["Man"], 10] select {
+                    alive _x && side _x in [west, east] && !(captive _x)
+                };
+                private _hostile = if (_nearThreats isEqualTo []) then { objNull } else {
+                    ([_nearThreats, [], { _x distance _civ }, "ASCEND"] call BIS_fnc_sortBy) select 0
+                };
+
                 if (!isNull _hostile) then {
                     _civ setBehaviour "AWARE";
                     _civ setCombatMode "RED";
                     _civ doTarget _hostile;
                     _civ doMove (getPosATL _hostile);
+
+                    if ((_civ distance _hostile) < 2.4) then {
+                        [_civ, _hostile] call co_main_fnc_applyMeleeHit;
+                    };
                 } else {
                     if (time > (_civ getVariable ["CO_civAlertUntil", 0])) then {
                         _civ setVariable ["CO_civState", "walking", false];

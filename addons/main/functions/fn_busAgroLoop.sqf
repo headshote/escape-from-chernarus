@@ -29,11 +29,13 @@ while { alive _veh } do {
 
         _veh setVariable ["CO_busState", "engaging", true];
         _veh setVariable ["CO_busNextEngageAt", time + 12, false];
-        _veh lockCargo true;
+        _veh lockCargo false;
 
         if (!isNull _driver) then {
             doStop _driver;
             _veh forceSpeed 0;
+            _driver setBehaviour "COMBAT";
+            _driver doMove (getPosATL _target);
         };
 
         // Dismount escort team and keep them outside until the capture attempt resolves.
@@ -56,16 +58,20 @@ while { alive _veh } do {
         [[_target], _grp] call co_main_fnc_checkpointAlert;
 
         // Driver tries to cut off escape
-        if (isPlayer _target) then {
-            [_veh, _target] spawn {
+        [_veh, _target] spawn {
             params ["_bus", "_target"];
-            waitUntil { sleep 0.5; _target distance _bus > 40 || captive _target };
-            if (!(captive _target)) then {
-                // Drive ahead of player's projected position
-                private _vel = velocity _target;
-                private _interceptPos = (getPosATL _target) vectorAdd (_vel vectorMultiply 6);
-                driver _bus doMove _interceptPos;
-            };
+            private _driver = driver _bus;
+            if (isNull _driver) exitWith {};
+
+            while { alive _bus && alive _target && !captive _target } do {
+                private _interceptPos = getPosATL _target;
+                if (isPlayer _target) then {
+                    private _vel = velocity _target;
+                    _interceptPos = _interceptPos vectorAdd (_vel vectorMultiply 6);
+                };
+
+                _driver doMove _interceptPos;
+                sleep 1.5;
             };
         };
 
@@ -98,6 +104,10 @@ while { alive _veh } do {
 
         _veh lockCargo false;
         _veh forceSpeed -1;
+
+        if (!isNull _driver && alive _driver) then {
+            _driver setBehaviour "SAFE";
+        };
 
         if ((_veh getVariable ["CO_busState", "patrol"]) == "engaging") then {
             _veh setVariable ["CO_busState", "patrol", true];

@@ -119,10 +119,11 @@ Eastern Front (deployed as CRN_FRONT, fn_deployToFront)
 
 ## Non-Lethal Melee
 
-Players now have a basic punch-based unarmed melee action while no weapon is equipped.
+Players now have a basic punch-based unarmed melee system while no weapon is equipped.
 
 - Range: about 2.4 m.
 - Effect: repeated punches within a short window knock the target unconscious for 60 seconds.
+- Input: left mouse click while unarmed and close enough to a human target.
 - Use: gives both players and the TCK capture loop a non-lethal takedown path without adding a
   separate melee weapon dependency.
 
@@ -195,6 +196,10 @@ Snapped to nearby building floor if possible. Marked with `CO_isWeaponCache = tr
 
 Dialog `CO_AdminPanel` (idd 9300). Accessible only to UIDs in `CO_adminUIDs`.
 Sliders broadcast globals via `publicVariable` on change. Key tunables:
+
+In game, an approved admin now gets an `Open Admin Panel` action on their player.
+If the action does not appear, the player's Steam64 UID is not currently listed in
+`missions/ChernOccupation.Chernarus/CO_adminDefaults.sqf` under `CO_adminUIDs`.
 
 | Control | Global | Default |
 |---------|--------|---------|
