@@ -22,7 +22,7 @@ CO_settlements = [
     ["Pavlovo",        [4400,  5600,  0], "small"],
     ["Tulga",          [9700,  9800,  0], "small"],
     ["Polana",         [9500,  8700,  0], "small"],
-    ["Mogilevka",      [8500,  8100,  0], "small"],
+    ["Mogilevka",      [8500,  8100,  0], "small"]
 ];
 
 // Build pairs: for every settlement, connect to those within 3800m
@@ -40,7 +40,7 @@ CO_roadGraph = [];
             private _mid = _aPosATL vectorMultiply 0.5 vectorAdd (_bPosATL vectorMultiply 0.5);
             private _road = roadAt _mid;
             if (!isNull _road) then {
-                CO_roadGraph pushBackUnique [[_a select 0, _b select 0, _mid, _a select 2, _b select 2]];
+                CO_roadGraph pushBackUnique [_a select 0, _b select 0, _mid, _a select 2, _b select 2];
             };
         };
     } forEach CO_settlements;

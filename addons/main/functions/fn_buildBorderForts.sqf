@@ -15,7 +15,7 @@ CO_borderSegments = [
     [[200,   200,  0], [200,  14800, 0], 270,  "land"],   // West edge, face west
     [[200,  14800, 0], [14800,14800, 0], 0,    "land"],   // North edge, face north
     [[14800,14800, 0], [14800,  200, 0], 90,   "land"],   // East edge  (Russian side — skip)
-    [[200,   200,  0], [14800,  200, 0], 180,  "coast"],  // South coast, face south
+    [[200,   200,  0], [14800,  200, 0], 180,  "coast"]   // South coast, face south
 ];
 
 {

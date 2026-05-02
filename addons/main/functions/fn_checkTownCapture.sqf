@@ -10,8 +10,8 @@
 
         private _rusUnits = {
             _x getVariable ["CO_faction",""] == "RUS_ADV" &&
-            { alive _x } count (units group _x) > 0 &&
-            (leader group _x) distance _townPos < 800
+            ({ alive _x } count (units _x)) > 0 &&
+            (leader _x) distance _townPos < 800
         } count allGroups;
 
         private _frontUnits = {
@@ -20,10 +20,10 @@
         } count allGroups;
 
         if (_rusUnits > _frontUnits * 2) then {
-            setMarkerColor [_markerName, "ColorRed"];
-            setMarkerText  [_markerName, format ["%1 — FALLEN", _townName]];
+            _markerName setMarkerColor "ColorRed";
+            _markerName setMarkerText format ["%1 - FALLEN", _townName];
             [_townName] call co_main_fnc_enforcerRetreatFromTown;
-            hint format ["%1 has fallen to Russian forces.", _townName];
+            [format ["%1 has fallen to Russian forces.", _townName]] remoteExecCall ["hint", 0];
         };
     };
 } forEach CO_rus_townObjectives;

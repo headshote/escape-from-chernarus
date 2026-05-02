@@ -10,7 +10,7 @@ CO_rus_townObjectives = [
     ["Berezino",       11600, "marker_berezino"],
     ["Elektrozavodsk", 10200, "marker_elektro"],
     ["Chernogorsk",     6400, "marker_cherno"],
-    ["Balota",          4500, "marker_balota"],
+    ["Balota",          4500, "marker_balota"]
 ];
 
 // Spawn loop

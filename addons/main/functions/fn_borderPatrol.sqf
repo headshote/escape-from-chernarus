@@ -7,7 +7,7 @@ CO_borderZones = [
     [[0, 7680, 0],   [0, 15360, 0],   "land"],  // West edge
     [[7680, 15360, 0],[15360,15360,0], "land"],  // North edge
     [[15360,7680,0], [15360, 0, 0],   "land"],  // East edge
-    [[0, 0, 0],      [15360, 0, 0],   "boat"],  // South coast
+    [[0, 0, 0],      [15360, 0, 0],   "boat"]   // South coast
 ];
 
 // Helper: is _pos near any map edge?

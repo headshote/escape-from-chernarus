@@ -22,8 +22,8 @@ set "SERVER_NAME=ChernOccupation Local Dedicated"
 set "SERVER_PASSWORD="
 set "SERVER_ADMIN_PASSWORD=admin123"
 set "MAX_PLAYERS=16"
-set "MISSION_PBO=ChernOccupation.Chernarus.pbo"
-set "MISSION_TEMPLATE=ChernOccupation.Chernarus"
+set "MISSION_SOURCE_TEMPLATE=ChernOccupation.Chernarus"
+set "MISSION_TEMPLATE=ChernOccupationLocal.Chernarus"
 
 REM ============================================================
 REM Resolve server executable
@@ -85,14 +85,26 @@ if not exist "%MOD_CUP_MAPS%\addons" (
 )
 
 REM ============================================================
-REM Ensure mission PBO exists in server mpmissions
+REM Stage unpacked mission source into server mpmissions for local testing
 REM ============================================================
 if not exist "%SERVER_INSTALL_ROOT%\mpmissions" mkdir "%SERVER_INSTALL_ROOT%\mpmissions"
-if not exist "%SERVER_INSTALL_ROOT%\mpmissions\%MISSION_PBO%" (
-    echo [ERROR] Missing mission PBO:
-    echo   %SERVER_INSTALL_ROOT%\mpmissions\%MISSION_PBO%
-    echo Build mission from missions\ChernOccupation.Chernarus and copy it there.
+set "MISSION_SOURCE_DIR=%MOD_CO%\missions\%MISSION_SOURCE_TEMPLATE%"
+set "MISSION_DEPLOY_DIR=%SERVER_INSTALL_ROOT%\mpmissions\%MISSION_TEMPLATE%"
+
+if not exist "%MISSION_SOURCE_DIR%\mission.sqm" (
+    echo [ERROR] Missing mission source file:
+    echo   %MISSION_SOURCE_DIR%\mission.sqm
     exit /b 1
+)
+
+if exist "%MOD_CO%\tools\stage_local_mission.ps1" (
+    powershell -NoProfile -ExecutionPolicy Bypass -File "%MOD_CO%\tools\stage_local_mission.ps1" -MissionSource "%MISSION_SOURCE_DIR%" -MissionDestination "%MISSION_DEPLOY_DIR%"
+    if errorlevel 1 exit /b 1
+)
+
+if exist "%MOD_CO%\tools\validate_mission.ps1" (
+    powershell -NoProfile -ExecutionPolicy Bypass -File "%MOD_CO%\tools\validate_mission.ps1" -MissionSource "%MISSION_SOURCE_DIR%" -MissionTarget "%MISSION_DEPLOY_DIR%"
+    if errorlevel 1 exit /b 1
 )
 
 REM ============================================================
@@ -145,7 +157,7 @@ echo.
 echo ===========================================================
 echo Starting Arma 3 Dedicated Server
 echo Executable: %SERVER_EXE%
-echo Mission:    %MISSION_TEMPLATE%
+echo Mission:    %MISSION_TEMPLATE% ^(staged from %MISSION_SOURCE_TEMPLATE%^)
 echo Port:       %SERVER_PORT%
 echo Mods:       %MODLIST%
 echo ===========================================================

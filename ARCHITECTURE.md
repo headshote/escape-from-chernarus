@@ -13,6 +13,7 @@
 │   └── co_main.pbo            ← built addon (gitignored / output)
 ├── missions/
 │   └── ChernOccupation.Chernarus/
+│       ├── mission.sqm
 │       ├── init.sqf
 │       ├── description.ext
 │       └── CO_adminDefaults.sqf
@@ -209,11 +210,24 @@ set in `onLoad`. Example: `uiNamespace getVariable "CO_AdminPanelDlg"`.
      actually contains the `fn_*.sqf` filenames from `addons/main/functions/`.
 
 2. **Mission PBO**: pack `missions/ChernOccupation.Chernarus` → `ChernOccupation.Chernarus.pbo`.
+   - `mission.sqm` is mandatory. Without it, the mission has no playable slots,
+     clients hang in the connection flow, and the server repeatedly re-reads the
+     mission from bank.
    - Copy to `<Arma3Server>/mpmissions/`.
    - Rebuild mission PBO whenever `init.sqf`, `description.ext`, or
      `CO_adminDefaults.sqf` changes.
+   - Run `tools/validate_mission.ps1` after rebuilding. It checks that the source
+     mission contains `mission.sqm`, that at least one playable slot exists, and
+     that the deployed mission PBO header contains the core mission files.
 
-3. **Launcher**: `local_start_server.bat` validates paths, generates `server.cfg`
+3. **Local Dev Server**: `local_start_server.bat` does not rely on the mission PBO.
+   - It stages `missions/ChernOccupation.Chernarus` into the dedicated server as
+     an unpacked mission folder named `ChernOccupationLocal.Chernarus`.
+   - This avoids Addon Builder mission-packing issues during local iteration and
+     uses `tools/stage_local_mission.ps1` plus `tools/validate_mission.ps1` on
+     every launch.
+
+4. **Launcher**: `local_start_server.bat` validates paths, generates `server.cfg`
    and `basic.cfg` under `.server_runtime/`, and launches `arma3server_x64.exe`.
 
 ---

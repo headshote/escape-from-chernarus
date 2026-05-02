@@ -3,7 +3,12 @@
 
 {
     private _grp = _x;
-    clearWaypoints _grp;
+    private _waypointCount = count (waypoints _grp);
+    if (_waypointCount > 0) then {
+        for "_waypointIndex" from (_waypointCount - 1) to 0 step -1 do {
+            deleteWaypoint [_grp, _waypointIndex];
+        };
+    };
     private _retreatPos = [3000 + random 2000, 3000 + random 5000, 0]; // west
     private _wp = _grp addWaypoint [_retreatPos, 50];
     _wp setWaypointType "MOVE";
@@ -17,7 +22,7 @@
                 _resistanceGrp = createGroup resistance;
                 _resistanceGrp setVariable ["CO_faction", "RESIST"];
             };
-            [_x] joinGroup _resistanceGrp;
+            [_x] joinSilent _resistanceGrp;
         };
     } forEach units _grp;
 } forEach (allGroups select { _x getVariable ["CO_faction",""] == "CRN_FRONT" });

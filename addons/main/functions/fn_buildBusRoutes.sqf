@@ -43,7 +43,7 @@ CO_busRoutes = []; // populated below, used by bus spawner
             _center getPos [120, 0],
             _center getPos [120, 90],
             _center getPos [120, 180],
-            _center getPos [120, 270],
+            _center getPos [120, 270]
         ];
         // Snap each to nearest road
         _loopWps = _loopWps apply {

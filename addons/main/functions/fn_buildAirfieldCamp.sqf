@@ -8,7 +8,7 @@ CO_airfieldCenter  = [2100, 12800, 0];  // NW Airfield center
 CO_airfieldRadius  = 350;               // approx camp perimeter radius
 CO_airfieldGates   = [                  // road entry angles
     [180, "Road from Vybor south"],     // south road
-    [90,  "Road from east"],
+    [90,  "Road from east"]
 ];
 
 // --- Perimeter walls (8-point polygon around airfield) ---
@@ -43,4 +43,4 @@ private _perimeterAngles = [0, 45, 90, 135, 180, 225, 270, 315];
 } forEach [0, 90, 180, 270];
 
 // --- Roving interior guards ---
-[CO_airfieldCenter, 200, 14, "CRN_ENF"] call co_main_fnc_spawnRovingGuards;
+[CO_airfieldCenter, 200, missionNamespace getVariable ["CO_airfield_guardCount", 14], "CRN_ENF"] call co_main_fnc_spawnRovingGuards;

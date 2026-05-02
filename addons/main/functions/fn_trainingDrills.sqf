@@ -6,18 +6,20 @@ private _drillPoints = [
     CO_trainingFieldPos vectorAdd [30, 0, 0],
     CO_trainingFieldPos vectorAdd [30, 30, 0],
     CO_trainingFieldPos vectorAdd [0, 30, 0],
-    CO_trainingFieldPos,
+    CO_trainingFieldPos
 ];
 
 {
     private _wp = _x;
+    private _markerName = format ["drill_wp_%1", _forEachIndex];
+
     // Show marker
-    createMarkerLocal [format ["drill_wp_%1", _forEachIndex], _wp];
-    setMarkerShapeLocal [format ["drill_wp_%1", _forEachIndex], "ICON"];
-    setMarkerTypeLocal  [format ["drill_wp_%1", _forEachIndex], "mil_dot"];
-    setMarkerColorLocal [format ["drill_wp_%1", _forEachIndex], "ColorYellow"];
+    createMarkerLocal [_markerName, _wp];
+    _markerName setMarkerShapeLocal "ICON";
+    _markerName setMarkerTypeLocal "mil_dot";
+    _markerName setMarkerColorLocal "ColorYellow";
 
     waitUntil { sleep 0.5; _player distance _wp < 8 || !(captive _player) };
-    deleteMarkerLocal format ["drill_wp_%1", _forEachIndex];
+    deleteMarkerLocal _markerName;
     if (!(captive _player)) exitWith {};
 } forEach _drillPoints;

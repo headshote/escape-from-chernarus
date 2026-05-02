@@ -24,13 +24,13 @@ private _cacheDefs = [
     [[5800,  8400, 0], "pistol"],
     [[9300, 10200, 0], "melee"],
     [[4100,  6900, 0], "rifle"],
-    [[12500, 6100, 0], "melee"],
+    [[12500, 6100, 0], "melee"]
 ];
 
 private _lootTables = [
     ["pistol",  ["hgun_P07_F"],           ["16Rnd_9x21_Mag",   "16Rnd_9x21_Mag"]],
     ["rifle",   ["arifle_AKM_F"],         ["30Rnd_762x39_Mag_F","30Rnd_762x39_Mag_F","30Rnd_762x39_Mag_F"]],
-    ["melee",   [],                       []],  // melee-only cache: crowbar item + medkits
+    ["melee",   [],                       []]   // melee-only cache: crowbar item + medkits
 ];
 
 {
@@ -42,8 +42,9 @@ private _lootTables = [
     private _finalPos = _pos;
     if (count _nearBuildings > 0) then {
         private _bldg = _nearBuildings select 0;
-        if (count (buildingPos [_bldg, 0]) > 0) then {
-            _finalPos = buildingPos [_bldg, floor (random (count (getArray (configFile >> "CfgVehicles" >> typeOf _bldg >> "positions"))))];
+        private _positions = [_bldg] call BIS_fnc_buildingPositions;
+        if (count _positions > 0) then {
+            _finalPos = selectRandom _positions;
         };
     };
 

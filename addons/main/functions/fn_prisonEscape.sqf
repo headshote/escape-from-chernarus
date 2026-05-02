@@ -10,7 +10,8 @@ _player setCaptive false;
 _player setVariable ["CO_detainPhase", "escaped", true];
 
 // Remove from any group and give them a solo group
-[_player] joinGroup createGroup (side group _player);
+private _soloGroup = createGroup (side _player);
+[_player] joinSilent _soloGroup;
 
 // Reduce wanted level slightly (they're out but still hunted)
 private _current = _player getVariable ["CO_wantedLevel", 50];

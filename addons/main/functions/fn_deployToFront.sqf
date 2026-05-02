@@ -15,13 +15,20 @@ private _deployPos = [_deployX, 5000 + random 3000, 0];
 _conscript setPos _deployPos;
 
 // Assign to a Chernarus Front group
-private _frontGrp = allGroups select { _x getVariable ["CO_faction",""] == "CRN_FRONT" && count units _x < 8 };
-if (count _frontGrp > 0) then {
-    [_conscript] joinGroup (_frontGrp select 0);
+private _frontGroups = allGroups select { _x getVariable ["CO_faction",""] == "CRN_FRONT" && count units _x < 8 };
+private _assignedGroup = if (count _frontGroups > 0) then {
+    _frontGroups select 0
 } else {
     private _newGrp = createGroup west;
     _newGrp setVariable ["CO_faction", "CRN_FRONT"];
-    [_conscript] joinGroup _newGrp;
+    _newGrp
+};
+
+if (side _conscript == side _assignedGroup) then {
+    [_conscript] joinSilent _assignedGroup;
+} else {
+    _conscript setVariable ["CO_faction", "CRN_FRONT", true];
+    diag_log format ["[CO] deployToFront: %1 could not join %2 because sides differ.", _conscript, side _assignedGroup];
 };
 
 // If player — give them a hint about their situation

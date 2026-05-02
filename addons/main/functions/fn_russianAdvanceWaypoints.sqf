@@ -9,7 +9,7 @@ private _advanceRoute = [
     [11600, 7800, 0],  // Berezino
     [10200, 7200, 0],  // Elektrozavodsk approach
     [8500,  5000, 0],  // Central corridor
-    [6400,  2400, 0],  // Chernogorsk
+    [6400,  2400, 0]   // Chernogorsk
 ];
 
 {

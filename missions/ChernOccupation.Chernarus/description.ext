@@ -4,8 +4,11 @@ onLoadMission = "Survive. Evade. Escape.";
 loadScreen = "";
 
 respawn = "BASE";
+respawnOnStart = 1;
 respawnDelay = 15;
 respawnTemplates[] = {"MenuPosition", "Counter"};
+respawnTemplatesCivilian[] = {"MenuPosition", "Counter"};
+respawnTemplatesGuer[] = {"MenuPosition", "Counter"};
 
 
 // Two respawn positions: civilian start, resistance start (gated by variable)
@@ -16,16 +19,16 @@ class RespawnPositions {
     };
     class ResistStart {
         name = "Resistance Fighter";
-        position[] = {2100, 12800, 0}; // NW, near airfield — gated in scripts
+        position[] = {2100, 12800, 0}; // NW, near airfield; gated in scripts
         condition = "profileNamespace getVariable ['CO_escaped_' + getPlayerUID player, false]";
     };
 };
 
-disabledAI = 0;
-enableDebugConsole = 1;  // SET TO 0 WHEN RELEASING — lets you run commands while testing
+disabledAI = 1;
+enableDebugConsole = 1;  // Set to 0 for release builds.
 
 class Header {
     gameType = COOP;
     minPlayers = 1;
-    maxPlayers = 32;
-};	
+    maxPlayers = 16;
+};

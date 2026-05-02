@@ -12,7 +12,7 @@ CO_policeTownPosts = [
     [[10200, 2300, 0], 500],   // Elektrozavodsk
     [[11600, 7800, 0], 500],   // Berezino
     [[3900,  7200, 0], 400],   // Zelenogorsk
-    [[7300,  7900, 0], 350],   // Stary Sobor
+    [[7300,  7900, 0], 350]    // Stary Sobor
 ];
 
 {

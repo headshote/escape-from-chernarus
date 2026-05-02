@@ -21,7 +21,7 @@ missionNamespace setVariable ["CO_hcTransferLoopStarted", true];
         if (_hcOwnerId >= 3) then {
             {
                 if (count units _x > 0 && groupOwner _x == 2) then {
-                    setGroupOwner [_x, _hcOwnerId];
+                    _x setGroupOwner _hcOwnerId;
                 };
             } forEach allGroups;
         };

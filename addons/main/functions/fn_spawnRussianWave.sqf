@@ -6,6 +6,7 @@ private _spawnYMin = 2000;
 private _spawnYMax = 11000;
 
 private _waveGroups = [];
+private _unitsPerGroup = ((missionNamespace getVariable ["CO_rus_unitsPerWave", 12]) / 3) ceil 1;
 
 // Infantry squad
 for "_w" from 0 to 2 do {
@@ -13,7 +14,7 @@ for "_w" from 0 to 2 do {
     private _grp = createGroup east;
     _grp setVariable ["CO_faction", "RUS_ADV"];
 
-    for "_i" from 0 to (CO_rus_unitsPerWave / 3) do {
+    for "_i" from 1 to _unitsPerGroup do {
         private _u = _grp createUnit [
             selectRandom ["O_Soldier_F","O_Soldier_AR_F","O_Medic_F"],
             _spawnPos, [], 8, "FORM"
