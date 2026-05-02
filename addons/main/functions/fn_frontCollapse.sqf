@@ -1,7 +1,7 @@
-// fn_frontCollapse.sqf — when front is broken
+// fn_frontCollapse.sqf - when front is broken
 // Surviving front units retreat west, some defect to Resistance
 
-allGroups select { _x getVariable ["CO_faction",""] == "CRN_FRONT" } apply {
+{
     private _grp = _x;
     clearWaypoints _grp;
     private _retreatPos = [3000 + random 2000, 3000 + random 5000, 0]; // west
@@ -10,9 +10,19 @@ allGroups select { _x getVariable ["CO_faction",""] == "CRN_FRONT" } apply {
     _wp setWaypointSpeed "FULL";
 
     // 30% chance each unit defects to Resistance on retreat
-    { if (random 1 < 0.3) then { [_x] joinGroup createGroup west; group _x setVariable ["CO_faction","RESIST"]; }; } forEach units _grp;
-};
+    private _resistanceGrp = grpNull;
+    {
+        if (random 1 < 0.3) then {
+            if (isNull _resistanceGrp) then {
+                _resistanceGrp = createGroup resistance;
+                _resistanceGrp setVariable ["CO_faction", "RESIST"];
+            };
+            [_x] joinGroup _resistanceGrp;
+        };
+    } forEach units _grp;
+} forEach (allGroups select { _x getVariable ["CO_faction",""] == "CRN_FRONT" });
 
 // Broadcast to all players
-["CO_frontCollapsed", true] remoteExec ["publicVariable", -2];
-hint "THE FRONT HAS COLLAPSED — Russian forces are advancing on all towns.";
+CO_frontCollapsed = true;
+publicVariable "CO_frontCollapsed";
+["THE FRONT HAS COLLAPSED - Russian forces are advancing on all towns."] remoteExecCall ["hint", 0];

@@ -17,4 +17,4 @@ private _current = _player getVariable ["CO_wantedLevel", 50];
 _player setVariable ["CO_wantedLevel", (_current - 20) max 20, true];
 
 // Client notification
-[_player] remoteExecCall ["co_main_fnc_showEscapeUnlockScreen", _player];
+["You escaped detention. Reach the border to unlock resistance respawn."] remoteExecCall ["hint", _player];

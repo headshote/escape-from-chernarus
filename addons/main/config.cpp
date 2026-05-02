@@ -5,9 +5,7 @@ class CfgPatches {
         url = "";
         requiredVersion = 1.98;
         requiredAddons[] = {
-            "cba_main",
-            "cup_terrains_core",
-            "cup_terrains_cup_chernarus_a3"
+            "cba_main"
         };
         units[] = {};
         weapons[] = {};
@@ -93,6 +91,7 @@ class CfgFunctions {
             class borderPatrol     {};
             class borderAlert      {};
             class checkEscapeUnlock{};
+            class unlockResistanceRespawn {};
             class showEscapeUnlockScreen {};
             class crowdResistance  {};
             class adminPanel       {};
@@ -106,6 +105,7 @@ class CfgFunctions {
             class alertNearbyGuards{};
             class prisonEscape     {};
             class initHC           {};
+            class registerHC       {};
             class showDetentionHUD {};
             class showTrainingHUD  {};
             class showFrontDeployHUD {};

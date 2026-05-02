@@ -1,21 +1,18 @@
 // ============================================================
 // ChernOccupation — Mission Init
 // ============================================================
-waitUntil { !isNull player }; // wait for player to exist
-
-// Server loads admin defaults first so globals exist before clients connect
+// Dedicated servers never own a player object, so keep server init separate.
 if (isServer) then {
     execVM "CO_adminDefaults.sqf";
-    sleep 0.3;
+    waitUntil { !isNil "CO_checkpoint_hostilesPerPost" };
     [] call co_main_fnc_initServer;
 };
 
 if (hasInterface) then {
-    // This machine has a screen (player or HC with interface — rare)
+    waitUntil { !isNull player };
     [] call co_main_fnc_initClient;
 };
 
 if (!hasInterface && !isServer) then {
-    // Headless Client
     [] call co_main_fnc_initHC;
 };

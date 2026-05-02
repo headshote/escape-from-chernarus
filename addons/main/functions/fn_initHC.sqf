@@ -8,17 +8,5 @@
 waitUntil { !isNil "CO_roadGraph" };
 sleep 5;
 
-// Transfer all AI groups to HC for better performance
-[] spawn {
-    while { true } do {
-        sleep 30;
-        {
-            if (count units _x > 0 && isServer) then {
-                private _grpOwner = groupOwner _x;
-                if (_grpOwner == 2) then { // still owned by server
-                    setGroupOwner [_x, clientOwner];
-                };
-            };
-        } forEach allGroups;
-    };
-};
+// Ask the server to hand newly spawned AI groups to this HC.
+[clientOwner] remoteExecCall ["co_main_fnc_registerHC", 2];

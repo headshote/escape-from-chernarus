@@ -10,8 +10,22 @@ CO_detentionCenters = [
 
 // Find or create transport bus
 private _bus = vehicle (leader _capturingGrp);
-if (typeOf _bus == "Man") then {
+if (_bus isKindOf "Man") then {
     _bus = "C_Van_01_transport_F" createVehicle (getPosATL _captive);
+
+    private _driverCandidates = units _capturingGrp select { alive _x };
+    if (_driverCandidates isEqualTo []) exitWith {
+        diag_log "[CO] transportToDetention aborted: no live capturing units.";
+    };
+
+    private _driver = _driverCandidates select 0;
+    _driver assignAsDriver _bus;
+    _driver moveInDriver _bus;
+};
+
+private _busDriver = driver _bus;
+if (isNull _busDriver) exitWith {
+    diag_log "[CO] transportToDetention aborted: no bus driver available.";
 };
 
 // Load captive into bus
@@ -29,8 +43,8 @@ _captive setCaptive true;
     private _dest = [CO_detentionCenters, [], { _x distance _bus }, "ASCEND"] call BIS_fnc_sortBy;
     _dest = _dest select 0;
 
-    (driver _bus) doMove _dest;
-    waitUntil { sleep 1; (driver _bus) distance _dest < 20 };
+    _busDriver doMove _dest;
+    waitUntil { sleep 1; _busDriver distance _dest < 20 };
 
     // Unload at detention
     _captive leaveVehicle _bus;

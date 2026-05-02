@@ -3,7 +3,7 @@
 // ============================================================
 
 // Wait for globals to arrive from server
-waitUntil { !isNil "CO_checkpoint_hostilesPerPost" };
+waitUntil { !isNil "CO_checkpoint_hostilesPerPost" && !isNil "CO_police_active" };
 
 // Start endurance bar HUD
 [] call co_main_fnc_enduranceBar;

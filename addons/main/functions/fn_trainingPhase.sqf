@@ -1,6 +1,7 @@
 // fn_trainingPhase.sqf
 params ["_conscript"];
 private _isPlayer = isPlayer _conscript;
+private _trainTime = missionNamespace getVariable ["CO_conscript_trainTime", 600];
 
 _conscript setPos (CO_trainingFieldPos vectorAdd [random 60 - 30, random 60 - 30, 0]);
 _conscript setVariable ["CO_detainPhase", "training", true];
@@ -18,11 +19,11 @@ if (_isPlayer) then {
 _conscript setVariable ["CO_trainingStartTime", time, false];
 
 [{
-    params ["_c"];
-    !(captive _c) || time > _c getVariable ["CO_trainingStartTime", 0] + 600
+    params ["_c", "_trainTime"];
+    !(captive _c) || time > (_c getVariable ["CO_trainingStartTime", 0]) + _trainTime
 }, {
     params ["_c"];
     if (captive _c) then {
         [_c] call co_main_fnc_deployToFront;
     };
-}, [_conscript]] call CBA_fnc_waitUntilAndExecute;
+}, [_conscript, _trainTime]] call CBA_fnc_waitUntilAndExecute;

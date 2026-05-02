@@ -1,7 +1,8 @@
 // fn_frontMilitary.sqf — spawns the initial CRN_FRONT defense line
 
-CO_front_initialStrength = 60; // total units, finite
+if (isNil "CO_front_initialStrength") then { CO_front_initialStrength = 60; };
 CO_front_unitsRemaining  = CO_front_initialStrength;
+publicVariable "CO_front_unitsRemaining";
 
 // Defense line positions (east side, west of Russian spawn)
 CO_frontDefensePositions = [

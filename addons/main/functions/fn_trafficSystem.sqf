@@ -70,7 +70,7 @@ private _spawnTrafficVehicle = {
                             private _u = _x;
                             if (isPlayer _u) then {
                                 if ([_cop, _u] call co_main_fnc_policeRecognise) then {
-                                    [_u, _cop] remoteExec ["co_main_fnc_checkpointAlert", 2];
+                                    [[_u], group _cop] remoteExec ["co_main_fnc_checkpointAlert", 2];
                                 };
                             };
                         } forEach crew _v;

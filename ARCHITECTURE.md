@@ -194,9 +194,18 @@ set in `onLoad`. Example: `uiNamespace getVariable "CO_AdminPanelDlg"`.
 
 1. **Addon PBO**: pack `addons/main` → output `addons/co_main.pbo`.
    - The `$PBOPREFIX$` file must contain exactly `co_main` (no newline issues).
+   - In Addon Builder, add `*.sqf;*.hpp` to **List of files to copy directly**.
+     If you skip that step, the PBO will contain `config.bin` but omit the SQF
+     sources, which produces the startup error `script co_main/functions/fn_init.sqf not found`.
+   - Because the source folder is named `main`, Addon Builder will happily emit
+     `main.pbo` unless you explicitly target `co_main.pbo`. Keep the output name
+     aligned with the PBO prefix and never ship both files together.
    - After every build, ensure only `co_main.pbo` is present in `addons/`.
      Any stale `main.pbo` from a mis-named build will be loaded by Arma too
      and will override the correct one with broken function paths.
+   - Run `tools/validate_build.ps1` after every rebuild. It verifies the exact
+     prefix bytes, rejects duplicate PBOs, and checks that the built PBO header
+     actually contains the `fn_*.sqf` filenames from `addons/main/functions/`.
 
 2. **Mission PBO**: pack `missions/ChernOccupation.Chernarus` → `ChernOccupation.Chernarus.pbo`.
    - Copy to `<Arma3Server>/mpmissions/`.

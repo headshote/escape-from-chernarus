@@ -67,6 +67,10 @@ if exist "%MOD_CO%\addons\main.pbo" (
     echo then keep only co_main.pbo for this mod before launching.
     exit /b 1
 )
+if exist "%MOD_CO%\tools\validate_build.ps1" (
+    powershell -NoProfile -ExecutionPolicy Bypass -File "%MOD_CO%\tools\validate_build.ps1" -ModRoot "%MOD_CO%"
+    if errorlevel 1 exit /b 1
+)
 if not exist "%MOD_CBA%\addons" (
     echo [ERROR] CBA not found at: %MOD_CBA%
     exit /b 1

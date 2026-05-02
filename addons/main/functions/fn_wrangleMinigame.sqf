@@ -1,7 +1,12 @@
 params ["_player"];
 
+disableSerialization;
+
 createDialog "CO_WrangleDialog";
-private _dlg = uiNamespace getVariable "CO_WrangleDlg";
+private _dlg = uiNamespace getVariable ["CO_WrangleDlg", displayNull];
+if (isNull _dlg) exitWith {
+    _player setVariable ["CO_wrangleResult", "captured", true];
+};
 
 private _resistBar  = _dlg displayCtrl 201;
 private _totalW     = 0.6;
@@ -11,14 +16,28 @@ private _startTime  = time;
 private _result     = "captured";
 
 // Keyboard press counter
-private _pressCount = 0;
-onKeyDown ["F", { _pressCount = _pressCount + 1; false }];
+missionNamespace setVariable ["CO_wranglePressCount", 0];
+missionNamespace setVariable ["CO_wrangleActionKeys", actionKeys "DefaultAction"];
+private _keyHandlerId = _dlg displayAddEventHandler ["KeyDown", {
+    params ["_display", "_key"];
+
+    if (_key in (missionNamespace getVariable ["CO_wrangleActionKeys", []])) then {
+        missionNamespace setVariable [
+            "CO_wranglePressCount",
+            (missionNamespace getVariable ["CO_wranglePressCount", 0]) + 1
+        ];
+    };
+
+    false
+}];
 
 // Mini-game loop
 while { time - _startTime < _timeLimit } do {
+    private _pressCount = missionNamespace getVariable ["CO_wranglePressCount", 0];
+
     if (_pressCount > 0) then {
         _progress = (_progress + (_pressCount * 0.08)) min 1;
-        _pressCount = 0;
+        missionNamespace setVariable ["CO_wranglePressCount", 0];
     } else {
         _progress = (_progress - 0.03) max 0;
     };
@@ -39,7 +58,9 @@ while { time - _startTime < _timeLimit } do {
     sleep 0.05;
 };
 
+_dlg displayRemoveEventHandler ["KeyDown", _keyHandlerId];
+missionNamespace setVariable ["CO_wrangleActionKeys", nil];
+missionNamespace setVariable ["CO_wranglePressCount", nil];
 closeDialog 0;
-onKeyDown ["F", {}]; // clear handler
 
 _player setVariable ["CO_wrangleResult", _result, true]; // broadcast to server
