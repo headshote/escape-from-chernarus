@@ -70,6 +70,10 @@ carries `CO_bus_hostilesPerBus` guards (default 5). Large towns get a minimum of
 Bus agro loop (`fn_busAgroLoop`) detects nearby players and male civilian NPCs, dismounts the
 escort group, and triggers `fn_checkpointAlert` using the bus guard group.
 
+Successful bus captures now knock the target out, load them into the vehicle, keep cruising for
+a short window, and then route the bus to the nearest detention center once it has enough
+detainees or the post-capture cruise timer expires.
+
 ---
 
 ## Conscription Pipeline
@@ -107,8 +111,22 @@ Eastern Front (deployed as CRN_FRONT, fn_deployToFront)
 - Player within 150 m of an edge triggers alert to nearby CRN_ENF groups.
 - Player within 50 m of actual edge triggers `fn_checkEscapeUnlock`.
 - Successful cross → `fn_showEscapeUnlockScreen`, sets resistance respawn eligibility.
-- Players spawning at the unlocked resistance location now receive a personal bicycle when the
-  class exists, with a quadbike fallback on servers that do not expose a bicycle vehicle class.
+- Players spawning at the unlocked resistance location or the initial Chernogorsk civilian start
+  now receive a personal bicycle when the class exists, with a quadbike fallback on servers that
+  do not expose a bicycle vehicle class.
+
+---
+
+## Non-Lethal Melee
+
+Players now have a basic punch-based unarmed melee action while no weapon is equipped.
+
+- Range: about 2.4 m.
+- Effect: repeated punches within a short window knock the target unconscious for 60 seconds.
+- Use: gives both players and the TCK capture loop a non-lethal takedown path without adding a
+  separate melee weapon dependency.
+
+This is a lightweight scripted system rather than a full melee-animation framework.
 
 ---
 
@@ -150,8 +168,9 @@ Each wave (`fn_spawnRussianWave`):
 
 ## Civilian AI
 
-40 NPCs spread across `CO_settlements`, with guaranteed presence in large, medium, and small
-towns so key settlements do not feel empty after server start. Each reacts to nearby military:
+The civilian system now targets a much denser population spread across `CO_settlements`, with
+heavy weighting toward large towns and a wider spawn radius inside cities so central areas do
+not stay empty while only the western edge of town feels populated. Each reacts to nearby military:
 - 0–0.5 random: flee.
 - 0.5–0.85: comply (stand still).
 - >0.85: resist (engage).
@@ -199,7 +218,12 @@ All defaults live in `missions/ChernOccupation.Chernarus/CO_adminDefaults.sqf`.
 - Border patrols, airfield defenses, and eastern-front fortifications are started independently
   from the town-life systems so a failure in one subsystem does not stop civilian life, buses,
   police, or checkpoints from spawning.
-- The opening client briefing text now stays on screen longer so the initial objective is readable.
+- The opening client briefing text now stays on screen for about one minute so the initial
+  objective is readable on connection.
+- Civilian-start players at the Chernogorsk train-station spawn now request a support bike from
+  the same helper that already serves unlocked resistance spawns.
+- `local_start_server.bat` now resolves copied dependency mods from the dedicated-server root
+  before falling back to a full client install path, which makes a server-only laptop setup easier.
 
 ---
 

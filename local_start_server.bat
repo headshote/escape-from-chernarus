@@ -47,10 +47,14 @@ set "SERVER_INSTALL_ROOT=%SERVER_INSTALL_ROOT:~0,-1%"
 REM ============================================================
 REM Resolve dependency mod paths
 REM ============================================================
-set "MOD_CBA=%ARMA_CLIENT_ROOT%\@CBA_A3"
-set "MOD_CUP_CORE=%ARMA_CLIENT_ROOT%\@CUP_Terrains_Core"
-set "MOD_CUP_MAPS=%ARMA_CLIENT_ROOT%\@CUP_Terrains_Maps"
+set "MOD_CBA=%ARMA_SERVER_ROOT%\@CBA_A3"
+set "MOD_CUP_CORE=%ARMA_SERVER_ROOT%\@CUP_Terrains_Core"
+set "MOD_CUP_MAPS=%ARMA_SERVER_ROOT%\@CUP_Terrains_Maps"
 set "MOD_CO=%CO_MOD_ROOT%"
+
+if not exist "%MOD_CBA%\addons" set "MOD_CBA=%ARMA_CLIENT_ROOT%\@CBA_A3"
+if not exist "%MOD_CUP_CORE%\addons" set "MOD_CUP_CORE=%ARMA_CLIENT_ROOT%\@CUP_Terrains_Core"
+if not exist "%MOD_CUP_MAPS%\addons" set "MOD_CUP_MAPS=%ARMA_CLIENT_ROOT%\@CUP_Terrains_Maps"
 
 if not exist "%MOD_CBA%\addons" set "MOD_CBA=%WORKSHOP_ROOT%\%WS_CBA%"
 if not exist "%MOD_CUP_CORE%\addons" set "MOD_CUP_CORE=%WORKSHOP_ROOT%\%WS_CUP_TERRAINS_CORE%"

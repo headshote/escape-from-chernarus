@@ -93,6 +93,8 @@ class CfgFunctions {
             class checkEscapeUnlock{};
             class unlockResistanceRespawn {};
             class spawnResistanceBike {};
+            class applyMeleeHit   {};
+            class applyKnockout   {};
             class showEscapeUnlockScreen {};
             class crowdResistance  {};
             class adminPanel       {};

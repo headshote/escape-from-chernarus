@@ -13,10 +13,12 @@ private _vehiclePool = missionNamespace getVariable ["CO_bus_vehiclePool", ["C_V
 private _veh = selectRandom _vehiclePool createVehicle _spawnPos;
 private _grp = createGroup west;
 _grp setVariable ["CO_faction", "CRN_ENF"];
+_grp setVariable ["CO_transportVehicle", _veh, false];
 
 // Driver
 private _driver = _grp createUnit ["B_Soldier_F", _spawnPos, [], 0, "CARGO"];
 _driver moveInDriver _veh;
+[_driver] call co_main_fnc_initHostileUnit;
 
 // Hostile cargo
 for "_i" from 1 to _hostilesCount do {
@@ -29,6 +31,12 @@ for "_i" from 1 to _hostilesCount do {
 { private _wp = _grp addWaypoint [_x, 10]; _wp setWaypointSpeed "NORMAL"; } forEach _routeWps;
 private _cycleWp = _grp addWaypoint [_routeWps select 0, 0];
 _cycleWp setWaypointType "CYCLE";
+
+_veh setVariable ["CO_isBusPatrol", true, true];
+_veh setVariable ["CO_busState", "patrol", true];
+_veh setVariable ["CO_busRouteWps", _routeWps, false];
+_veh setVariable ["CO_busCaptives", [], true];
+_veh setVariable ["CO_busNextEngageAt", 0, false];
 
 // Attach aggro loop
 [_veh, _grp] spawn co_main_fnc_busAgroLoop;

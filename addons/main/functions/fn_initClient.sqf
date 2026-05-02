@@ -39,5 +39,5 @@ titleText [
     "BLACK IN",
     0.8
 ];
-sleep 12;
-titleFadeOut 3;
+sleep 60;
+titleFadeOut 4;

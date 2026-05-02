@@ -2,24 +2,39 @@
 // Spawns civilian NPCs that walk, react to hostiles, comply or flee.
 
 // Use settlement positions as spawn zones
-private _totalCivs = 40;
+private _totalCivs = missionNamespace getVariable ["CO_civilian_totalPopulation", 150];
 private _settlementPlan = [];
+private _weightedSettlements = [];
 
 {
-    private _guaranteed = switch (_x select 2) do {
-        case "large":  { 4 };
-        case "medium": { 2 };
+    private _townName = _x select 0;
+    private _townType = _x select 2;
+    private _guaranteed = switch (_townType) do {
+        case "large":  { 18 };
+        case "medium": { 8 };
+        default         { 2 };
+    };
+    private _weight = switch (_townType) do {
+        case "large":  { 5 };
+        case "medium": { 3 };
         default         { 1 };
     };
 
     for "_slot" from 1 to _guaranteed do {
         _settlementPlan pushBack _x;
     };
+
+    for "_weightIndex" from 1 to _weight do {
+        _weightedSettlements pushBack _x;
+    };
 } forEach CO_settlements;
 
-private _prioritySettlements = CO_settlements select { (_x select 2) in ["large", "medium"] };
+if (_weightedSettlements isEqualTo []) then {
+    _weightedSettlements = +CO_settlements;
+};
+
 while { count _settlementPlan < _totalCivs } do {
-    _settlementPlan pushBack (selectRandom _prioritySettlements);
+    _settlementPlan pushBack (selectRandom _weightedSettlements);
 };
 
 if (count _settlementPlan > _totalCivs) then {
@@ -27,15 +42,49 @@ if (count _settlementPlan > _totalCivs) then {
 };
 
 {
-    // Pick a random settlement, offset within it
+    private _townName = _x select 0;
+    private _townType = _x select 2;
     private _basePos = _x select 1;
-    private _pos = _basePos vectorAdd [random 200 - 100, random 200 - 100, 0];
+    private _townHotspots = switch (_townName) do {
+        case "Chernogorsk":    { [[6400, 2400, 0], [6575, 2510, 0], [6240, 2285, 0]] };
+        case "Elektrozavodsk": { [[10200, 2300, 0], [10370, 2440, 0], [10035, 2175, 0]] };
+        case "Berezino":       { [[11600, 7800, 0], [11810, 7705, 0], [11420, 7920, 0]] };
+        case "Stary Sobor":    { [[7300, 7900, 0], [7190, 8045, 0]] };
+        case "Zelenogorsk":    { [[3900, 7200, 0], [4040, 7340, 0]] };
+        default                 { [_basePos] };
+    };
+    private _spawnRadius = switch (_townType) do {
+        case "large":  { 140 };
+        case "medium": { 100 };
+        default         { 55 };
+    };
+
+    private _anchorPos = (selectRandom _townHotspots) getPos [random _spawnRadius, random 360];
+    private _nearRoads = _anchorPos nearRoads 60;
+    if !(_nearRoads isEqualTo []) then {
+        _anchorPos = getPosATL (selectRandom _nearRoads);
+    };
+
+    private _emptyPos = _anchorPos findEmptyPosition [0, 20, "C_man_1"];
+    private _pos = if (_emptyPos isEqualTo []) then { _anchorPos } else { _emptyPos };
     private _grp = createGroup civilian;
-    private _gender = selectRandom ["C_man_polo_1_F", "C_man_polo_2_F", "C_man_casual_4_F", "C_Woman_casual_F"];
+    private _gender = selectRandom [
+        "C_man_polo_1_F",
+        "C_man_polo_2_F",
+        "C_man_casual_4_F",
+        "C_Man_casual_6_F",
+        "C_man_hunter_1_F",
+        "C_Woman_casual_F"
+    ];
     private _civ = _grp createUnit [_gender, _pos, [], 5, "NONE"];
 
     _civ setVariable ["CO_isFemale", (_gender == "C_Woman_casual_F")];
     _civ setVariable ["CO_civState", "walking"]; // walking | fleeing | compliant | fighting
+    _civ setVariable ["CO_civAlertUntil", 0, false];
+    _civ setVariable ["CO_homePos", _anchorPos, false];
+    _civ setVariable ["CO_wanderRadius", switch (_townType) do { case "large": { 85 }; case "medium": { 60 }; default { 35 } }, false];
+    _civ setBehaviour "CARELESS";
+    _civ setSpeedMode "LIMITED";
 
     // Wander behavior
     [_civ] spawn {
@@ -43,7 +92,21 @@ if (count _settlementPlan > _totalCivs) then {
         while { alive _civ } do {
             private _state = _civ getVariable ["CO_civState", "walking"];
             if (_state isEqualTo "walking") then {
-                private _dest = getPosATL _civ vectorAdd [random 80 - 40, random 80 - 40, 0];
+                _civ setBehaviour "CARELESS";
+                _civ setSpeedMode "LIMITED";
+
+                if (random 1 < 0.3) then {
+                    sleep (4 + random 7);
+                };
+
+                private _homePos = _civ getVariable ["CO_homePos", getPosATL _civ];
+                private _wanderRadius = _civ getVariable ["CO_wanderRadius", 45];
+                private _dest = _homePos getPos [random _wanderRadius, random 360];
+                private _destRoads = _dest nearRoads 25;
+                if !(_destRoads isEqualTo []) then {
+                    _dest = getPosATL (selectRandom _destRoads);
+                };
+
                 _civ doMove _dest;
                 waitUntil {
                     sleep 1;
@@ -54,24 +117,41 @@ if (count _settlementPlan > _totalCivs) then {
             };
 
             if (_state isEqualTo "fleeing") then {
+                _civ setBehaviour "AWARE";
+                _civ setSpeedMode "FULL";
                 private _away = getPosATL _civ vectorAdd [random 100 - 50, random 100 - 50, 0];
                 _civ doMove _away;
-                _civ setSpeedMode "FULL";
-                sleep 5;
-                _civ setVariable ["CO_civState", "walking"];
+                sleep (5 + random 4);
+
+                if (time > (_civ getVariable ["CO_civAlertUntil", 0])) then {
+                    _civ setVariable ["CO_civState", "walking", false];
+                };
             };
 
             if (_state isEqualTo "compliant") then {
-                sleep 8; // stays put, hands up (setCaptive or animation)
+                _civ setBehaviour "SAFE";
+                _civ setSpeedMode "LIMITED";
                 _civ playMoveNow "AmovPercMstpSrasWrflDnon"; // surrender anim
+                sleep (5 + random 4);
+
+                if (time > (_civ getVariable ["CO_civAlertUntil", 0])) then {
+                    _civ switchMove "";
+                    _civ setVariable ["CO_civState", "walking", false];
+                };
             };
 
             if (_state isEqualTo "fighting") then {
                 // Cheap melee: civilian runs at nearest hostile and targets them.
                 private _hostile = _civ findNearestEnemy _civ;
                 if (!isNull _hostile) then {
+                    _civ setBehaviour "AWARE";
                     _civ setCombatMode "RED";
                     _civ doTarget _hostile;
+                    _civ doMove (getPosATL _hostile);
+                } else {
+                    if (time > (_civ getVariable ["CO_civAlertUntil", 0])) then {
+                        _civ setVariable ["CO_civState", "walking", false];
+                    };
                 };
                 sleep 3;
             };
@@ -84,27 +164,64 @@ if (count _settlementPlan > _totalCivs) then {
         params ["_civ"];
         while { alive _civ } do {
             private _nearHostiles = _civ nearEntities [["Man"], 40] select {
-                side _x in [west, east] && !(isPlayer _x) && !(captive _x)
+                private _unit = _x;
+                if (!alive _unit || _unit == _civ || captive _unit) exitWith { false };
+                if !(side _unit in [west, east]) exitWith { false };
+
+                private _threatObject = vehicle _unit;
+                private _distance = _civ distance _threatObject;
+                if (_distance < 12) exitWith { true };
+
+                if (_threatObject != _unit) exitWith {
+                    _distance < 20 && speed _threatObject > 4
+                };
+
+                private _losBlocks = lineIntersectsSurfaces [
+                    AGLToASL eyePos _civ,
+                    AGLToASL eyePos _unit,
+                    _civ,
+                    _unit,
+                    true,
+                    1,
+                    "VIEW",
+                    "FIRE"
+                ];
+                _losBlocks isEqualTo []
             };
-            if (count _nearHostiles > 0 && (_civ getVariable ["CO_civState", "walking"]) == "walking") then {
-                private _isFemale = _civ getVariable ["CO_isFemale", false];
-                if (_isFemale) then {
-                    // Women are not targeted; only react if nearby male is being grabbed.
-                    sleep 5;
-                } else {
+
+            if (_nearHostiles isEqualTo []) then {
+                if (time > (_civ getVariable ["CO_civAlertUntil", 0])) then {
+                    private _state = _civ getVariable ["CO_civState", "walking"];
+                    if (_state != "walking") then {
+                        _civ setVariable ["CO_civState", "walking", false];
+                    };
+                };
+            } else {
+                _civ setVariable ["CO_civAlertUntil", time + 14, false];
+
+                if ((_civ getVariable ["CO_civState", "walking"]) == "walking") then {
+                    private _isFemale = _civ getVariable ["CO_isFemale", false];
                     private _roll = random 1;
-                    private _newState = "fighting";
-                    if (_roll < 0.5) then {
-                        _newState = "fleeing";
-                    } else {
-                        if (_roll < 0.85) then {
+                    private _newState = "fleeing";
+
+                    if (_isFemale) then {
+                        if (_roll < 0.7) then {
                             _newState = "compliant";
                         };
+                    } else {
+                        if (_roll >= 0.55 && _roll < 0.88) then {
+                            _newState = "compliant";
+                        } else {
+                            if (_roll >= 0.88) then {
+                                _newState = "fighting";
+                            };
+                        };
                     };
+
                     _civ setVariable ["CO_civState", _newState, false];
                 };
             };
-            sleep 2;
+            sleep 3;
         };
     };
 } forEach _settlementPlan;

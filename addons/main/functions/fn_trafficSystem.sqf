@@ -24,12 +24,44 @@ CO_trafficRoutes = [
 ];
 
 private _spawnTrafficVehicle = {
-    params ["_route"];
-    private _spawnPos = _route select 0;
-    private _nearRd   = _spawnPos nearRoads 30;
-    if (count _nearRd > 0) then { _spawnPos = getPos (_nearRd select 0); };
+    params ["_route", ["_spawnWaypointIndex", 0]];
 
-    private _veh = (selectRandom CO_trafficVehiclePool) createVehicle _spawnPos;
+    private _routeCount = count _route;
+    if (_routeCount == 0) exitWith { objNull };
+
+    _spawnWaypointIndex = _spawnWaypointIndex max 0;
+    if (_spawnWaypointIndex >= _routeCount) then {
+        _spawnWaypointIndex = _routeCount - 1;
+    };
+
+    private _spawnPos = _route select _spawnWaypointIndex;
+    private _nearRd = _spawnPos nearRoads 30;
+    if !(_nearRd isEqualTo []) then {
+        private _roadIndex = _spawnWaypointIndex min ((count _nearRd) - 1);
+        _spawnPos = getPosATL (_nearRd select _roadIndex);
+    };
+
+    private _vehClass = selectRandom CO_trafficVehiclePool;
+    private _emptyPos = _spawnPos findEmptyPosition [0, 15, _vehClass];
+    if !(_emptyPos isEqualTo []) then {
+        _spawnPos = _emptyPos;
+    };
+
+    private _veh = _vehClass createVehicle _spawnPos;
+    _veh allowDamage false;
+    [_veh] spawn {
+        params ["_veh"];
+        sleep 8;
+        if (!isNull _veh) then {
+            _veh allowDamage true;
+        };
+    };
+
+    private _nextWaypointIndex = (_spawnWaypointIndex + 1) mod _routeCount;
+    _veh setDir (_spawnPos getDir (_route select _nextWaypointIndex));
+    _veh setPosATL _spawnPos;
+    _veh setVectorUp (surfaceNormal _spawnPos);
+
     private _grp = createGroup civilian;
     private _driver = _grp createUnit ["C_man_polo_1_F", _spawnPos, [], 0, "CARGO"];
     _driver moveInDriver _veh;
@@ -83,23 +115,27 @@ private _spawnTrafficVehicle = {
     _veh
 };
 
-// Initial spawn: 2 vehicles per route for a livelier opening state.
+// Initial spawn: 2 vehicles per route, but at separated route points to avoid pileups.
 {
-    [_x] call _spawnTrafficVehicle;
-    [_x] call _spawnTrafficVehicle;
+    private _secondarySpawnIndex = if ((count _x) > 2) then { floor ((count _x) / 2) } else { 1 min ((count _x) - 1) };
+    [_x, 0] call _spawnTrafficVehicle;
+    if (_secondarySpawnIndex > 0) then {
+        [_x, _secondarySpawnIndex] call _spawnTrafficVehicle;
+    };
 } forEach CO_trafficRoutes;
 
 diag_log format ["[CO] Traffic system started on %1 routes.", count CO_trafficRoutes];
 
-// Respawn loop: maintain roughly 3 vehicles per route.
+// Respawn loop: maintain roughly 2 vehicles per route without stacking them at one point.
 [] spawn {
     while { true } do {
         sleep 120;
         {
             private _route = _x;
             private _nearVehicles = (_route select 0) nearEntities [["Car"], 500];
-            if (count _nearVehicles < 3) then {
-                [_route] call _spawnTrafficVehicle;
+            if (count _nearVehicles < 2) then {
+                private _spawnIndex = floor (random (count _route));
+                [_route, _spawnIndex] call _spawnTrafficVehicle;
             };
         } forEach CO_trafficRoutes;
     };

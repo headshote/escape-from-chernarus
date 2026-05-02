@@ -5,9 +5,13 @@
 // ============================================================
 params ["_pos"];
 
+private _guardedCenters = missionNamespace getVariable ["CO_guardedDetentionCenters", []];
+private _guardKey = format ["%1_%2", round (_pos select 0), round (_pos select 1)];
+
 // Avoid respawning if already guarded
-if (_pos getVariable ["CO_guardsSpawned", false]) exitWith {};
-_pos setVariable ["CO_guardsSpawned", true];
+if (_guardKey in _guardedCenters) exitWith {};
+_guardedCenters pushBack _guardKey;
+missionNamespace setVariable ["CO_guardedDetentionCenters", _guardedCenters];
 
 // Perimeter guards
 for "_i" from 0 to 5 do {
@@ -19,7 +23,7 @@ for "_i" from 0 to 5 do {
     [_u] call co_main_fnc_initHostileUnit;
     // Short patrol loop around their post
     private _wp1 = _grp addWaypoint [_pos getPos [22, _angle + 30], 5];
-    _wp1 setWaypointType "CYCLE";
+    _wp1 setWaypointType "MOVE";
     private _wp2 = _grp addWaypoint [_pos getPos [22, _angle - 30], 5];
     _wp2 setWaypointType "CYCLE";
 };

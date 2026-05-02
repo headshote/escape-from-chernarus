@@ -25,25 +25,64 @@ missionNamespace setVariable ["CO_fnc_refreshResistanceRespawn", {
     missionNamespace setVariable ["CO_resistanceRespawnHandles", _newHandles];
 }];
 
-missionNamespace setVariable ["CO_fnc_requestResistanceBike", {
-    private _isResistanceSpawn = (player distance2D [2100, 12800, 0]) < 180;
-    if (!_isResistanceSpawn && { side group player != resistance }) exitWith {};
+missionNamespace setVariable ["CO_fnc_requestSupportBike", {
+    private _resistanceSpawnPos = [2100, 12800, 0];
+    private _civilianSpawnPos = markerPos "respawn_civilian";
+    private _isResistanceSpawn = (player distance2D _resistanceSpawnPos) < 180;
+    private _hasCivilianMarker = !(_civilianSpawnPos isEqualTo [0, 0, 0]);
+    private _isCivilianSpawn = _hasCivilianMarker && { (player distance2D _civilianSpawnPos) < 180 };
 
-    [player] remoteExecCall ["co_main_fnc_spawnResistanceBike", 2];
+    if (!_isResistanceSpawn && !_isCivilianSpawn && { side group player != resistance }) exitWith {};
+
+    private _anchorPos = if (_isResistanceSpawn || { side group player == resistance }) then {
+        _resistanceSpawnPos
+    } else {
+        _civilianSpawnPos
+    };
+
+    [player, _anchorPos] remoteExecCall ["co_main_fnc_spawnResistanceBike", 2];
+}];
+
+missionNamespace setVariable ["CO_fnc_setupUnarmedKnockout", {
+    private _existingAction = player getVariable ["CO_unarmedKnockoutActionId", -1];
+    if (_existingAction >= 0) then {
+        player removeAction _existingAction;
+    };
+
+    private _actionId = player addAction [
+        "Punch Nearby Target",
+        {
+            private _target = cursorObject;
+            [player, _target] remoteExecCall ["co_main_fnc_applyMeleeHit", 2];
+        },
+        nil,
+        1.5,
+        false,
+        true,
+        "",
+        "vehicle player == player && currentWeapon player == '' && { alive cursorObject } && { cursorObject isKindOf 'CAManBase' } && { cursorObject != player } && { player distance cursorObject < 2.4 } && { vehicle cursorObject == cursorObject } && { !(cursorObject getVariable ['CO_knockedOut', false]) }"
+    ];
+
+    player setVariable ["CO_unarmedKnockoutActionId", _actionId];
 }];
 
 [] call (missionNamespace getVariable ["CO_fnc_refreshResistanceRespawn", {}]);
 [] spawn {
     sleep 1;
-    [] call (missionNamespace getVariable ["CO_fnc_requestResistanceBike", {}]);
+    [] call (missionNamespace getVariable ["CO_fnc_requestSupportBike", {}]);
 };
+[] call (missionNamespace getVariable ["CO_fnc_setupUnarmedKnockout", {}]);
 
 if ((missionNamespace getVariable ["CO_respawnMissionEhId", -1]) < 0) then {
     private _eventId = addMissionEventHandler ["Respawn", {
         [] call (missionNamespace getVariable ["CO_fnc_refreshResistanceRespawn", {}]);
         [] spawn {
             sleep 1;
-            [] call (missionNamespace getVariable ["CO_fnc_requestResistanceBike", {}]);
+            [] call (missionNamespace getVariable ["CO_fnc_requestSupportBike", {}]);
+        };
+        [] spawn {
+            sleep 0.2;
+            [] call (missionNamespace getVariable ["CO_fnc_setupUnarmedKnockout", {}]);
         };
     }];
     missionNamespace setVariable ["CO_respawnMissionEhId", _eventId];
