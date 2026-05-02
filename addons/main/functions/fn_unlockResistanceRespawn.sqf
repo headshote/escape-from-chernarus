@@ -12,4 +12,7 @@ if !(profileNamespace getVariable [_profileKey, false]) then {
     saveProfileNamespace;
 };
 
+private _refreshRespawnOptions = missionNamespace getVariable ["CO_fnc_refreshResistanceRespawn", {}];
+[] call _refreshRespawnOptions;
+
 [] call co_main_fnc_showEscapeUnlockScreen;

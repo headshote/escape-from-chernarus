@@ -56,6 +56,11 @@ if not exist "%MOD_CBA%\addons" set "MOD_CBA=%WORKSHOP_ROOT%\%WS_CBA%"
 if not exist "%MOD_CUP_CORE%\addons" set "MOD_CUP_CORE=%WORKSHOP_ROOT%\%WS_CUP_TERRAINS_CORE%"
 if not exist "%MOD_CUP_MAPS%\addons" set "MOD_CUP_MAPS=%WORKSHOP_ROOT%\%WS_CUP_TERRAINS_MAPS%"
 
+if exist "%MOD_CO%\tools\build_addon.ps1" (
+    powershell -NoProfile -ExecutionPolicy Bypass -File "%MOD_CO%\tools\build_addon.ps1" -ModRoot "%MOD_CO%" -SkipIfUpToDate
+    if errorlevel 1 exit /b 1
+)
+
 if not exist "%MOD_CO%\addons\co_main.pbo" (
     echo [ERROR] Missing %MOD_CO%\addons\co_main.pbo
     echo Build and copy your addon PBO to @ChernOccupation\addons\co_main.pbo first.

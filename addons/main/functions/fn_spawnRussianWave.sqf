@@ -6,7 +6,8 @@ private _spawnYMin = 2000;
 private _spawnYMax = 11000;
 
 private _waveGroups = [];
-private _unitsPerGroup = ((missionNamespace getVariable ["CO_rus_unitsPerWave", 12]) / 3) ceil 1;
+private _waveSize = (missionNamespace getVariable ["CO_rus_unitsPerWave", 12]) max 1;
+private _unitsPerGroup = (ceil (_waveSize / 3)) max 1;
 
 // Infantry squad
 for "_w" from 0 to 2 do {

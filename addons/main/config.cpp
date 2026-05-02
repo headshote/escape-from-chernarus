@@ -46,7 +46,7 @@ class CO_AdminSettings {
 };
 
 class CfgFunctions {
-    class CO {
+    class co_main {
         class Main {
             file = "\main\functions";
 

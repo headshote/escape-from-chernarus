@@ -5,24 +5,10 @@ loadScreen = "";
 
 respawn = "BASE";
 respawnOnStart = 1;
-respawnDelay = 15;
-respawnTemplates[] = {"MenuPosition", "Counter"};
-respawnTemplatesCivilian[] = {"MenuPosition", "Counter"};
-respawnTemplatesGuer[] = {"MenuPosition", "Counter"};
-
-
-// Two respawn positions: civilian start, resistance start (gated by variable)
-class RespawnPositions {
-    class CivStart {
-        name = "Civilian";
-        position[] = {6400, 2400, 0}; // Chernogorsk
-    };
-    class ResistStart {
-        name = "Resistance Fighter";
-        position[] = {2100, 12800, 0}; // NW, near airfield; gated in scripts
-        condition = "profileNamespace getVariable ['CO_escaped_' + getPlayerUID player, false]";
-    };
-};
+respawnDelay = 0;
+respawnTemplates[] = {"MenuPosition"};
+respawnTemplatesCiv[] = {"MenuPosition"};
+respawnTemplatesGuer[] = {"MenuPosition"};
 
 disabledAI = 1;
 enableDebugConsole = 1;  // Set to 0 for release builds.

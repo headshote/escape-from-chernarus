@@ -60,9 +60,22 @@ if ($sourceFunctions.Count -eq 0) {
     Fail "No function source files were found under $functionsPath"
 }
 
+$sourceArtifacts = @(
+    Get-ChildItem -LiteralPath $functionsPath -File -Recurse
+    Get-ChildItem -LiteralPath (Join-Path $sourceRoot 'ui') -File -Recurse -ErrorAction SilentlyContinue
+    Get-Item -LiteralPath $configPath
+    Get-Item -LiteralPath $prefixPath
+)
+
 $pboLength = (Get-Item -LiteralPath $pboPath).Length
 if ($pboLength -lt 65536) {
     Write-Warning "The built PBO is unusually small ($pboLength bytes). Validate that Addon Builder copied the SQF sources."
+}
+
+$pboItem = Get-Item -LiteralPath $pboPath
+$newestSource = $sourceArtifacts | Sort-Object LastWriteTime -Descending | Select-Object -First 1
+if ($newestSource.LastWriteTime -gt $pboItem.LastWriteTime) {
+    Fail "The addon source is newer than addons/co_main.pbo (latest source: $($newestSource.FullName) at $($newestSource.LastWriteTime)). Rebuild the addon before launching the server or client."
 }
 
 $pboBytes = [System.IO.File]::ReadAllBytes($pboPath)
@@ -86,6 +99,9 @@ if (-not $pboText.Contains('config.bin')) {
 $configText = Get-Content -LiteralPath $configPath -Raw
 if ($configText -notmatch 'file\s*=\s*"\\main\\functions"\s*;') {
     Fail "CfgFunctions in $configPath must use file = \"\\main\\functions\"; to match the packed addon prefix."
+}
+if ($configText -notmatch 'class\s+CfgFunctions\s*\{[\s\S]*?class\s+co_main\s*\{[\s\S]*?class\s+Main\s*\{') {
+    Fail "CfgFunctions in $configPath must register functions under the co_main tag so runtime calls to co_main_fnc_* resolve correctly."
 }
 
 $missingFunctions = $sourceFunctions |

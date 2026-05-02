@@ -30,7 +30,18 @@ class Mission
 	};
 	class Markers
 	{
-		items=0;
+		items=1;
+		class Item0
+		{
+			position[]={6400,0,2400};
+			name="respawn_civilian";
+			text="Civilian";
+			markerType="mil_start";
+			type="Empty";
+			colorName="ColorWhite";
+			a=1;
+			b=1;
+		};
 	};
 	class Sensors
 	{

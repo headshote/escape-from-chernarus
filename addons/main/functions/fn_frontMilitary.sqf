@@ -12,7 +12,8 @@ CO_frontDefensePositions = [
     [13500, 3600, 0]
 ];
 
-private _unitsPerNode = ((missionNamespace getVariable ["CO_front_initialStrength", 60]) / ((count CO_frontDefensePositions) max 1)) ceil 1;
+private _totalStrength = (missionNamespace getVariable ["CO_front_initialStrength", 60]) max 1;
+private _unitsPerNode = (ceil (_totalStrength / ((count CO_frontDefensePositions) max 1))) max 1;
 
 {
     private _pos = _x;

@@ -21,31 +21,37 @@ for "_i" from 1 to _totalCivs do {
         params ["_civ"];
         while { alive _civ } do {
             private _state = _civ getVariable ["CO_civState", "walking"];
-            switch (_state) do {
-                case "walking": {
-                    private _dest = getPosATL _civ vectorAdd [random 80 - 40, random 80 - 40, 0];
-                    _civ doMove _dest;
-                    waitUntil { sleep 1; !(_civ isFormationLeader) || _civ distance _dest < 5 || _civ getVariable "CO_civState" != "walking" };
+            if (_state isEqualTo "walking") then {
+                private _dest = getPosATL _civ vectorAdd [random 80 - 40, random 80 - 40, 0];
+                _civ doMove _dest;
+                waitUntil {
+                    sleep 1;
+                    !alive _civ ||
+                    _civ distance _dest < 5 ||
+                    (_civ getVariable ["CO_civState", "walking"]) != "walking"
                 };
-                case "fleeing": {
+            } else {
+                if (_state isEqualTo "fleeing") then {
                     private _away = getPosATL _civ vectorAdd [random 100 - 50, random 100 - 50, 0];
                     _civ doMove _away;
                     _civ setSpeedMode "FULL";
                     sleep 5;
                     _civ setVariable ["CO_civState", "walking"];
-                };
-                case "compliant": {
-                    sleep 8; // stays put, hands up (setCaptive or animation)
-                    _civ playMoveNow "AmovPercMstpSrasWrflDnon"; // surrender anim
-                };
-                case "fighting": {
-                    // Cheap melee: civilian runs at nearest hostile and triggers setCombatMode
-                    private _hostile = nearestEnemy _civ;
-                    if (!isNull _hostile) then {
-                        _civ setCombatMode "RED";
-                        _civ doTarget _hostile;
+                } else {
+                    if (_state isEqualTo "compliant") then {
+                        sleep 8; // stays put, hands up (setCaptive or animation)
+                        _civ playMoveNow "AmovPercMstpSrasWrflDnon"; // surrender anim
+                    } else {
+                        if (_state isEqualTo "fighting") then {
+                            // Cheap melee: civilian runs at nearest hostile and targets them.
+                            private _hostile = nearestEnemy _civ;
+                            if (!isNull _hostile) then {
+                                _civ setCombatMode "RED";
+                                _civ doTarget _hostile;
+                            };
+                            sleep 3;
+                        };
                     };
-                    sleep 3;
                 };
             };
             sleep 0.5;
@@ -59,15 +65,20 @@ for "_i" from 1 to _totalCivs do {
             private _nearHostiles = _civ nearEntities [["Man"], 40] select {
                 side _x in [west, east] && !(isPlayer _x) && !(captive _x)
             };
-            if (count _nearHostiles > 0 && _civ getVariable "CO_civState" == "walking") then {
+            if (count _nearHostiles > 0 && (_civ getVariable ["CO_civState", "walking"]) == "walking") then {
                 private _isFemale = _civ getVariable ["CO_isFemale", false];
                 if (_isFemale) then {
-                    // Women not targeted — only react if nearby male is being grabbed
+                    // Women are not targeted; only react if nearby male is being grabbed.
                     sleep 5;
                 } else {
                     private _roll = random 1;
-                    private _newState = if (_roll < 0.5) then {"fleeing"} else {
-                        if (_roll < 0.85) then {"compliant"} else {"fighting"}
+                    private _newState = "fighting";
+                    if (_roll < 0.5) then {
+                        _newState = "fleeing";
+                    } else {
+                        if (_roll < 0.85) then {
+                            _newState = "compliant";
+                        };
                     };
                     _civ setVariable ["CO_civState", _newState, false];
                 };

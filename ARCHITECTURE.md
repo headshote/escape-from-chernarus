@@ -34,7 +34,7 @@ Declares three major config classes:
 - `requiredAddons[] = {"cba_main"}` — only CBA is a hard config dependency.
   CUP Terrains is required at mission level, not at addon config level.
 
-**`CfgFunctions / CO / Main`**
+**`CfgFunctions / co_main / Main`**
 - `file = "\main\functions"` — absolute virtual path using the packed PBO prefix.
 - All 60 functions registered as `class fnName {};`.
 - Naming convention: source file `fn_FOO.sqf` → function `co_main_fnc_FOO`.
@@ -75,10 +75,19 @@ init.sqf
 ### Client (`hasInterface`)
 ```
 co_main_fnc_initClient
-  ├── wait for CO_roadGraph (globals from server)
+  ├── wait for server globals
   ├── enduranceBar                     (CBA per-frame handler)
   ├── disguise EH setup                (CBA event handler)
   └── police recognition loop          (every 4 s)
+```
+
+### Player-local respawn bootstrap
+```
+initPlayerLocal.sqf
+  ├── registers the baseline civilian respawn via mission marker respawn_civilian
+  ├── checks profileNamespace for escaped-player unlock state
+  ├── adds a Resistance Fighter respawn position for that player only when unlocked
+  └── refreshes the per-player respawn list on mission respawn
 ```
 
 ### Headless Client (`!hasInterface && !isServer`)
@@ -204,6 +213,11 @@ set in `onLoad`. Example: `uiNamespace getVariable "CO_AdminPanelDlg"`.
    - After every build, ensure only `co_main.pbo` is present in `addons/`.
      Any stale `main.pbo` from a mis-named build will be loaded by Arma too
      and will override the correct one with broken function paths.
+   - `tools/build_addon.ps1` wraps Addon Builder with the correct include rules
+     and writes the rebuilt output back as `addons/co_main.pbo`.
+   - `local_start_server.bat` now calls `tools/build_addon.ps1 -SkipIfUpToDate`
+     automatically before validation, so local dedicated launches do not run
+     against stale addon PBOs.
    - Run `tools/validate_build.ps1` after every rebuild. It verifies the exact
      source prefix, rejects duplicate PBOs, verifies the embedded PBO prefix,
      checks the `CfgFunctions.file` path, and confirms that the built PBO header
@@ -226,6 +240,10 @@ set in `onLoad`. Example: `uiNamespace getVariable "CO_AdminPanelDlg"`.
    - This avoids Addon Builder mission-packing issues during local iteration and
      uses `tools/stage_local_mission.ps1` plus `tools/validate_mission.ps1` on
      every launch.
+   - Mission spawn selection uses Arma's supported `BASE` respawn flow:
+     `mission.sqm` provides the civilian `respawn_civilian` marker and
+     `initPlayerLocal.sqf` adds the gated resistance respawn dynamically via
+     `BIS_fnc_addRespawnPosition` after escape unlock.
 
 4. **Launcher**: `local_start_server.bat` validates paths, generates `server.cfg`
    and `basic.cfg` under `.server_runtime/`, and launches `arma3server_x64.exe`.
@@ -249,6 +267,6 @@ VS Code will show false-positive CBA namespace errors. These do not affect build
 ## Adding a New Function
 
 1. Create `addons/main/functions/fn_NEWNAME.sqf`.
-2. Add `class NEWNAME {};` inside `CfgFunctions / CO / Main` in `config.cpp`.
+2. Add `class NEWNAME {};` inside `CfgFunctions / co_main / Main` in `config.cpp`.
 3. Call as `[] call co_main_fnc_NEWNAME` from SQF.
 4. Rebuild `co_main.pbo`.
