@@ -53,10 +53,15 @@ params ["_detectedUnits", "_hostileGrp"];
                         _finished = true;
                     };
                 } else {
-                    // NPC civilian: auto-capture
-                    _target setCaptive true;
-                    [_target, _grp] call co_main_fnc_transportToDetention;
-                    _finished = true;
+                    // NPC civilian: punch them down so the swing animation
+                    // plays on every viewer, then haul them off when they drop.
+                    private _attacker = _nearest select 0;
+                    [_attacker, _target] call co_main_fnc_applyMeleeHit;
+                    if (_target getVariable ["CO_knockedOut", false]) then {
+                        _target setCaptive true;
+                        [_target, _grp] call co_main_fnc_transportToDetention;
+                        _finished = true;
+                    };
                 };
             };
             sleep 0.5;

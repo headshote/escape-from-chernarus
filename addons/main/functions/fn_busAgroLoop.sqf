@@ -1,9 +1,24 @@
 // fn_busAgroLoop.sqf — server-side, monitors bus for nearby targets
 params ["_veh", "_grp"];
 
+private _aggroRadius = missionNamespace getVariable ["CO_bus_aggroRadius", 140];
+private _maxCaptives = missionNamespace getVariable ["CO_bus_maxCaptives", 3];
+
 while { alive _veh } do {
     if ((_veh getVariable ["CO_busState", "patrol"]) == "delivering") then {
         sleep 2;
+        continue;
+    };
+
+    // If we've hit the cargo cap, stop hunting; existing delivery scheduler
+    // (set up in fn_transportToDetention after the first capture) will drive
+    // the bus to a detention center on its own.
+    private _aboard = (_veh getVariable ["CO_busCaptives", []]) select {
+        !isNull _x && alive _x && captive _x
+    };
+    if (count _aboard >= _maxCaptives) then {
+        _veh setVariable ["CO_busCaptives", _aboard, true];
+        sleep 3;
         continue;
     };
 
@@ -12,12 +27,13 @@ while { alive _veh } do {
         continue;
     };
 
-    private _nearTargets = (_veh nearEntities [["Man"], 60]) select {
+    private _nearTargets = (_veh nearEntities [["Man"], _aggroRadius]) select {
         alive _x &&
         !captive _x &&
         side _x == civilian &&
         !(_x getVariable ["CO_isFemale", false]) &&
         !(_x getVariable ["CO_captureInProgress", false]) &&
+        !(_x getVariable ["CO_knockedOut", false]) &&
         vehicle _x == _x
     };
 

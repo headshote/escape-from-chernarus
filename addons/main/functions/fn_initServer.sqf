@@ -13,6 +13,8 @@
     "CO_westBorderCampCount","CO_westBorderCampGuardsMin","CO_westBorderCampGuardsMax",
     "CO_westBorderTownGuardCount","CO_westBorderChaseRadius","CO_westBorderFireRadius",
     "CO_westRoadCheckpointGuardCount","CO_westRoadCheckpointLethal","CO_westBorderFemaleOnlyTowns",
+    "CO_westBorderForestPatrols",
+    "CO_bus_aggroRadius","CO_bus_maxCaptives","CO_busDetentionThreshold","CO_busCruiseAfterCapture",
     "CO_airfield_guardCount","CO_airfield_gateGuards",
     "CO_conscript_detainTime","CO_conscript_trainTime",
     "CO_police_carStopChance","CO_police_active",
@@ -48,11 +50,12 @@ sleep 0.5;
 ["trafficSystem", { [] call co_main_fnc_trafficSystem; }] call _launchStep;
 ["policePatrols", { [] call co_main_fnc_policePatrols; }] call _launchStep;
 ["spawnWeaponCaches", { [] call co_main_fnc_spawnWeaponCaches; }] call _launchStep;
-["borderSystem", {
-    [] call co_main_fnc_buildBorderForts;
-    [] call co_main_fnc_buildWestBorderEnforcement;
-    [] call co_main_fnc_borderPatrol;
-}] call _launchStep;
+// Western enforcement is the most player-visible border layer: run it first
+// in its own task so guards appear in seconds rather than after the slow
+// perimeter fort placement finishes.
+["westBorderEnforcement", { [] call co_main_fnc_buildWestBorderEnforcement; }] call _launchStep;
+["perimeterBorderForts", { [] call co_main_fnc_buildBorderForts; }] call _launchStep;
+["borderRovingPatrols", { [] call co_main_fnc_borderPatrol; }] call _launchStep;
 ["frontSystem", {
     [] call co_main_fnc_buildEasternFront;
     [] call co_main_fnc_frontMilitary;

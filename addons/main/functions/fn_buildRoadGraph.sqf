@@ -20,6 +20,8 @@ CO_settlements = [
     ["Vybor",          [5100,  10100, 0], "small"],
     ["Zelenogorsk",    [3900,  7200,  0], "medium"],
     ["Pavlovo",        [4400,  5600,  0], "small"],
+    ["Myshkino",       [3300,  6900,  0], "small"],
+    ["Lopatino",       [3700,  9700,  0], "small"],
     ["Tulga",          [9700,  9800,  0], "small"],
     ["Polana",         [9500,  8700,  0], "small"],
     ["Mogilevka",      [8500,  8100,  0], "small"]

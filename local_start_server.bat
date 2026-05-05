@@ -3,13 +3,20 @@ setlocal EnableExtensions EnableDelayedExpansion
 
 REM ============================================================
 REM ChernOccupation - Local Dedicated Server Launcher
+REM
+REM Auto-detects the Arma 3 / Arma 3 Server install location across
+REM common Steam library roots (any drive). You normally do NOT have
+REM to edit anything: just drop @ChernOccupation into the same folder
+REM as @CBA_A3 / @CUP_Terrains_* and run this .bat.
+REM
+REM If your Steam library lives somewhere unusual, set ARMA_OVERRIDE_*
+REM below or set the same variables in your environment before running.
 REM ============================================================
-REM Edit only these paths if needed.
-set "ARMA_SERVER_ROOT=C:\Steam\steamapps\common\Arma 3 Server"
-set "ARMA_CLIENT_ROOT=C:\Steam\steamapps\common\Arma 3"
-set "WORKSHOP_ROOT=C:\Steam\steamapps\workshop\content\107410"
-set "CO_MOD_ROOT=%~dp0"
-if "%CO_MOD_ROOT:~-1%"=="\" set "CO_MOD_ROOT=%CO_MOD_ROOT:~0,-1%"
+
+REM Optional manual overrides (leave blank for auto-detect).
+set "ARMA_OVERRIDE_SERVER_ROOT="
+set "ARMA_OVERRIDE_CLIENT_ROOT="
+set "ARMA_OVERRIDE_WORKSHOP_ROOT="
 
 REM Optional: Workshop IDs (used only if local @mod folders are missing)
 set "WS_CBA=450814997"
@@ -25,44 +32,45 @@ set "MAX_PLAYERS=16"
 set "MISSION_SOURCE_TEMPLATE=ChernOccupation.Chernarus"
 set "MISSION_TEMPLATE=ChernOccupationLocal.Chernarus"
 
+set "CO_MOD_ROOT=%~dp0"
+if "%CO_MOD_ROOT:~-1%"=="\" set "CO_MOD_ROOT=%CO_MOD_ROOT:~0,-1%"
+
 REM ============================================================
-REM Resolve server executable
+REM Detect Arma 3 / Arma 3 Server / dependency mods on any drive
+REM (PowerShell handles spaces and parens robustly; CMD can't.)
 REM ============================================================
-set "SERVER_EXE=%ARMA_SERVER_ROOT%\arma3server_x64.exe"
-if not exist "%SERVER_EXE%" (
-    set "SERVER_EXE=%ARMA_CLIENT_ROOT%\arma3server_x64.exe"
+set "DETECT_PS1=%CO_MOD_ROOT%\tools\detect_arma_paths.ps1"
+if not exist "%DETECT_PS1%" (
+    echo [ERROR] Missing %DETECT_PS1%
+    exit /b 1
 )
-if not exist "%SERVER_EXE%" (
-    echo [ERROR] Could not find arma3server_x64.exe
-    echo Checked:
-    echo   %ARMA_SERVER_ROOT%\arma3server_x64.exe
-    echo   %ARMA_CLIENT_ROOT%\arma3server_x64.exe
-    echo Update ARMA_SERVER_ROOT / ARMA_CLIENT_ROOT in this .bat.
+for /f "usebackq tokens=1,* delims==" %%A in (`powershell -NoProfile -ExecutionPolicy Bypass -File "%DETECT_PS1%" -OverrideServerRoot "%ARMA_OVERRIDE_SERVER_ROOT%" -OverrideClientRoot "%ARMA_OVERRIDE_CLIENT_ROOT%" -OverrideWorkshopRoot "%ARMA_OVERRIDE_WORKSHOP_ROOT%"`) do (
+    set "%%A=%%B"
+)
+
+if not defined SERVER_EXE (
+    echo [ERROR] Could not locate arma3server_x64.exe.
+    echo Either install Arma 3 / Arma 3 Server in any Steam library, or set
+    echo ARMA_OVERRIDE_SERVER_ROOT / ARMA_OVERRIDE_CLIENT_ROOT in this .bat.
     exit /b 1
 )
 
 for %%I in ("%SERVER_EXE%") do set "SERVER_INSTALL_ROOT=%%~dpI"
 set "SERVER_INSTALL_ROOT=%SERVER_INSTALL_ROOT:~0,-1%"
 
-REM ============================================================
-REM Resolve dependency mod paths
-REM ============================================================
-set "MOD_CBA=%ARMA_SERVER_ROOT%\@CBA_A3"
-set "MOD_CUP_CORE=%ARMA_SERVER_ROOT%\@CUP_Terrains_Core"
-set "MOD_CUP_MAPS=%ARMA_SERVER_ROOT%\@CUP_Terrains_Maps"
 set "MOD_CO=%CO_MOD_ROOT%"
 
-if not exist "%MOD_CBA%\addons" set "MOD_CBA=%ARMA_CLIENT_ROOT%\@CBA_A3"
-if not exist "%MOD_CUP_CORE%\addons" set "MOD_CUP_CORE=%ARMA_CLIENT_ROOT%\@CUP_Terrains_Core"
-if not exist "%MOD_CUP_MAPS%\addons" set "MOD_CUP_MAPS=%ARMA_CLIENT_ROOT%\@CUP_Terrains_Maps"
-
-if not exist "%MOD_CBA%\addons" set "MOD_CBA=%WORKSHOP_ROOT%\%WS_CBA%"
-if not exist "%MOD_CUP_CORE%\addons" set "MOD_CUP_CORE=%WORKSHOP_ROOT%\%WS_CUP_TERRAINS_CORE%"
-if not exist "%MOD_CUP_MAPS%\addons" set "MOD_CUP_MAPS=%WORKSHOP_ROOT%\%WS_CUP_TERRAINS_MAPS%"
+echo [INFO] Server exe : %SERVER_EXE%
+echo [INFO] CBA mod    : %MOD_CBA%
+echo [INFO] CUP Core   : %MOD_CUP_CORE%
+echo [INFO] CUP Maps   : %MOD_CUP_MAPS%
 
 if exist "%MOD_CO%\tools\build_addon.ps1" (
     powershell -NoProfile -ExecutionPolicy Bypass -File "%MOD_CO%\tools\build_addon.ps1" -ModRoot "%MOD_CO%" -SkipIfUpToDate
-    if errorlevel 1 exit /b 1
+    if errorlevel 1 (
+        echo [WARN] Addon rebuild step failed or skipped ^(no Arma 3 Tools?^).
+        echo Falling back to existing co_main.pbo if available.
+    )
 )
 
 if not exist "%MOD_CO%\addons\co_main.pbo" (

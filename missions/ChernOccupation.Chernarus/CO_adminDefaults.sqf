@@ -30,15 +30,22 @@ CO_border_postSpacing           = 600;    // meters between border posts
 CO_border_includeCoast          = true;
 CO_border_includeLand           = true;
 CO_border_patrolDensity         = 1.0;    // multiplier on guard counts
-CO_westBorderCampCount          = 7;      // number of active forest camps on west edge
+CO_westBorderCampCount          = 14;     // number of active forest camps on west edge
 CO_westBorderCampGuardsMin      = 2;
 CO_westBorderCampGuardsMax      = 4;
-CO_westBorderTownGuardCount     = 4;
-CO_westBorderChaseRadius        = 180;    // guards chase with melee inside this distance from their post
-CO_westBorderFireRadius         = 85;     // once target gets this far from their post, guards escalate to gunfire
+CO_westBorderForestPatrols      = 5;      // foot patrols rovingthe forest strip
+CO_westBorderTownGuardCount     = 6;
+CO_westBorderChaseRadius        = 220;    // guards chase with melee inside this distance from their post
+CO_westBorderFireRadius         = 95;     // once target gets this far from their post, guards escalate to gunfire
 CO_westRoadCheckpointGuardCount = 6;
 CO_westRoadCheckpointLethal     = true;
-CO_westBorderFemaleOnlyTowns    = ["Komarovo", "Balota", "Pavlovo"];
+CO_westBorderFemaleOnlyTowns    = ["Komarovo", "Balota", "Pavlovo", "Myshkino", "Lopatino"];
+
+// --- Hostile Buses (TCK trucks) ---
+CO_bus_aggroRadius              = 140;    // detection range while cruising
+CO_bus_maxCaptives              = 3;      // force delivery once truck holds this many
+CO_busDetentionThreshold        = 2;      // immediate delivery threshold
+CO_busCruiseAfterCapture        = 60;     // seconds bus keeps hunting after first capture
 
 // --- Airfield / Training Camp ---
 CO_airfield_guardCount          = 14;     // total roving guards inside
@@ -68,6 +75,8 @@ CO_adminUIDs                    = [76561198054336866];     // add Steam64 UIDs a
     "CO_westBorderCampCount","CO_westBorderCampGuardsMin","CO_westBorderCampGuardsMax",
     "CO_westBorderTownGuardCount","CO_westBorderChaseRadius","CO_westBorderFireRadius",
     "CO_westRoadCheckpointGuardCount","CO_westRoadCheckpointLethal","CO_westBorderFemaleOnlyTowns",
+    "CO_westBorderForestPatrols",
+    "CO_bus_aggroRadius","CO_bus_maxCaptives","CO_busDetentionThreshold","CO_busCruiseAfterCapture",
     "CO_airfield_guardCount","CO_airfield_gateGuards",
     "CO_conscript_detainTime","CO_conscript_trainTime",
     "CO_police_carStopChance","CO_police_active",

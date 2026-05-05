@@ -4,22 +4,32 @@
 // west-town guard pressure, and a hard checkpoint on the Komarovo road.
 // ============================================================
 
+// Dense camp lattice along the western forest. The strip runs roughly
+// from Komarovo south up to the NW bend at Y~10500. We jitter the X to
+// avoid a perfectly straight line through the forest.
 private _campSites = [
-    [[3050, 2550, 0], 270, "border_outpost"],
-    [[3160, 3420, 0], 270, "border_tower"],
-    [[3260, 4580, 0], 270, "border_outpost"],
-    [[3020, 5900, 0], 270, "border_tower"],
-    [[2920, 7250, 0], 270, "border_outpost"],
-    [[3070, 8720, 0], 270, "border_tower"],
-    [[3210, 10120, 0], 270, "border_outpost"]
+    [[3050, 2350, 0], 270, "border_outpost"],
+    [[3160, 2950, 0], 270, "border_tower"],
+    [[2840, 3520, 0], 270, "border_outpost"],
+    [[3260, 4180, 0], 270, "border_tower"],
+    [[2980, 4820, 0], 270, "border_outpost"],
+    [[3170, 5520, 0], 270, "border_tower"],
+    [[2920, 6180, 0], 270, "border_outpost"],
+    [[3060, 6840, 0], 270, "border_tower"],
+    [[2820, 7480, 0], 270, "border_outpost"],
+    [[3110, 8140, 0], 270, "border_tower"],
+    [[2960, 8800, 0], 270, "border_outpost"],
+    [[3210, 9440, 0], 270, "border_tower"],
+    [[2880, 10080, 0], 270, "border_outpost"],
+    [[3070, 10620, 0], 270, "border_tower"]
 ];
 
 private _westTownZones = [
-    ["Komarovo", [3600, 2300, 0], 220],
-    ["Balota",   [4500, 2200, 0], 260],
-    ["Pavlovo",  [4400, 5600, 0], 240],
-    ["Myshkino", [1900, 6900, 0], 260],
-    ["Lopatino", [2800,10200, 0], 280]
+    ["Komarovo", [3600, 2300, 0], 240],
+    ["Balota",   [4500, 2200, 0], 280],
+    ["Pavlovo",  [4400, 5600, 0], 260],
+    ["Myshkino", [3300, 6900, 0], 280],
+    ["Lopatino", [3700, 9700, 0], 280]
 ];
 
 private _registerResponseGroup = {
@@ -80,10 +90,43 @@ for "_campIndex" from 0 to (_campCount - 1) do {
     [_campPos, _campDir, _template] call co_main_fnc_stampFortification;
 
     private _staticGrp = [_campPos, _campDir, "CRN_ENF", _guardCount] call co_main_fnc_spawnFortGuards;
-    [_staticGrp, _campPos, 130] call _registerResponseGroup;
+    [_staticGrp, _campPos, 220] call _registerResponseGroup;
 
     private _rovingGrp = [_campPos, 90, (_guardCount max 2), "CRN_ENF"] call co_main_fnc_spawnRovingGuards;
-    [_rovingGrp, _campPos, 160] call _registerResponseGroup;
+    [_rovingGrp, _campPos, 260] call _registerResponseGroup;
+};
+
+// --- Roving foot patrols that walk between camps through the forest. ---
+// They give the strip life beyond static encampments and chase any male civ
+// they spot exactly like a camp would.
+private _patrolCount = (missionNamespace getVariable ["CO_westBorderForestPatrols", 5]) max 0;
+if (_patrolCount > 0 && count _campSites > 1) then {
+    private _step = (count _campSites) / _patrolCount;
+    for "_p" from 0 to (_patrolCount - 1) do {
+        private _anchorIdx = (round (_p * _step)) min ((count _campSites) - 1);
+        private _anchor = (_campSites select _anchorIdx) select 0;
+        private _grp = [_anchor, 60, 3, "CRN_ENF"] call co_main_fnc_spawnRovingGuards;
+        if !(isNull _grp) then {
+            // Replace the small idle cycle with a long N-S patrol along the strip
+            { deleteWaypoint _x } forEach +waypoints _grp;
+            private _patrolSpan = 6;
+            for "_w" from 0 to _patrolSpan do {
+                private _idx = ((_anchorIdx - 2 + _w) max 0) min ((count _campSites) - 1);
+                private _wpPos = (_campSites select _idx) select 0;
+                _wpPos = _wpPos vectorAdd [random 60 - 30, random 60 - 30, 0];
+                private _wp = _grp addWaypoint [_wpPos, 25];
+                _wp setWaypointType "MOVE";
+                _wp setWaypointSpeed "LIMITED";
+                _wp setWaypointBehaviour "AWARE";
+                _wp setWaypointCombatMode "YELLOW";
+            };
+            private _cycleWp = _grp addWaypoint [_anchor, 0];
+            _cycleWp setWaypointType "CYCLE";
+            [_grp, _anchor, 250, "forest_patrol"] call _registerResponseGroup;
+            _grp setVariable ["CO_borderChaseRadius", 320, false];
+            _grp setVariable ["CO_borderFireRadius", 110, false];
+        };
+    };
 };
 
 {

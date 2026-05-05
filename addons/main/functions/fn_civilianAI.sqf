@@ -3,13 +3,15 @@
 
 // Use settlement positions as spawn zones
 private _totalCivs = missionNamespace getVariable ["CO_civilian_totalPopulation", 150];
+// Read once at the top so both the planning loop and the spawn loop can see it.
+// Previously this was scoped to the planning forEach which broke gender selection.
+private _femaleOnlyTowns = missionNamespace getVariable ["CO_westBorderFemaleOnlyTowns", []];
 private _settlementPlan = [];
 private _weightedSettlements = [];
 
 {
     private _townName = _x select 0;
     private _townType = _x select 2;
-    private _femaleOnlyTowns = missionNamespace getVariable ["CO_westBorderFemaleOnlyTowns", []];
     private _guaranteed = switch (_townType) do {
         case "large":  { 18 };
         case "medium": { 8 };
