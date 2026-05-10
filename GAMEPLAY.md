@@ -249,13 +249,15 @@ All defaults live in `missions/ChernOccupation.Chernarus/CO_adminDefaults.sqf`.
   enforcement) no longer silently aborts the rest of init — look at `diag_log` `[CO]` lines.
 - **World density staggered.** Border forts, eastern front, west-border camps, and civilian
   spawn loops yield (`sleep` 0.15–0.25s) every few iterations to avoid choking the server.
-- **Hostile bus aggression.** Buses now drive `AWARE`/yellow, aggro radius defaults to 180m
-  (was 140m), polling is 1s. Every `CO_bus_patrolStopInterval` (default 150s) a bus near a
-  settlement pulls over, escort dismounts and patrols 30s, then reboards.
+- **Hostile bus aggression.** Buses now drive `AWARE`/yellow, aggro radius defaults to 260m
+  (was 140m), polling is 1s, vehicle crews are valid targets, and trucks pursue civilian
+  vehicles before stopping to dismount escorts. Every `CO_bus_patrolStopInterval` (default
+  75s) a bus near a settlement pulls over, escort dismounts and patrols 30s, then reboards.
 - **Melee.** Swing/flinch use `playActionNow` gestures broadcast globally, plus a body-impact
   sound. The previous `switchMove` was overridden by movement state and never visible.
 - **Russian advance.** `CO_rus_advanceFront` is pre-broadcast before any wave; first wave
-  triggers ~30s after server init (was 180s).
+  triggers ~12s after server init (was 180s). Russian waves now spawn on north/central/south
+  lanes near the front line, including a northern Krasnostav combat axis.
 - **Border alert NPC path.** Civilians intercepted at the border no longer attempt a
   `wrangleMinigame` (which would block forever waiting for a key); they take melee hits until
   knocked out, then are transported to detention. Players still get the full minigame.

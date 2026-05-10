@@ -5,6 +5,53 @@ private _aggroRadius = missionNamespace getVariable ["CO_bus_aggroRadius", 180];
 private _maxCaptives = missionNamespace getVariable ["CO_bus_maxCaptives", 3];
 private _patrolStopInterval = missionNamespace getVariable ["CO_bus_patrolStopInterval", 150];
 
+private _isValidTarget = {
+    params ["_unit"];
+    if (isNull _unit || {!alive _unit} || {captive _unit}) exitWith { false };
+    if (_unit getVariable ["CO_isFemale", false]) exitWith { false };
+    if (_unit getVariable ["CO_captureInProgress", false]) exitWith { false };
+    if (_unit getVariable ["CO_knockedOut", false]) exitWith { false };
+
+    private _faction = group _unit getVariable ["CO_faction", ""];
+    if (_faction in ["CRN_ENF", "POLICE", "CRN_FRONT", "RUS_ADV"]) exitWith { false };
+
+    if (isPlayer _unit) exitWith {
+        !((side (group _unit)) in [west, east])
+    };
+
+    side _unit == civilian
+};
+
+private _dismountEscort = {
+    params ["_escortUnits", "_bus", "_target"];
+
+    {
+        if (alive _x) then {
+            _x enableAI "MOVE";
+            _x enableAI "PATH";
+            _x enableAI "AUTOCOMBAT";
+            _x allowGetIn false;
+            unassignVehicle _x;
+            if (vehicle _x == _bus) then {
+                doGetOut _x;
+                moveOut _x;
+            };
+            _x setBehaviour "COMBAT";
+            _x setCombatMode "RED";
+            _x doTarget _target;
+            _x doMove (getPosATL _target);
+        };
+    } forEach _escortUnits;
+
+    private _dismountDeadline = time + 8;
+    waitUntil {
+        sleep 0.25;
+        ({ alive _x && { vehicle _x == _bus } } count _escortUnits) == 0 ||
+        time > _dismountDeadline ||
+        !alive _bus
+    };
+};
+
 while { alive _veh } do {
     if ((_veh getVariable ["CO_busState", "patrol"]) == "delivering") then {
         sleep 2;
@@ -29,14 +76,16 @@ while { alive _veh } do {
     };
 
     private _nearTargets = (_veh nearEntities [["Man"], _aggroRadius]) select {
-        alive _x &&
-        !captive _x &&
-        side _x == civilian &&
-        !(_x getVariable ["CO_isFemale", false]) &&
-        !(_x getVariable ["CO_captureInProgress", false]) &&
-        !(_x getVariable ["CO_knockedOut", false]) &&
-        vehicle _x == _x
+        [_x] call _isValidTarget
     };
+
+    {
+        private _vehicle = _x;
+        private _crewTargets = (crew _vehicle) select { [_x] call _isValidTarget };
+        {
+            _nearTargets pushBackUnique _x;
+        } forEach _crewTargets;
+    } forEach ((_veh nearEntities [["LandVehicle"], _aggroRadius + 120]) select { _x != _veh && alive _x });
 
     // --- Proactive patrol stop ---
     // If the bus is in/near a populated settlement and hasn't paused recently,
@@ -63,9 +112,15 @@ while { alive _veh } do {
 
                     private _escort = units _grp select { alive _x && _x != _driver };
                     {
+                        _x enableAI "MOVE";
+                        _x enableAI "PATH";
+                        _x enableAI "AUTOCOMBAT";
                         _x allowGetIn false;
                         unassignVehicle _x;
-                        if (vehicle _x == _bus) then { doGetOut _x; };
+                        if (vehicle _x == _bus) then {
+                            doGetOut _x;
+                            moveOut _x;
+                        };
                     } forEach _escort;
 
                     private _scanCenter = getPosATL _bus;
@@ -110,8 +165,10 @@ while { alive _veh } do {
     };
 
     if (count _nearTargets > 0) then {
-        private _sortedTargets = [_nearTargets, [], { _x distance _veh }, "ASCEND"] call BIS_fnc_sortBy;
+        private _sortedTargets = [_nearTargets, [], { (vehicle _x) distance _veh }, "ASCEND"] call BIS_fnc_sortBy;
         private _target = _sortedTargets select 0;
+        private _targetObject = vehicle _target;
+        private _targetInVehicle = _targetObject != _target;
         private _driver = driver _veh;
         private _escortUnits = units _grp select { alive _x && _x != _driver };
 
@@ -120,28 +177,39 @@ while { alive _veh } do {
         _veh lockCargo false;
 
         if (!isNull _driver) then {
+            _driver setVariable ["CO_vehicleChaseDriver", true, false];
+            _driver enableAI "MOVE";
+            _driver enableAI "PATH";
+            _driver enableAI "AUTOCOMBAT";
+            _driver setBehaviour "COMBAT";
+            _driver setCombatMode "RED";
+        };
+
+        if (_targetInVehicle) then {
+            diag_log format ["[CO] Bus patrol pursuing vehicle target %1 near %2.", name _target, mapGridPosition _targetObject];
+            _veh forceSpeed -1;
+            private _pursuitDeadline = time + 45;
+            waitUntil {
+                sleep 1;
+                _targetObject = vehicle _target;
+                if (!alive _veh || !alive _target || captive _target) exitWith { true };
+                if (!isNull _driver && alive _driver) then {
+                    _grp reveal [_targetObject, 4];
+                    _driver doTarget _targetObject;
+                    _driver doMove (getPosATL _targetObject);
+                };
+                (_veh distance _targetObject) < 45 ||
+                _targetObject == _target ||
+                time > _pursuitDeadline
+            };
+        };
+
+        if (!isNull _driver && alive _driver) then {
             doStop _driver;
             _veh forceSpeed 0;
-            _driver setBehaviour "COMBAT";
-            _driver doMove (getPosATL _target);
         };
 
-        // Dismount escort team and keep them outside until the capture attempt resolves.
-        {
-            _x allowGetIn false;
-            if (vehicle _x == _veh) then {
-                unassignVehicle _x;
-                doGetOut _x;
-            };
-        } forEach _escortUnits;
-
-        private _dismountDeadline = time + 6;
-        waitUntil {
-            sleep 0.5;
-            ({ vehicle _x == _veh } count _escortUnits) == 0 ||
-            time > _dismountDeadline ||
-            !alive _veh
-        };
+        [_escortUnits, _veh, _target] call _dismountEscort;
 
         [[_target], _grp] call co_main_fnc_checkpointAlert;
 
@@ -195,6 +263,12 @@ while { alive _veh } do {
 
         if (!isNull _driver && alive _driver) then {
             _driver setBehaviour "AWARE";
+            _driver setCombatMode "YELLOW";
+            _driver setVariable ["CO_vehicleChaseDriver", false, false];
+            private _currentWpPos = waypointPosition [_grp, currentWaypoint _grp];
+            if !(_currentWpPos isEqualTo [0,0,0]) then {
+                _driver doMove _currentWpPos;
+            };
         };
 
         if ((_veh getVariable ["CO_busState", "patrol"]) == "engaging") then {

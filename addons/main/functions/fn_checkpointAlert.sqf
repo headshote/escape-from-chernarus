@@ -15,6 +15,7 @@ params ["_detectedUnits", "_hostileGrp"];
 
     // Order whole group to move on target
     {
+        if (_x getVariable ["CO_vehicleChaseDriver", false]) then { continue };
         _x doTarget _target;
         _x doMove (getPosATL _target);
         _x setCombatMode "RED";
@@ -27,7 +28,11 @@ params ["_detectedUnits", "_hostileGrp"];
         private _finished = false;
 
         while { alive _target && !captive _target && !_finished } do {
-            private _liveUnits = units _grp select { alive _x };
+            private _liveUnits = units _grp select {
+                alive _x &&
+                !(_x getVariable ["CO_vehicleChaseDriver", false]) &&
+                vehicle _x == _x
+            };
             if (count _liveUnits == 0) exitWith {}; // all guards killed
             private _nearest = [_liveUnits, [], { _x distance _target }, "ASCEND"] call BIS_fnc_sortBy;
             if ((_nearest select 0) distance _target < 2.5) then {

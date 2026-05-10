@@ -6,6 +6,7 @@ publicVariable "CO_front_unitsRemaining";
 
 // Defense line positions (east side, west of Russian spawn)
 CO_frontDefensePositions = [
+    [12150, 12300, 0],
     [13800, 8100, 0],
     [13200, 6800, 0],
     [12900, 5200, 0],

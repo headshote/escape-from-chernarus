@@ -12,7 +12,7 @@ params [
 ];
 
 private _yMin = 1500;
-private _yMax = 11500;
+private _yMax = 13000;
 private _nodes = floor ((_yMax - _yMin) / _lineSpacingY);
 private _spawned = 0;
 

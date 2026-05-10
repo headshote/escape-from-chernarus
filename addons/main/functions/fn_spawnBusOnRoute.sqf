@@ -52,10 +52,16 @@ _grp setFormation "FILE";
 _veh engineOn true;
 _veh forceSpeed -1;
 {
-    _x disableAI "AUTOCOMBAT";
+    _x enableAI "MOVE";
+    _x enableAI "PATH";
+    _x enableAI "AUTOCOMBAT";
+    _x setBehaviour "AWARE";
+    _x setCombatMode "YELLOW";
     _x setSkill ["aimingAccuracy", 0.25];
     _x setSkill ["aimingShake", 0.4];
     _x setSkill ["spotDistance", 0.6];
+    _x setSkill ["spotTime", 0.7];
+    _x setSkill ["courage", 0.8];
 } forEach (units _grp);
 
 _veh setVariable ["CO_isBusPatrol", true, true];
@@ -63,7 +69,8 @@ _veh setVariable ["CO_busState", "patrol", true];
 _veh setVariable ["CO_busRouteWps", _routeWps, false];
 _veh setVariable ["CO_busCaptives", [], true];
 _veh setVariable ["CO_busNextEngageAt", 0, false];
-_veh setVariable ["CO_busLastPatrolStop", time, false];
+private _patrolStopInterval = missionNamespace getVariable ["CO_bus_patrolStopInterval", 75];
+_veh setVariable ["CO_busLastPatrolStop", time - _patrolStopInterval + random 25, false];
 _veh setVehicleLock "UNLOCKED";
 
 // Attach aggro loop

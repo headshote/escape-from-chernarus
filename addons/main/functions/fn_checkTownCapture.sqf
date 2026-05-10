@@ -3,11 +3,18 @@
     private _townName   = _x select 0;
     private _townX      = _x select 1;
     private _markerName = _x select 2;
+    private _townPos    = if (count _x > 3) then { _x select 3 } else { [_townX, 6000, 0] };
+
+    if ((getMarkerPos _markerName) isEqualTo [0,0,0]) then {
+        createMarker [_markerName, _townPos];
+        _markerName setMarkerType "mil_objective";
+        _markerName setMarkerColor "ColorBlue";
+        _markerName setMarkerText _townName;
+    };
+
     private _alreadyFallen = markerColor _markerName == "ColorRed";
 
     if (!_alreadyFallen && CO_rus_advanceFront < _townX + 500) then {
-        private _townPos = [_townX, 6000, 0]; // approximate town center
-
         private _rusUnits = {
             _x getVariable ["CO_faction",""] == "RUS_ADV" &&
             ({ alive _x } count (units _x)) > 0 &&

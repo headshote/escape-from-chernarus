@@ -20,6 +20,8 @@ CO_bus_vehiclePool              = ["C_Van_01_transport_F","C_Truck_02_transport_
 CO_rus_waveCooldown             = 180;    // seconds between Russian waves
 CO_rus_unitsPerWave             = 12;
 CO_rus_armorFrequency           = 3;      // every Nth wave gets an APC
+CO_rus_firstWaveDelay           = 12;     // seconds after init before first visible wave
+CO_rus_spawnX                   = 14100;  // close enough to eastern front for early contact
 CO_front_initialStrength        = 60;
 CO_front_lineSpacingY           = 280;    // meters between front nodes N-S (was 200; lighter default)
 CO_front_depthRows              = 2;      // rows of fortification
@@ -42,11 +44,11 @@ CO_westRoadCheckpointLethal     = true;
 CO_westBorderFemaleOnlyTowns    = ["Komarovo", "Balota", "Pavlovo", "Myshkino", "Lopatino"];
 
 // --- Hostile Buses (TCK trucks) ---
-CO_bus_aggroRadius              = 180;    // detection range while cruising
+CO_bus_aggroRadius              = 260;    // detection range while cruising
 CO_bus_maxCaptives              = 3;      // force delivery once truck holds this many
 CO_busDetentionThreshold        = 2;      // immediate delivery threshold
 CO_busCruiseAfterCapture        = 60;     // seconds bus keeps hunting after first capture
-CO_bus_patrolStopInterval       = 150;    // seconds between proactive bus dismount-and-search stops
+CO_bus_patrolStopInterval       = 75;     // seconds between proactive bus dismount-and-search stops
 
 // --- Airfield / Training Camp ---
 CO_airfield_guardCount          = 14;     // total roving guards inside
@@ -70,7 +72,7 @@ CO_adminUIDs                    = [76561198054336866];     // add Steam64 UIDs a
     "CO_checkpoint_hostilesPerPost","CO_checkpoint_includeLarge","CO_checkpoint_includeMedium",
     "CO_checkpoint_includeSmall","CO_checkpoint_fortTemplate",
     "CO_bus_totalCruising","CO_bus_hostilesPerBus","CO_bus_townGuaranteed","CO_bus_vehiclePool",
-    "CO_rus_waveCooldown","CO_rus_unitsPerWave","CO_rus_armorFrequency",
+    "CO_rus_waveCooldown","CO_rus_unitsPerWave","CO_rus_armorFrequency","CO_rus_firstWaveDelay","CO_rus_spawnX",
     "CO_front_initialStrength","CO_front_lineSpacingY","CO_front_depthRows","CO_front_rowSpacing",
     "CO_border_postSpacing","CO_border_includeCoast","CO_border_includeLand","CO_border_patrolDensity",
     "CO_westBorderCampCount","CO_westBorderCampGuardsMin","CO_westBorderCampGuardsMax",
