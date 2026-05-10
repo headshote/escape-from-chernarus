@@ -1,6 +1,7 @@
 // fn_russianAdvance.sqf — master controller, runs on server
 
 CO_rus_advanceFront = 14000;   // current X coord of front line (starts at east edge ~15000)
+publicVariable "CO_rus_advanceFront";
 if (isNil "CO_rus_waveCooldown") then { CO_rus_waveCooldown = 180; };
 if (isNil "CO_rus_unitsPerWave") then { CO_rus_unitsPerWave = 12; };
 CO_rus_advanceSpeed = 0.5;     // front moves this many meters per second of game time (abstract)
@@ -13,13 +14,19 @@ CO_rus_townObjectives = [
     ["Balota",          4500, "marker_balota"]
 ];
 
-// Spawn loop
+// Spawn loop. First wave fires after a brief warmup so players see Russian
+// activity within ~30 seconds of mission start instead of waiting a full
+// CO_rus_waveCooldown (default 180s) before anything spawns east.
 [] spawn {
+    sleep 30;
+    diag_log "[CO] Russian advance: first wave triggering.";
     while { CO_rus_advanceFront > 3000 } do { // stop at west coast
         [] call co_main_fnc_spawnRussianWave;
         CO_rus_advanceFront = CO_rus_advanceFront - 120; // advance front abstraction
+        publicVariable "CO_rus_advanceFront";
         [] call co_main_fnc_updateFrontLine;
         [] call co_main_fnc_checkTownCapture;
         sleep CO_rus_waveCooldown;
     };
+    diag_log "[CO] Russian advance loop exited (front reached west coast or stopped).";
 };

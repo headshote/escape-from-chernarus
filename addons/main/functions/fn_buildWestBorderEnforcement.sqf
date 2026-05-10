@@ -94,6 +94,9 @@ for "_campIndex" from 0 to (_campCount - 1) do {
 
     private _rovingGrp = [_campPos, 90, (_guardCount max 2), "CRN_ENF"] call co_main_fnc_spawnRovingGuards;
     [_rovingGrp, _campPos, 260] call _registerResponseGroup;
+
+    // Yield every couple of camps so the west edge spawns smoothly.
+    if (_campIndex % 2 == 1) then { sleep 0.25; };
 };
 
 // --- Roving foot patrols that walk between camps through the forest. ---

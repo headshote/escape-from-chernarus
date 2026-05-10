@@ -241,3 +241,30 @@ All defaults live in `missions/ChernOccupation.Chernarus/CO_adminDefaults.sqf`.
   dedicated mission dependency audit.
 - This document reflects the current scripted systems, but the detention, training, front-line,
   and town-population loops still need live in-game playtesting after this runtime pass.
+
+## Recent Runtime Pass — Notes
+
+- **Resilient init.** `fn_initServer` now wraps each step in a per-step try/catch and records
+  status into a `CO_initStepStatus` hashmap. A failure in one step (e.g. west-border
+  enforcement) no longer silently aborts the rest of init — look at `diag_log` `[CO]` lines.
+- **World density staggered.** Border forts, eastern front, west-border camps, and civilian
+  spawn loops yield (`sleep` 0.15–0.25s) every few iterations to avoid choking the server.
+- **Hostile bus aggression.** Buses now drive `AWARE`/yellow, aggro radius defaults to 180m
+  (was 140m), polling is 1s. Every `CO_bus_patrolStopInterval` (default 150s) a bus near a
+  settlement pulls over, escort dismounts and patrols 30s, then reboards.
+- **Melee.** Swing/flinch use `playActionNow` gestures broadcast globally, plus a body-impact
+  sound. The previous `switchMove` was overridden by movement state and never visible.
+- **Russian advance.** `CO_rus_advanceFront` is pre-broadcast before any wave; first wave
+  triggers ~30s after server init (was 180s).
+- **Border alert NPC path.** Civilians intercepted at the border no longer attempt a
+  `wrangleMinigame` (which would block forever waiting for a key); they take melee hits until
+  knocked out, then are transported to detention. Players still get the full minigame.
+- **Disguise pickup.** Weapon caches now contain civilian uniforms (`U_C_Workman_01`,
+  `U_C_Poor_1`, `U_C_Farmer`, `U_C_Driver_1`) and expose `Take Disguise (Worker/Farmer)`
+  actions which fire the `co_main_disguise` CBA event and bump `CO_disguiseLevel`.
+- **Lockpick.** Real `displayAddEventHandler "KeyDown"` handler in
+  `fn_minigame_lockpick`, plus a self-action `Attempt to pick the lock` shown to the
+  detained player while `CO_detainPhase == "detention"`.
+- **Day/night cycle.** Server sets `setTimeMultiplier 6` so a Chernarus day is ~4 real hours.
+  Clients start with `ItemMap`, `ItemCompass`, `ItemWatch` only — `ItemGPS`, `ItemRadio`,
+  `B_UavTerminal` are stripped on init (per spec point 16).

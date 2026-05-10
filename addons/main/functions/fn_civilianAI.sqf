@@ -242,6 +242,11 @@ if (count _settlementPlan > _totalCivs) then {
             sleep 3;
         };
     };
+
+    // Yield every batch so we don't lock the server scheduler creating
+    // hundreds of civilians on one frame. With ~150-220 civilians a 0.15s
+    // sleep every 8 spawns keeps the cost spread across ~3-5 seconds.
+    if (_forEachIndex % 8 == 7) then { sleep 0.15; };
 } forEach _settlementPlan;
 
 diag_log format ["[CO] Civilian AI spawned: %1 civilians across %2 settlements.", count _settlementPlan, count CO_settlements];

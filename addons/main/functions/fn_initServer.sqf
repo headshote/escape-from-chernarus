@@ -14,7 +14,7 @@
     "CO_westBorderTownGuardCount","CO_westBorderChaseRadius","CO_westBorderFireRadius",
     "CO_westRoadCheckpointGuardCount","CO_westRoadCheckpointLethal","CO_westBorderFemaleOnlyTowns",
     "CO_westBorderForestPatrols",
-    "CO_bus_aggroRadius","CO_bus_maxCaptives","CO_busDetentionThreshold","CO_busCruiseAfterCapture",
+    "CO_bus_aggroRadius","CO_bus_maxCaptives","CO_busDetentionThreshold","CO_busCruiseAfterCapture","CO_bus_patrolStopInterval",
     "CO_airfield_guardCount","CO_airfield_gateGuards",
     "CO_conscript_detainTime","CO_conscript_trainTime",
     "CO_police_carStopChance","CO_police_active",
@@ -22,20 +22,65 @@
 ];
 sleep 0.5;
 
+// Each init step is wrapped so an SQF error in one subsystem cannot silently
+// abort downstream subsystems. We track per-step status in
+// CO_initStepStatus for in-game diagnostics via the admin panel / RPT.
+missionNamespace setVariable ["CO_initStepStatus", createHashMap, true];
+
+private _markStep = {
+    params ["_label", "_state", ["_detail", ""]];
+    private _status = missionNamespace getVariable ["CO_initStepStatus", createHashMap];
+    _status set [_label, [_state, _detail, time]];
+    missionNamespace setVariable ["CO_initStepStatus", _status, true];
+};
+
 private _runStep = {
     params ["_label", "_code"];
+    [_label, "running"] call _markStep;
     diag_log format ["[CO] Init step start: %1", _label];
-    call _code;
-    diag_log format ["[CO] Init step done: %1", _label];
+    private _ok = true;
+    private _err = "";
+    if (!isNil { _label }) then {
+        // Use call inside a fault-tolerant wrapper. SQF doesn't have try/catch
+        // in older runtimes outside of throw/catch blocks, so we use that.
+        try {
+            call _code;
+        } catch {
+            _ok = false;
+            _err = str _exception;
+            diag_log format ["[CO] Init step FAILED: %1 -> %2", _label, _err];
+        };
+    };
+    if (_ok) then {
+        [_label, "done"] call _markStep;
+        diag_log format ["[CO] Init step done: %1", _label];
+    } else {
+        [_label, "failed", _err] call _markStep;
+    };
 };
 
 private _launchStep = {
     params ["_label", "_code"];
+    [_label, "scheduled"] call _markStep;
     [_label, _code] spawn {
         params ["_stepLabel", "_stepCode"];
         diag_log format ["[CO] Async step start: %1", _stepLabel];
-        call _stepCode;
-        diag_log format ["[CO] Async step done: %1", _stepLabel];
+        private _status = missionNamespace getVariable ["CO_initStepStatus", createHashMap];
+        _status set [_stepLabel, ["running", "", time]];
+        missionNamespace setVariable ["CO_initStepStatus", _status, true];
+        try {
+            call _stepCode;
+            _status = missionNamespace getVariable ["CO_initStepStatus", createHashMap];
+            _status set [_stepLabel, ["done", "", time]];
+            missionNamespace setVariable ["CO_initStepStatus", _status, true];
+            diag_log format ["[CO] Async step done: %1", _stepLabel];
+        } catch {
+            private _err = str _exception;
+            _status = missionNamespace getVariable ["CO_initStepStatus", createHashMap];
+            _status set [_stepLabel, ["failed", _err, time]];
+            missionNamespace setVariable ["CO_initStepStatus", _status, true];
+            diag_log format ["[CO] Async step FAILED: %1 -> %2", _stepLabel, _err];
+        };
     };
 };
 
@@ -44,6 +89,10 @@ private _launchStep = {
 sleep 0.5;
 ["placeCheckpoints", { [] call co_main_fnc_placeCheckpoints; }] call _runStep;
 ["buildBusRoutes", { [] call co_main_fnc_buildBusRoutes; }] call _runStep;
+
+// Day/night cycle so morning, midday, and night affect police recognition,
+// civilian density, and patrol behaviour. 6x runs a 24h Chernarus day in 4h.
+setTimeMultiplier 6;
 
 ["spawnAllBuses", { [] call co_main_fnc_spawnAllBuses; }] call _launchStep;
 ["civilianAI", { [] call co_main_fnc_civilianAI; }] call _launchStep;

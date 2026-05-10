@@ -71,7 +71,16 @@ private _lootTables = [
         _box addItemCargoGlobal ["ToolKit", 1]; // represents crowbar/improvised melee
     };
 
+    // Civilian uniforms — these are the items the disguise action picks up.
+    // Not a guaranteed roll; rural caches are more likely to hold a worker
+    // disguise, town caches a farmer/journalist disguise.
+    private _disguisePool = ["U_C_Workman_01", "U_C_Poor_1", "U_C_Farmer", "U_C_Driver_1"];
+    if (random 1 < 0.6) then {
+        _box addItemCargoGlobal [selectRandom _disguisePool, 1];
+    };
+
     // Mark as cache for interaction system
-    _box setVariable ["CO_isWeaponCache", true, false];
+    _box setVariable ["CO_isWeaponCache", true, true];
+    _box setVariable ["CO_disguiseTaken", false, true];
     CO_weaponCaches pushBack _box;
 } forEach _cacheDefs;

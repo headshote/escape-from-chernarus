@@ -5,6 +5,29 @@
 // Wait for globals to arrive from server
 waitUntil { !isNil "CO_checkpoint_hostilesPerPost" && !isNil "CO_police_active" };
 
+// --- Player loadout policy: civilian start has no GPS ---
+// Per spec point 16: only a map, compass, and watch by default. Players who
+// later find a GPS in a weapon cache can pick it up manually. Goggles are
+// unaffected so face-cover items still work as part of the disguise system.
+{
+    private _hasItem = (_x in (assignedItems player));
+    if (_hasItem) then { player unassignItem _x; };
+    player removeItem _x;
+} forEach ["ItemGPS", "ItemRadio", "B_UavTerminal"];
+
+// Make sure the basic identity items are present
+{
+    if !(_x in (assignedItems player)) then {
+        player addItem _x;
+        player assignItem _x;
+    };
+} forEach ["ItemMap", "ItemCompass", "ItemWatch"];
+
+// Hide the player's own marker on the map (engine-level: shows only in radar
+// HUD, which civilians don't have anyway). We force hide via showHUD
+// preserving other elements so the watch/compass remain visible.
+showGPS false;
+
 // Start endurance bar HUD
 [] call co_main_fnc_enduranceBar;
 

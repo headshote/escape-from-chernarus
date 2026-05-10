@@ -42,6 +42,12 @@ CO_borderSegments = [
 
         // Spawn border guards
         [_pos, _facing, "CRN_ENF"] call co_main_fnc_spawnFortGuards;
+
+        // Yield between posts so we don't burn through the entire perimeter
+        // on one frame. Border posts can number ~70 with default spacing.
+        if (_i % 3 == 0) then { sleep 0.2; };
     };
 
 } forEach CO_borderSegments;
+
+diag_log "[CO] Border perimeter forts built.";

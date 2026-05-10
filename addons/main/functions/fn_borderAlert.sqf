@@ -31,13 +31,25 @@ if (_mode == "capture") exitWith {
             if (count _nearest == 0) exitWith { true };
             private _sorted = [_nearest, [], { _x distance _target }, "ASCEND"] call BIS_fnc_sortBy;
             if ((_sorted select 0) distance _target < 2.5) then {
-                [_target] remoteExecCall ["co_main_fnc_wrangleMinigame", _target];
-                waitUntil { !isNil { _target getVariable "CO_wrangleResult" } };
-                private _result = _target getVariable ["CO_wrangleResult", "captured"];
-                _target setVariable ["CO_wrangleResult", nil, true];
-                if (_result == "captured") then {
-                    _target setCaptive true;
-                    [_target, _grp] call co_main_fnc_transportToDetention;
+                if (isPlayer _target) then {
+                    [_target] remoteExecCall ["co_main_fnc_wrangleMinigame", _target];
+                    waitUntil { !isNil { _target getVariable "CO_wrangleResult" } };
+                    private _result = _target getVariable ["CO_wrangleResult", "captured"];
+                    _target setVariable ["CO_wrangleResult", nil, true];
+                    if (_result == "captured") then {
+                        _target setCaptive true;
+                        [_target, _grp] call co_main_fnc_transportToDetention;
+                    };
+                } else {
+                    // Non-player target: never run a wrangle dialog (would block
+                    // forever waiting for a key handler that no one will trigger).
+                    // Use the same melee knockout flow as checkpointAlert.
+                    private _attacker = _sorted select 0;
+                    [_attacker, _target] call co_main_fnc_applyMeleeHit;
+                    if (_target getVariable ["CO_knockedOut", false]) then {
+                        _target setCaptive true;
+                        [_target, _grp] call co_main_fnc_transportToDetention;
+                    };
                 };
                 true
             } else {

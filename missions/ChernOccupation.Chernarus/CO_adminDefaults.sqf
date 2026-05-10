@@ -21,12 +21,12 @@ CO_rus_waveCooldown             = 180;    // seconds between Russian waves
 CO_rus_unitsPerWave             = 12;
 CO_rus_armorFrequency           = 3;      // every Nth wave gets an APC
 CO_front_initialStrength        = 60;
-CO_front_lineSpacingY           = 200;    // meters between front nodes N-S
+CO_front_lineSpacingY           = 280;    // meters between front nodes N-S (was 200; lighter default)
 CO_front_depthRows              = 2;      // rows of fortification
-CO_front_rowSpacing             = 50;
+CO_front_rowSpacing             = 60;
 
 // --- Border Patrol ---
-CO_border_postSpacing           = 600;    // meters between border posts
+CO_border_postSpacing           = 1000;   // meters between border posts (default sparse to avoid AI overload)
 CO_border_includeCoast          = true;
 CO_border_includeLand           = true;
 CO_border_patrolDensity         = 1.0;    // multiplier on guard counts
@@ -42,10 +42,11 @@ CO_westRoadCheckpointLethal     = true;
 CO_westBorderFemaleOnlyTowns    = ["Komarovo", "Balota", "Pavlovo", "Myshkino", "Lopatino"];
 
 // --- Hostile Buses (TCK trucks) ---
-CO_bus_aggroRadius              = 140;    // detection range while cruising
+CO_bus_aggroRadius              = 180;    // detection range while cruising
 CO_bus_maxCaptives              = 3;      // force delivery once truck holds this many
 CO_busDetentionThreshold        = 2;      // immediate delivery threshold
 CO_busCruiseAfterCapture        = 60;     // seconds bus keeps hunting after first capture
+CO_bus_patrolStopInterval       = 150;    // seconds between proactive bus dismount-and-search stops
 
 // --- Airfield / Training Camp ---
 CO_airfield_guardCount          = 14;     // total roving guards inside
@@ -76,7 +77,7 @@ CO_adminUIDs                    = [76561198054336866];     // add Steam64 UIDs a
     "CO_westBorderTownGuardCount","CO_westBorderChaseRadius","CO_westBorderFireRadius",
     "CO_westRoadCheckpointGuardCount","CO_westRoadCheckpointLethal","CO_westBorderFemaleOnlyTowns",
     "CO_westBorderForestPatrols",
-    "CO_bus_aggroRadius","CO_bus_maxCaptives","CO_busDetentionThreshold","CO_busCruiseAfterCapture",
+    "CO_bus_aggroRadius","CO_bus_maxCaptives","CO_busDetentionThreshold","CO_busCruiseAfterCapture","CO_bus_patrolStopInterval",
     "CO_airfield_guardCount","CO_airfield_gateGuards",
     "CO_conscript_detainTime","CO_conscript_trainTime",
     "CO_police_carStopChance","CO_police_active",

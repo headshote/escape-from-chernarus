@@ -31,16 +31,19 @@ private _yaw = (_toTarget select 0) atan2 (_toTarget select 1);
 [_attacker, _yaw] remoteExec ["setDir", 0];
 
 // Visible punch animation broadcast globally so every viewer sees the swing.
-// "Acts_PoloShirtConfrontation_Loop" plays a clear arm-swing motion in vanilla A3
-// and overrides whatever animation the unit was in.
-[_attacker, "Acts_PoloShirtConfrontation_Loop"] remoteExec ["switchMove", 0];
-[_attacker] spawn {
-    params ["_a"];
-    sleep 0.7;
-    if (!isNull _a && alive _a) then {
-        [_a, ""] remoteExec ["switchMove", 0];
-    };
-};
+// playActionNow uses gesture layers that don't get cancelled by the player's
+// movement state (unlike switchMove which is overridden the next frame). We
+// alternate "GestureGo" / "GestureFollow" / "GestureCeaseFire" so successive
+// punches read as different swings and a final knockout animation reads as
+// distinct from the in-progress swings.
+private _swingGesture = selectRandom ["GestureGo", "GestureFollow", "GestureCeaseFire"];
+[_attacker, _swingGesture] remoteExec ["playActionNow", 0];
+
+// Audible punch hit cue, broadcast globally
+playSound3D [
+    "A3\Sounds_F\characters\human-sfx\other\Body_Fall1.wss",
+    _target, false, getPosASL _target, 1.6, 1, 25
+];
 
 private _punchState = _target getVariable ["CO_meleePunchState", [0, 0]];
 private _hitCount = _punchState select 0;
@@ -75,8 +78,10 @@ private _pushVector = vectorNormalized _toTarget;
 if !(_pushVector isEqualTo [0, 0, 0]) then {
     _target setVelocity [(_pushVector select 0) * 1.2, (_pushVector select 1) * 1.2, 0.25];
 };
-// Brief hand-up flinch broadcast on the target (cleared automatically by their move loop)
-[_target, "AmovPercMstpSrasWrflDnon_diary"] remoteExec ["switchMove", 0];
+// Short flinch gesture broadcast on the target. playActionNow layers on top of
+// the existing animation so it reads as a hit reaction without freezing them
+// in place.
+[_target, "GestureNo"] remoteExec ["playActionNow", 0];
 
 if (!isPlayer _attacker) then {
     _attacker doMove (getPosATL _target);

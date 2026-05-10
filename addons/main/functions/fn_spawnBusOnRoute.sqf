@@ -34,22 +34,36 @@ for "_i" from 1 to _hostilesCount do {
 {
     private _wp = _grp addWaypoint [_x, 10];
     _wp setWaypointType "MOVE";
-    _wp setWaypointBehaviour "SAFE";
+    _wp setWaypointBehaviour "AWARE";
     _wp setWaypointCombatMode "YELLOW";
     _wp setWaypointSpeed "NORMAL";
 } forEach _routeWps;
 private _cycleWp = _grp addWaypoint [_routeWps select 0, 0];
 _cycleWp setWaypointType "CYCLE";
 
-_grp setBehaviour "SAFE";
+_grp setBehaviour "AWARE";
 _grp setCombatMode "YELLOW";
 _grp setSpeedMode "NORMAL";
+_grp setFormation "FILE";
+
+// Make sure the engine is on so the AI driver actually moves immediately
+// (vans sometimes spawn with engine off and the driver waits for a fuel-up
+// behaviour cycle before starting). Force the bus toward the first waypoint.
+_veh engineOn true;
+_veh forceSpeed -1;
+{
+    _x disableAI "AUTOCOMBAT";
+    _x setSkill ["aimingAccuracy", 0.25];
+    _x setSkill ["aimingShake", 0.4];
+    _x setSkill ["spotDistance", 0.6];
+} forEach (units _grp);
 
 _veh setVariable ["CO_isBusPatrol", true, true];
 _veh setVariable ["CO_busState", "patrol", true];
 _veh setVariable ["CO_busRouteWps", _routeWps, false];
 _veh setVariable ["CO_busCaptives", [], true];
 _veh setVariable ["CO_busNextEngageAt", 0, false];
+_veh setVariable ["CO_busLastPatrolStop", time, false];
 _veh setVehicleLock "UNLOCKED";
 
 // Attach aggro loop
