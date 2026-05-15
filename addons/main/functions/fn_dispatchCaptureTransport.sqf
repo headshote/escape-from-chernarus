@@ -41,13 +41,15 @@ if (isNull _bus || !alive _bus) then {
 };
 
 if (isNull _bus) exitWith {
-    // No transport available: leave the victim down. They'll wake in 90s.
-    diag_log format ["[CO] Non-lethal hit on %1 but no nearby bus for pickup.", name _target];
-    [_target] spawn {
-        params ["_t"];
-        sleep 95;
-        _t setVariable ["CO_captureInProgress", false, true];
-    };
+    // No patrol bus available — fall back to spawning a dedicated capture
+    // van at the nearest road. This is the path used by the SW border fort,
+    // remote checkpoints, and the global TCK aggression failsafe whenever
+    // the player gets knocked out far from any active patrol route.
+    diag_log format [
+        "[CO] No nearby bus for %1 — dispatching dedicated capture transport.",
+        name _target
+    ];
+    [_target, group _shooter] call co_main_fnc_spawnCaptureTransport;
 };
 
 private _busGrp = group (driver _bus);

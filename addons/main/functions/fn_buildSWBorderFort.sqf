@@ -98,6 +98,12 @@ private _spawnLethalGarrison = {
     _wpHold setWaypointType "SENTRY";
     _wpHold setWaypointSpeed "LIMITED";
 
+    // Also attach the standard checkpoint-style aggro loop so any
+    // civilian/player within the post radius goes through the
+    // wrangle→knockout→transport pipeline (not just the lethal fire
+    // loop below — the lethal loop only opens fire at long range).
+    [_grp, _pos, _engageRadius min 150, "CRN_ENF"] call co_main_fnc_guardAggroLoop;
+
     // Scripted lethal engagement loop (civilians are setFriend west=1, so
     // the engine won't auto-fire on them — we force it).
     [_grp, _pos, _engageRadius] spawn {

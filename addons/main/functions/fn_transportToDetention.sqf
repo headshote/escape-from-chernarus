@@ -12,17 +12,14 @@ if (isNil "CO_detentionCenters") then {
 
 // Find or create transport bus
 private _bus = vehicle (leader _capturingGrp);
-if (_bus isKindOf "Man") then {
-    _bus = "C_Van_01_transport_F" createVehicle (getPosATL _captive);
-
-    private _driverCandidates = units _capturingGrp select { alive _x };
-    if (_driverCandidates isEqualTo []) exitWith {
-        diag_log "[CO] transportToDetention aborted: no live capturing units.";
-    };
-
-    private _driver = _driverCandidates select 0;
-    _driver assignAsDriver _bus;
-    _driver moveInDriver _bus;
+if (_bus isKindOf "Man") exitWith {
+    // No vehicle attached to the capturing group. Hand off entirely to
+    // the dedicated capture-transport helper which spawns a van at the
+    // NEAREST ROAD (NOT on top of the captive — that detonated against
+    // the player hitbox and silently aborted the flow), drives it over,
+    // loads the captive + a jailer guard, and delivers to detention or
+    // the NW airfield training ground.
+    [_captive, _capturingGrp] call co_main_fnc_spawnCaptureTransport;
 };
 
 private _busDriver = driver _bus;

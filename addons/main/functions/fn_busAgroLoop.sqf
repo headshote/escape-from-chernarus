@@ -40,9 +40,9 @@ params ["_veh", "_driverGrp", "_escortGrp"];
 if (!isServer) exitWith {};
 if (isNull _veh || isNull _driverGrp) exitWith {};
 
-#define BUS_SCAN_RADIUS        220
-#define BUS_DISMOUNT_RANGE      55
-#define BUS_FOOT_SCAN_RADIUS    28
+#define BUS_SCAN_RADIUS        260
+#define BUS_DISMOUNT_RANGE      75
+#define BUS_FOOT_SCAN_RADIUS    30
 #define BUS_MELEE_RANGE          2.6
 #define BUS_WP_REACHED_DIST     35
 #define BUS_DOMOVE_INTERVAL      5
@@ -50,6 +50,7 @@ if (isNull _veh || isNull _driverGrp) exitWith {};
 #define BUS_REBOARD_TIMEOUT     15
 #define BUS_STUCK_SPEED          1.8
 #define BUS_STUCK_GRACE         22
+#define BUS_APPROACH_TIMEOUT    90
 
 private _aggroRadius = missionNamespace getVariable ["CO_bus_aggroRadius", BUS_SCAN_RADIUS];
 private _maxCaptives = missionNamespace getVariable ["CO_bus_maxCaptives", 3];
@@ -63,6 +64,7 @@ private _lastDoMove     = 0;
 private _huntTarget     = objNull;
 private _huntUntil      = 0;
 private _dismountUntil  = 0;
+private _approachStarted = -1;
 
 _veh setVariable ["CO_busState", "traveling", true];
 
@@ -331,7 +333,7 @@ while { alive _veh } do {
     // SCAN for nearby civilians/players from the bus point
     // ====================================================================
     private _scanCenter = getPosATL _veh;
-    private _scan = (_scanCenter nearEntities [["Man"], _aggroRadius]) select {
+    private _scanFoot = (_scanCenter nearEntities [["Man"], _aggroRadius]) select {
         private _t = _x;
         private _ok = alive _t && vehicle _t == _t;
         if (_ok && captive _t) then { _ok = false };
@@ -346,6 +348,26 @@ while { alive _veh } do {
             _ok = (isPlayer _t || side _t == civilian);
         };
         _ok
+    };
+
+    // Also detect players inside civilian-driven vehicles (cars/bikes) so the
+    // bus pulls them over instead of cruising past.
+    private _scanVehDrivers = (_scanCenter nearEntities [["LandVehicle"], _aggroRadius]) select {
+        private _v = _x;
+        alive _v &&
+        !(_v getVariable ["CO_isBusPatrol", false]) &&
+        !(_v getVariable ["CO_isCaptureTransport", false]) && {
+            private _d = driver _v;
+            !isNull _d && alive _d &&
+            (isPlayer _d || side _d == civilian) &&
+            !captive _d &&
+            !(_d getVariable ["CO_knockedOut", false]) &&
+            !(_d getVariable ["CO_captureInProgress", false])
+        }
+    };
+    private _scan = _scanFoot;
+    if (count _scanVehDrivers > 0) then {
+        _scan = _scan + (_scanVehDrivers apply { driver _x });
     };
 
     // Pick nearest target
@@ -366,24 +388,42 @@ while { alive _veh } do {
             _huntTarget = objNull;
             _veh setVariable ["CO_busState", "traveling", true];
             _state = "traveling";
+            _approachStarted = -1;
             _lastDoMove = 0;
         } else {
+            if (_approachStarted < 0) then { _approachStarted = time };
+
+            // Force-keep the driver in a state that will actually drive.
+            // disableAI on FSM/PATH would deadlock pursuit, so keep them ON.
+            _driver setBehaviour "SAFE";
+            _driver setCombatMode "BLUE";
+            _driver enableAI "MOVE";
+            _driver enableAI "PATH";
+            _driver enableAI "FSM";
+            _driver disableAI "AUTOTARGET";
+            _driver disableAI "TARGET";
+            _driverGrp setSpeedMode "FULL";
+
             if ((time - _lastDoMove) > 4) then {
                 private _tgtPos = getPosATL _huntTarget;
                 private _vel = velocity _huntTarget;
                 if !(_vel isEqualTo [0,0,0]) then {
                     _tgtPos = _tgtPos vectorAdd (_vel vectorMultiply 3);
                 };
+                _veh engineOn true;
                 _driver doMove _tgtPos;
                 _veh forceSpeed -1;
                 _lastDoMove = time;
             };
 
-            if (_veh distance2D _huntTarget < BUS_DISMOUNT_RANGE) then {
+            private _approachStuckTooLong = (time - _approachStarted) > BUS_APPROACH_TIMEOUT;
+
+            if ((_veh distance2D _huntTarget) < BUS_DISMOUNT_RANGE || _approachStuckTooLong) then {
                 // Drop into dismounted state and spin up the escort hunters
                 _veh setVariable ["CO_busState", "dismounted", true];
                 _state = "dismounted";
                 _dismountUntil = time + BUS_DISMOUNT_DURATION;
+                _approachStarted = -1;
                 doStop _driver;
                 _veh forceSpeed 0;
 
@@ -393,21 +433,43 @@ while { alive _veh } do {
                 _escortGrp setSpeedMode "FULL";
 
                 diag_log format [
-                    "[CO] Bus %1 dismounting at %2 (target %3m away).",
+                    "[CO] Bus %1 DISMOUNTING at %2 (target %3m, forced=%4).",
                     netId _veh, mapGridPosition _veh,
-                    round (_veh distance2D _huntTarget)
+                    round (_veh distance2D _huntTarget),
+                    _approachStuckTooLong
                 ];
 
+                private _dismountCount = 0;
                 {
                     if (alive _x && vehicle _x == _veh) then {
                         _x allowGetIn false;
                         unassignVehicle _x;
                         _x action ["GetOut", _veh];
                         doGetOut _x;
-                        moveOut _x;
+                        // Force teleport just outside the truck so the
+                        // engine can't keep them strapped in if the
+                        // GetOut animation gets cancelled.
+                        [_x, _veh, _dismountUntil] spawn {
+                            params ["_u", "_v", "_until"];
+                            sleep 1.2;
+                            if (alive _u && vehicle _u == _v) then {
+                                moveOut _u;
+                                if (vehicle _u == _v) then {
+                                    _u setPosATL ((getPosATL _v) vectorAdd [
+                                        (random 6) - 3, (random 6) - 3, 0
+                                    ]);
+                                };
+                            };
+                        };
                         [_x, _veh, _dismountUntil] call _spawnEscortHunter;
+                        _dismountCount = _dismountCount + 1;
                     };
                 } forEach (units _escortGrp);
+
+                diag_log format [
+                    "[CO] Bus %1 dispatched %2 escort hunters.",
+                    netId _veh, _dismountCount
+                ];
             };
         };
     };
