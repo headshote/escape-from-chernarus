@@ -26,6 +26,8 @@ for "_i" from 0 to 5 do {
     _wp1 setWaypointType "MOVE";
     private _wp2 = _grp addWaypoint [_pos getPos [22, _angle - 30], 5];
     _wp2 setWaypointType "CYCLE";
+    // Active scan so escape attempts are spotted immediately
+    [_grp, _pos, 60, "CRN_ENF"] call co_main_fnc_guardAggroLoop;
 };
 
 // Roving interior patrol group

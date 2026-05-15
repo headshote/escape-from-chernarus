@@ -17,8 +17,8 @@ CO_bus_townGuaranteed           = 3;      // min intra-town buses per large city
 CO_bus_vehiclePool              = ["C_Van_01_transport_F","C_Truck_02_transport_F"];
 
 // --- Eastern Front ---
-CO_rus_waveCooldown             = 180;    // seconds between Russian waves
-CO_rus_unitsPerWave             = 12;
+CO_rus_waveCooldown             = 150;    // seconds between Russian waves
+CO_rus_unitsPerWave             = 21;     // total infantry across the three lanes
 CO_rus_armorFrequency           = 3;      // every Nth wave gets an APC
 CO_rus_firstWaveDelay           = 12;     // seconds after init before first visible wave
 CO_rus_spawnX                   = 14100;  // close enough to eastern front for early contact

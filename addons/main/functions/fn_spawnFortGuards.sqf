@@ -41,4 +41,10 @@ private _wp2 = _grp addWaypoint [_pos getPos [15, _dir + 270], 0];
 _wp2 setWaypointType "CYCLE";
 _wp2 setWaypointSpeed "LIMITED";
 
+// Active scan: engine treats civilians as friendly to BLUFOR, so guards
+// never engage them without scripted help. CRN_FRONT scans narrowly so
+// the eastern line stays focused on the Russian assault.
+private _scanRadius = if (_faction == "CRN_FRONT") then { 40 } else { 75 };
+[_grp, _pos, _scanRadius, _faction] call co_main_fnc_guardAggroLoop;
+
 _grp

@@ -29,11 +29,17 @@ _unit addMagazine "30Rnd_762x39_Mag_F";
 _unit addMagazine "30Rnd_762x39_Mag_F";
 _unit addItem "FirstAidKit";
 
-// Combat posture
+// Combat posture — AWARE/YELLOW so guards actually engage once a target
+// is identified. SAFE made them never raise their weapons at civilians.
 _unit setUnitPos "UP";
-_unit setBehaviour "SAFE";
+_unit setBehaviour "AWARE";
 _unit setCombatMode "YELLOW";
 _unit allowFleeing 0;
+_unit setSkill ["aimingAccuracy", 0.25];
+_unit setSkill ["aimingShake", 0.45];
+_unit setSkill ["spotDistance", 0.7];
+_unit setSkill ["spotTime", 0.6];
+_unit setSkill ["courage", 0.9];
 
 // On killed — decrement front counter if applicable
 _unit addEventHandler ["Killed", {

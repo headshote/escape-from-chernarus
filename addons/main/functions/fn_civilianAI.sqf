@@ -94,6 +94,10 @@ if (count _settlementPlan > _totalCivs) then {
     _civ setBehaviour "CARELESS";
     _civ setSpeedMode "LIMITED";
 
+    // Non-lethal damage handler so TCK/police gunfire knocks them out
+    // instead of killing them outright (per gameplay spec).
+    [_civ] call co_main_fnc_installNonLethalDamage;
+
     // Wander behavior
     [_civ] spawn {
         params ["_civ"];

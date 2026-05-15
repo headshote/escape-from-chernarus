@@ -35,11 +35,23 @@ private _unitsPerNode = (ceil (_totalStrength / ((count CO_frontDefensePositions
         }];
     };
 
-    // Dig-in behavior: fortify position, engage east
+    // Dig-in behaviour, then a forward SAD lane so they push contact
+    // east instead of just sitting on a HOLD waypoint.
     private _wpHold = _grp addWaypoint [_pos, 0];
     _wpHold setWaypointType "HOLD";
     _wpHold setWaypointBehaviour "COMBAT";
     _wpHold setWaypointCombatMode "RED";
+
+    private _engagePos = [_pos select 0, _pos select 1, 0] vectorAdd [400, 0, 0];
+    private _wpEngage = _grp addWaypoint [_engagePos, 80];
+    _wpEngage setWaypointType "SAD";
+    _wpEngage setWaypointBehaviour "COMBAT";
+    _wpEngage setWaypointCombatMode "RED";
+    _wpEngage setWaypointSpeed "LIMITED";
+
+    // Loop back so they reform on the position when the area is clear
+    private _wpCycle = _grp addWaypoint [_pos, 0];
+    _wpCycle setWaypointType "CYCLE";
 
 } forEach CO_frontDefensePositions;
 

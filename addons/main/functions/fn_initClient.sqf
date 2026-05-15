@@ -37,6 +37,17 @@ showGPS false;
 // Disguise event listener (CBA EH wired in fn_disguise)
 [] call co_main_fnc_disguise;
 
+// Install non-lethal damage handler on the local player so TCK/police
+// gunfire stuns instead of killing.
+[player] call co_main_fnc_installNonLethalDamage;
+
+// Re-install after every respawn
+addMissionEventHandler ["Respawn", {
+    params ["_newUnit"];
+    _newUnit setVariable ["CO_nonLethalInstalled", false, true];
+    [_newUnit] call co_main_fnc_installNonLethalDamage;
+}];
+
 // Police recognition loop: periodically check nearby police
 [] spawn {
     while { true } do {

@@ -45,3 +45,6 @@ private _perimeterAngles = [0, 45, 90, 135, 180, 225, 270, 315];
 
 // --- Roving interior guards ---
 [CO_airfieldCenter, 200, missionNamespace getVariable ["CO_airfield_guardCount", 14], "CRN_ENF"] call co_main_fnc_spawnRovingGuards;
+
+// --- Training ground (drill area, recruits, instructor, range) ---
+[] call co_main_fnc_buildTrainingGround;

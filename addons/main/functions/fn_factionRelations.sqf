@@ -13,11 +13,14 @@ east setFriend [resistance, 0];      // Russians fight GUER
 // Russians are hostile to Chernarus (BLUFOR)
 // This is the default (east vs west) — no override needed.
 
-// Russians ignore civilians
+// Russians ignore civilians (per spec point 18 — RUS_ADV doesn't attack civs)
 east setFriend [civilian, 1];
 civilian setFriend [east, 1];
 
-// Civilians are not hostile to anyone by default
+// BLUFOR and civilians stay engine-friendly (=1) so police don't blast every
+// civilian they roll past and so female civilians aren't autoshot. All TCK
+// aggression on civilians is scripted instead, via fn_guardAggroLoop +
+// fn_checkpointAlert which use fireAtTarget to bypass relations.
 civilian setFriend [west, 1];
 west setFriend [civilian, 1];
 

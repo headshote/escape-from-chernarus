@@ -36,8 +36,12 @@ private _yaw = (_toTarget select 0) atan2 (_toTarget select 1);
 // alternate "GestureGo" / "GestureFollow" / "GestureCeaseFire" so successive
 // punches read as different swings and a final knockout animation reads as
 // distinct from the in-progress swings.
-private _swingGesture = selectRandom ["GestureGo", "GestureFollow", "GestureCeaseFire"];
+// Visible swing: combine a body action with a gesture overlay so the
+// punch reads on every viewer regardless of stance. We pick from a few
+// known gestures + a small body lunge.
+private _swingGesture = selectRandom ["GestureGo", "GestureFollow", "GestureCeaseFire", "GestureAttack"];
 [_attacker, _swingGesture] remoteExec ["playActionNow", 0];
+[_attacker, "PutDown"] remoteExec ["playAction", 0];
 
 // Audible punch hit cue, broadcast globally
 playSound3D [
@@ -90,8 +94,10 @@ if (!isPlayer _attacker) then {
 if (_hitCount >= 3) then {
     _target setVariable ["CO_meleePunchState", [0, 0], true];
 
-    // Final, knock-out hit: collapse animation broadcast for visibility
+    // Final, knock-out hit: collapse animation broadcast for visibility.
+    // Acts_ExecutionVictim_Loop reads as a downed-on-knees pose.
     [_target, "Acts_ExecutionVictim_Loop"] remoteExec ["switchMove", 0];
+    [_attacker, "GestureFreeze"] remoteExec ["playActionNow", 0];
 
     [_attacker, _target, 60, false] call co_main_fnc_applyKnockout;
     if (isPlayer _attacker) then {

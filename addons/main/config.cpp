@@ -96,6 +96,10 @@ class CfgFunctions {
             class spawnResistanceBike {};
             class applyMeleeHit   {};
             class applyKnockout   {};
+            class guardAggroLoop  {};
+            class installNonLethalDamage {};
+            class dispatchCaptureTransport {};
+            class buildTrainingGround {};
             class showEscapeUnlockScreen {};
             class crowdResistance  {};
             class adminPanel       {};

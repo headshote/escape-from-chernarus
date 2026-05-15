@@ -10,16 +10,26 @@ params ["_detectedUnits", "_hostileGrp"];
 
     _target setVariable ["CO_captureInProgress", true, true];
 
+    // Install non-lethal damage handler so any gunfire from this group on
+    // civilians/players is converted into stun + transport.
+    [_target] call co_main_fnc_installNonLethalDamage;
+
     // Check crowd resistance first
     [getPosATL _target, _hostileGrp, _target] call co_main_fnc_crowdResistance;
 
-    // Order whole group to move on target
+    // Order whole group to move on target. Guards close to melee range
+    // first; if the target is still > 25 m after a beat, they're cleared
+    // to open fire (handled by setting COMBAT/RED + revealing the target).
     {
         if (_x getVariable ["CO_vehicleChaseDriver", false]) then { continue };
         _x doTarget _target;
         _x doMove (getPosATL _target);
         _x setCombatMode "RED";
         _x setBehaviour "COMBAT";
+        _x reveal [_target, 4];
+        // Friendly side relations would block engine fire; clearing the
+        // captive flag plus an explicit doFire on long-range targets is
+        // applied inside the capture loop below.
     } forEach units _hostileGrp;
 
     // Capture check loop — run on server
@@ -35,7 +45,24 @@ params ["_detectedUnits", "_hostileGrp"];
             };
             if (count _liveUnits == 0) exitWith {}; // all guards killed
             private _nearest = [_liveUnits, [], { _x distance _target }, "ASCEND"] call BIS_fnc_sortBy;
-            if ((_nearest select 0) distance _target < 2.5) then {
+            private _closest = _nearest select 0;
+            private _dist = _closest distance _target;
+
+            // Long-range: explicitly order the closest guards to fire at the
+            // target. fireAtTarget bypasses engine side-relations (civilians
+            // are setFriend west = 1), and fn_installNonLethalDamage on the
+            // target converts each hit into stun + scripted knockout.
+            if (_dist > 12) then {
+                private _shooters = _nearest select [0, (3 min count _nearest)];
+                {
+                    _x reveal [_target, 4];
+                    _x doWatch _target;
+                    _x setCombatMode "RED";
+                    _x fireAtTarget [_target];
+                } forEach _shooters;
+            };
+
+            if (_closest distance _target < 2.5) then {
                 // Increase wanted level
                 private _wl = (_target getVariable ["CO_wantedLevel", 0]) + 30;
                 _target setVariable ["CO_wantedLevel", _wl min 100, true];
