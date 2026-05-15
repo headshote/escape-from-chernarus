@@ -193,24 +193,35 @@ private _spawnEscortHunter = {
                             _bus setVariable ["CO_busCaptives", _caps, true];
                         };
                         // Carry: teleport into cargo. moveInCargo can
-                        // silently fail on an unconscious player so we
-                        // retry with wake-up + hard setPos fallback,
-                        // mirroring the load logic in
-                        // fn_spawnCaptureTransport.
+                        // silently fail on a player whose unit is
+                        // local to a remote client — the server's
+                        // queued seat-assignment never lands. We:
+                        //   * wake the captive,
+                        //   * setPos onto the bus,
+                        //   * moveInCargo on server (works for AI),
+                        //   * remoteExec moveInCargo to the player's
+                        //     owner if captive is a player.
                         if (alive _bus) then {
+                            _myTarget setUnconscious false;
+                            _myTarget setVariable ["CO_knockedOut", false, true];
+                            _myTarget setPos (getPosATL _bus);
                             _myTarget assignAsCargo _bus;
                             _myTarget moveInCargo _bus;
+                            if (isPlayer _myTarget) then {
+                                [_myTarget, _bus] remoteExec ["moveInCargo", _myTarget];
+                            };
                             private _loadOk = false;
-                            for "_attempt" from 0 to 3 do {
-                                sleep 0.4;
+                            for "_attempt" from 0 to 6 do {
+                                sleep 0.5;
                                 if (_myTarget in _bus) exitWith { _loadOk = true };
-                                if (_myTarget getVariable ["CO_knockedOut", false]) then {
-                                    _myTarget setUnconscious false;
-                                    _myTarget setVariable ["CO_knockedOut", false, true];
-                                };
+                                _myTarget setUnconscious false;
+                                _myTarget setVariable ["CO_knockedOut", false, true];
                                 _myTarget setPos (getPosATL _bus);
                                 _myTarget assignAsCargo _bus;
                                 _myTarget moveInCargo _bus;
+                                if (isPlayer _myTarget) then {
+                                    [_myTarget, _bus] remoteExec ["moveInCargo", _myTarget];
+                                };
                             };
                             if (!_loadOk) then {
                                 diag_log format [
@@ -219,11 +230,6 @@ private _spawnEscortHunter = {
                                 ];
                                 _myTarget setPos (getPosATL _bus);
                             };
-                            // Wake them so they sit upright in the
-                            // seat (still captive — cargo lock prevents
-                            // bailing).
-                            _myTarget setUnconscious false;
-                            _myTarget setVariable ["CO_knockedOut", false, true];
                             _bus lockCargo true;
                         };
                         _myTarget setVariable ["CO_captureInProgress", false, true];
@@ -301,6 +307,68 @@ while { alive _veh } do {
     };
     _veh setVariable ["CO_busCaptives", _aboard, true];
     if (count _aboard >= _maxCaptives) then { continue };
+
+    // ====================================================================
+    // GLOBAL IDLE-DISMOUNT TRIGGER
+    // Applies to "traveling" AND "approaching" — the bus AI can stall
+    // for many reasons (blocked road, bad pathing, target out of reach).
+    // If the bus has not moved >4 m in 20 s while supposedly cruising
+    // or chasing, force a foot dismount of up to 2 escorts so they can
+    // patrol the area on foot. The rest stay in the truck.
+    // ====================================================================
+    if (_state in ["traveling", "approaching"]) then {
+        private _curPos = getPosATL _veh;
+        if (_curPos distance2D _lastIdlePos > 4) then {
+            _lastIdlePos = _curPos;
+            _idleSince = time;
+        };
+        if ((time - _idleSince) > 20) then {
+            diag_log format [
+                "[CO] Bus %1 idle %2s in state '%3' — forcing partial dismount.",
+                netId _veh, round (time - _idleSince), _state
+            ];
+            _veh setVariable ["CO_busState", "dismounted", true];
+            _state = "dismounted";
+            _dismountUntil = time + BUS_DISMOUNT_DURATION;
+            _approachStarted = -1;
+            doStop _driver;
+            _veh forceSpeed 0;
+            _escortGrp setBehaviour "AWARE";
+            _escortGrp setCombatMode "YELLOW";
+            _escortGrp setSpeedMode "FULL";
+
+            private _dismountCount = 0;
+            {
+                // Cap to 2 escorts on idle-dismount — rest stay aboard.
+                if (alive _x && vehicle _x == _veh && _dismountCount < 2) then {
+                    _x allowGetIn false;
+                    unassignVehicle _x;
+                    _x action ["GetOut", _veh];
+                    doGetOut _x;
+                    [_x, _veh, _dismountUntil] spawn {
+                        params ["_u", "_v", "_until"];
+                        sleep 1.2;
+                        if (alive _u && vehicle _u == _v) then {
+                            moveOut _u;
+                            if (vehicle _u == _v) then {
+                                _u setPosATL ((getPosATL _v) vectorAdd [
+                                    (random 6) - 3, (random 6) - 3, 0
+                                ]);
+                            };
+                        };
+                    };
+                    [_x, _veh, _dismountUntil] call _spawnEscortHunter;
+                    _dismountCount = _dismountCount + 1;
+                };
+            } forEach (units _escortGrp);
+            diag_log format [
+                "[CO] Bus %1 idle-dispatched %2 escort hunters.",
+                netId _veh, _dismountCount
+            ];
+            _idleSince = time;
+            _lastIdlePos = _curPos;
+        };
+    };
 
     // ====================================================================
     // STATE: dismounted — escort hunters do the work in sub-threads
@@ -545,67 +613,8 @@ while { alive _veh } do {
                 round (_veh distance2D _bestTarget)
             ];
         } else {
-            // ---- Idle-dismount trigger ---------------------------------
-            // If the bus has not actually moved >4 m in the last ~20 s,
-            // dismount the escorts to patrol on foot. The engine-driven
-            // bus AI can stall silently (traffic, blocked road, bad WP
-            // pathing) and players standing in plain sight then never
-            // get noticed because the 260 m scan is centred on the
-            // stationary bus and the scan filter is conservative. A
-            // foot patrol fixes both: the hunters use a 28 m scan with
-            // a more aggressive filter and they wander.
-            private _movedFar = (getPosATL _veh) distance2D _lastIdlePos > 4;
-            if (_movedFar) then {
-                _lastIdlePos = getPosATL _veh;
-                _idleSince = time;
-            };
-            if (!_movedFar && (time - _idleSince) > 20) then {
-                diag_log format [
-                    "[CO] Bus %1 idle %2s — forcing dismount.",
-                    netId _veh, round (time - _idleSince)
-                ];
-                _veh setVariable ["CO_busState", "dismounted", true];
-                _state = "dismounted";
-                _dismountUntil = time + BUS_DISMOUNT_DURATION;
-                _approachStarted = -1;
-                doStop _driver;
-                _veh forceSpeed 0;
-                _escortGrp setBehaviour "AWARE";
-                _escortGrp setCombatMode "YELLOW";
-                _escortGrp setSpeedMode "FULL";
-
-                private _dismountCount = 0;
-                {
-                    // Cap to 2 escorts on idle-dismount so the bus
-                    // isn't completely emptied just because it
-                    // hit a red light.
-                    if (alive _x && vehicle _x == _veh && _dismountCount < 2) then {
-                        _x allowGetIn false;
-                        unassignVehicle _x;
-                        _x action ["GetOut", _veh];
-                        doGetOut _x;
-                        [_x, _veh, _dismountUntil] spawn {
-                            params ["_u", "_v", "_until"];
-                            sleep 1.2;
-                            if (alive _u && vehicle _u == _v) then {
-                                moveOut _u;
-                                if (vehicle _u == _v) then {
-                                    _u setPosATL ((getPosATL _v) vectorAdd [
-                                        (random 6) - 3, (random 6) - 3, 0
-                                    ]);
-                                };
-                            };
-                        };
-                        [_x, _veh, _dismountUntil] call _spawnEscortHunter;
-                        _dismountCount = _dismountCount + 1;
-                    };
-                } forEach (units _escortGrp);
-                _idleSince = time;
-                _lastIdlePos = getPosATL _veh;
-            } else {
-                // Keep engine on + speed unforced so engine waypoints handle motion.
-                if (!isEngineOn _veh) then { _veh engineOn true };
-            };
+            // Keep engine on + speed unforced so engine waypoints handle motion.
+            if (!isEngineOn _veh) then { _veh engineOn true };
 
             // Stuck recovery: if the engine waypoints are failing to make
             // progress, snap to a nearby road and force a fresh waypoint

@@ -64,20 +64,21 @@ _captive setCaptive true;
     private _radius     = 100;
     while { _spawnPos isEqualTo [] && _radius <= 600 } do {
         private _roads = _captivePos nearRoads _radius;
-        private _candidates = _roads select { !isNull _x && isOnRoad (getPos _x) };
+        private _candidates = _roads select {
+            !isNull _x &&
+            isOnRoad (getPos _x) &&
+            (getPos _x) distance2D _captive > 18 &&
+            (count ((getPos _x) nearEntities [["Car","Truck","Tank"], 14])) == 0
+        };
         if (count _candidates > 0) then {
             private _tries = _candidates call BIS_fnc_arrayShuffle;
             if (count _tries > 14) then { _tries resize 14 };
             {
                 private _p = getPos _x;
-                // Reject if too close to the captive (telefrag) or to
-                // another vehicle.
-                if ((_p distance2D _captive) < 12) then { continue };
-                if ((count (_p nearEntities [["Car","Truck","Tank"], 14])) > 0) then {
-                    continue
-                };
                 private _empty = _p findEmptyPosition [0, 6, "C_Van_01_transport_F"];
-                if !(_empty isEqualTo []) exitWith { _spawnPos = _empty };
+                if (!(_empty isEqualTo []) && (_empty distance2D _captive) > 18) exitWith {
+                    _spawnPos = _empty;
+                };
             } forEach _tries;
         };
         if (_spawnPos isEqualTo []) then { _radius = _radius + 80 };
@@ -142,32 +143,45 @@ _captive setCaptive true;
     _driverUnit setVariable ["CO_vehicleChaseDriver", true, true];
 
     // ---- 5. FORCE-LOAD the captive immediately ----------------
-    // Don't drive to the captive — too unreliable. Teleport them
-    // directly into cargo. They're already "captured" (setCaptive
-    // true, possibly knocked out); doing this on-spawn is the
-    // most robust path and matches the user's expectation that
-    // detention = "get put in the van".
+    // The bus is now stationary at a road. We need the captive in
+    // cargo before we kick off the drive. moveInCargo is global
+    // BUT, for player units, the queued teleport can silently fail
+    // when the server is not the owner of the player (every MP
+    // case). The reliable pattern is:
+    //   1. Wake them so no special anim state blocks the move.
+    //   2. Snap them onto the vehicle's position.
+    //   3. Issue moveInCargo on the server (handles AI captives).
+    //   4. For players: also remoteExec moveInCargo to the player's
+    //      owner so the engine runs the seat assignment locally.
+    //   5. Verify in-vehicle for up to ~3 s, retrying every 0.5 s.
+    if (_captive getVariable ["CO_knockedOut", false]) then {
+        _captive setUnconscious false;
+        _captive setVariable ["CO_knockedOut", false, true];
+        _captive setVariable ["CO_knockedOutUntil", time, true];
+    };
     _captive setCaptive true;
+    _captive setPos (getPosATL _veh);
     _captive assignAsCargo _veh;
     _captive moveInCargo _veh;
+    if (isPlayer _captive) then {
+        [_captive, _veh] remoteExec ["moveInCargo", _captive];
+    };
 
-    // Verify the load took (moveInCargo silently fails on
-    // unconscious players in some edge cases). Retry, then fall
-    // back to a hard setPos teleport into the vehicle's cargo
-    // position.
     private _loadOk = false;
-    for "_attempt" from 0 to 3 do {
-        sleep 0.4;
+    for "_attempt" from 0 to 6 do {
+        sleep 0.5;
         if (_captive in _veh) exitWith { _loadOk = true };
-        // Wake them up if knocked out — moveInCargo is more
-        // reliable on a conscious unit.
-        if (_captive getVariable ["CO_knockedOut", false]) then {
-            _captive setUnconscious false;
-            _captive setVariable ["CO_knockedOut", false, true];
-        };
+        // Make sure they're not stuck unconscious from any other
+        // damage handler that ran in parallel.
+        _captive setUnconscious false;
+        _captive setVariable ["CO_knockedOut", false, true];
+        // Hard teleport onto the vehicle then re-issue moveInCargo.
         _captive setPos (getPosATL _veh);
         _captive assignAsCargo _veh;
         _captive moveInCargo _veh;
+        if (isPlayer _captive) then {
+            [_captive, _veh] remoteExec ["moveInCargo", _captive];
+        };
     };
 
     if (!_loadOk) then {
