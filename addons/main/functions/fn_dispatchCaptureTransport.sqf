@@ -13,6 +13,14 @@ if (!isServer) exitWith {
 if (isNull _target || !alive _target) exitWith {};
 if (_target getVariable ["CO_isFemale", false]) exitWith {};
 if (_target getVariable ["CO_captureInProgress", false]) exitWith {};
+// Already mid-transport (van/bus has them in cargo or is en route).
+// Without this guard, residual gunfire from guards after the wrangle
+// completed kept re-triggering dispatchCaptureTransport, which yanked
+// the player out of the existing van into a new one further down the
+// road — the "vehicle keeps getting respawned" bug.
+if (_target getVariable ["CO_transportInProgress", false]) exitWith {};
+// Already detained and being processed (captive + in any vehicle).
+if (captive _target && !isNull (objectParent _target)) exitWith {};
 
 _target setVariable ["CO_captureInProgress", true, true];
 

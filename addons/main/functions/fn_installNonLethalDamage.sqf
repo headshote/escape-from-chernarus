@@ -77,10 +77,15 @@ _unit addEventHandler ["HandleDamage", {
         _target setVariable ["CO_stunDamage", 0, true];
         _target setVariable ["CO_stunHits", 0, true];
 
-        if (isServer) then {
-            [_shooter, _target] spawn co_main_fnc_dispatchCaptureTransport;
-        } else {
-            [_shooter, _target] remoteExec ["co_main_fnc_dispatchCaptureTransport", 2];
+        // Don't re-dispatch if already mid-transport — see the matching
+        // guard in fn_dispatchCaptureTransport.
+        if (!(_target getVariable ["CO_transportInProgress", false]) &&
+            isNull (objectParent _target)) then {
+            if (isServer) then {
+                [_shooter, _target] spawn co_main_fnc_dispatchCaptureTransport;
+            } else {
+                [_shooter, _target] remoteExec ["co_main_fnc_dispatchCaptureTransport", 2];
+            };
         };
     };
 
@@ -111,7 +116,9 @@ _unit addEventHandler ["Hit", {
     };
 
     if (!(_target getVariable ["CO_knockedOut", false]) &&
-        !(_target getVariable ["CO_captureInProgress", false])) then {
+        !(_target getVariable ["CO_captureInProgress", false]) &&
+        !(_target getVariable ["CO_transportInProgress", false]) &&
+        isNull (objectParent _target)) then {
         private _stunHits = (_target getVariable ["CO_stunHits", 0]) + 1;
         _target setVariable ["CO_stunHits", _stunHits, true];
         if (_stunHits >= 2) then {

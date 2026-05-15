@@ -10,9 +10,25 @@ if (isNil "CO_detentionCenters") then {
     ];
 };
 
-// Find or create transport bus
-private _bus = vehicle (leader _capturingGrp);
-if (_bus isKindOf "Man") exitWith {
+// Find or create transport bus.
+// Prefer an explicit CO_transportVehicle pinned by busAgroLoop when the
+// escort leader has dismounted and `vehicle (leader _grp)` would no
+// longer resolve to the bus.
+private _bus = _capturingGrp getVariable ["CO_transportVehicle", objNull];
+if (isNull _bus || !alive _bus) then {
+    _bus = vehicle (leader _capturingGrp);
+};
+// Last-resort: walk the group looking for any unit currently inside a
+// vehicle that belongs to the bus patrol.
+if (isNull _bus || _bus isKindOf "Man") then {
+    {
+        private _v = vehicle _x;
+        if (_v != _x && alive _v && (_v getVariable ["CO_isBusPatrol", false])) exitWith {
+            _bus = _v;
+        };
+    } forEach (units _capturingGrp);
+};
+if (isNull _bus || _bus isKindOf "Man") exitWith {
     // No vehicle attached to the capturing group. Hand off entirely to
     // the dedicated capture-transport helper which spawns a van at the
     // NEAREST ROAD (NOT on top of the captive — that detonated against
