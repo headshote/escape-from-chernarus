@@ -1,27 +1,30 @@
 // ============================================================
 // fn_spawnCaptureTransport.sqf
 //
-// Robust on-demand transport that picks up a captive whenever
-// no patrol bus is close enough to do the job. Used by the SW
-// border fort, checkpoint guards, and the global TCK aggression
-// failsafe.
+// Robust on-demand transport that picks up a captive and ships
+// them to the NWAF training camp. Used by the SW border fort,
+// checkpoint guards, and the global TCK aggression failsafe.
 //
-// Behavior
-// --------
-//   1. Pick the closest detention center OR NW airfield training
-//      ground as the destination (50/50).
-//   2. Spawn a transport van/truck at the nearest road within
-//      ~180 m of the captive (NEVER on top of the captive — that
-//      was the cause of the silent-fail bug where vans detonated
-//      against the player's hitbox on the same frame).
-//   3. Assign one of the capturing guards as the driver
-//      (teleported into the seat) and a second guard as the
-//      "jailer" who stays next to the captive until the van
-//      pulls up.
-//   4. Drive the van to the captive's position, force-load the
-//      captive + the jailer into cargo, then route to the
-//      destination via doMove.
-//   5. On arrival: unload, run prisonSequence on the captive.
+// Design notes
+// ------------
+//   The previous version drove the van TO the captive, then
+//   tried to load. That was fragile: SAFE + disableAI TARGET
+//   drivers silently ignored doMove on long-distance route
+//   points, and even when the van arrived, moveInCargo on a
+//   knocked-out player could fail without retry.
+//
+//   This version is deliberately direct:
+//     1. Spawn the van at the nearest road > 12 m from the
+//        captive (so the van's hitbox doesn't telefrag them).
+//     2. Force-load the captive + a jailer IMMEDIATELY via
+//        moveInCargo + verification + setPos fallback.
+//     3. Wake the captive from knockout so they can ride
+//        upright in the cargo (still captive — they can't
+//        leave the seat while doors are locked).
+//     4. Drive to the NWAF training field via an engine MOVE
+//        waypoint (proven pattern from fn_policePatrols).
+//     5. On arrival: unlock, force the captive out, clear
+//        knockout state, and hand off to fn_trainingPhase.
 //
 // Params:
 //   _captive       - the man to transport
@@ -46,34 +49,14 @@ if (_captive getVariable ["CO_transportInProgress", false]) exitWith {};
 _captive setVariable ["CO_transportInProgress", true, true];
 _captive setCaptive true;
 
-// Make sure the captive is in a sticky knockout so they can't bolt
-if !(_captive getVariable ["CO_knockedOut", false]) then {
-    private _attacker = leader _capturingGrp;
-    [_attacker, _captive, 75, true] call co_main_fnc_applyKnockout;
-};
-
 [_captive, _capturingGrp] spawn {
     params ["_captive", "_capturingGrp"];
 
-    // ---- 1. Pick destination ----------------------------------
-    if (isNil "CO_detentionCenters") then {
-        CO_detentionCenters = [
-            [4800, 9600, 0],   // NW camp
-            [12000, 5000, 0],  // East facility
-            [7400, 3100, 0]    // Central
-        ];
+    // ---- 1. Destination = NWAF training field -----------------
+    if (isNil "CO_trainingFieldPos") then {
+        CO_trainingFieldPos = [2160, 12800, 0];
     };
-    private _nwAirfield = missionNamespace getVariable [
-        "CO_airfieldCenter", [4720, 9985, 0]
-    ];
-
-    private _destChoices = (+CO_detentionCenters) + [_nwAirfield];
-    // 60% nearest detention, 40% NW airfield (variety of outcomes)
-    private _dest = if (random 1 < 0.6) then {
-        ([CO_detentionCenters, [], { _x distance2D _captive }, "ASCEND"] call BIS_fnc_sortBy) select 0
-    } else {
-        _nwAirfield
-    };
+    private _dest = +CO_trainingFieldPos;
 
     // ---- 2. Find a road spawn position near the captive -------
     private _captivePos = getPosATL _captive;
@@ -87,7 +70,9 @@ if !(_captive getVariable ["CO_knockedOut", false]) then {
             if (count _tries > 14) then { _tries resize 14 };
             {
                 private _p = getPos _x;
-                // Reject if another vehicle within 14 m
+                // Reject if too close to the captive (telefrag) or to
+                // another vehicle.
+                if ((_p distance2D _captive) < 12) then { continue };
                 if ((count (_p nearEntities [["Car","Truck","Tank"], 14])) > 0) then {
                     continue
                 };
@@ -113,145 +98,221 @@ if !(_captive getVariable ["CO_knockedOut", false]) then {
     _veh setPosATL [_spawnPos select 0, _spawnPos select 1, 0.15];
     _veh setVectorUp [0, 0, 1];
     _veh setVelocity [0, 0, 0];
-    // Face roughly toward the captive
-    private _dx = (_captivePos select 0) - (_spawnPos select 0);
-    private _dy = (_captivePos select 1) - (_spawnPos select 1);
+    // Face roughly toward the destination
+    private _dx = (_dest select 0) - (_spawnPos select 0);
+    private _dy = (_dest select 1) - (_spawnPos select 1);
     _veh setDir (_dx atan2 _dy);
     _veh setVariable ["CO_isCaptureTransport", true, true];
-    [_veh] spawn { params ["_v"]; sleep 5; if (!isNull _v) then { _v allowDamage true } };
+    _veh lockCargo false;
+    _veh lockDriver false;
+    [_veh] spawn { params ["_v"]; sleep 8; if (!isNull _v) then { _v allowDamage true } };
 
     diag_log format [
-        "[CO] Capture transport %1 spawned at %2 for captive %3 (dest %4).",
+        "[CO] Capture transport %1 spawned at %2 for captive %3 (dest NWAF training %4).",
         _vehClass, mapGridPosition _veh, name _captive, _dest
     ];
 
     // ---- 4. Pick a driver + a jailer from the capturing group --
     private _alive = (units _capturingGrp) select { alive _x && vehicle _x == _x };
     if (count _alive == 0) exitWith {
-        diag_log "[CO] Capture transport: no live guards left to drive.";
-        deleteVehicle _veh;
-        _captive setVariable ["CO_transportInProgress", false, true];
+        diag_log "[CO] Capture transport: no live guards left to drive — using fallback NPC driver.";
+        // Fallback driver so the captive still arrives at training
+        private _fallbackGrp = createGroup west;
+        _fallbackGrp setVariable ["CO_faction", "CRN_ENF", true];
+        private _drv = _fallbackGrp createUnit ["B_Soldier_F", _spawnPos, [], 0, "FORM"];
+        [_drv] call co_main_fnc_initHostileUnit;
+        _alive = [_drv];
     };
 
-    // Driver: the guard furthest from the captive (so the closest stays as jailer)
-    private _sortedByDist = [_alive, [], { _x distance _captive }, "DESCEND"] call BIS_fnc_sortBy;
+    // Driver = closest guard (so they're already nearby); jailer = next closest.
+    private _sortedByDist = [_alive, [], { _x distance _captive }, "ASCEND"] call BIS_fnc_sortBy;
     private _driverUnit = _sortedByDist select 0;
     private _jailerUnit = if (count _sortedByDist >= 2) then {
-        // The closest guard is the jailer
-        (_sortedByDist select ((count _sortedByDist) - 1))
+        _sortedByDist select 1
     } else { objNull };
 
     // Teleport driver into the van
     _driverUnit assignAsDriver _veh;
     _driverUnit moveInDriver _veh;
-    _driverUnit setBehaviour "SAFE";
+    _driverUnit setBehaviour "AWARE";
     _driverUnit setCombatMode "BLUE";
-    _driverUnit disableAI "AUTOTARGET";
-    _driverUnit disableAI "TARGET";
     _driverUnit enableAI "MOVE";
     _driverUnit enableAI "PATH";
     _driverUnit enableAI "FSM";
     _driverUnit setVariable ["CO_vehicleChaseDriver", true, true];
 
-    // Jailer behaviour — stand right next to the captive until pickup
-    private _jailerStaysThread = scriptNull;
-    if (!isNull _jailerUnit) then {
-        _jailerUnit setVariable ["CO_isJailer", true, true];
-        _jailerUnit setBehaviour "AWARE";
-        _jailerUnit setCombatMode "YELLOW";
-        _jailerUnit setUnitPos "UP";
-        _jailerStaysThread = [_jailerUnit, _captive, _veh] spawn {
-            params ["_j", "_c", "_v"];
-            while {
-                alive _j && alive _c &&
-                vehicle _j == _j &&
-                !(_c in (crew _v))
-            } do {
-                if ((_j distance _c) > 4) then {
-                    _j doMove (getPosATL _c);
-                };
-                _j doWatch _c;
-                sleep 2;
-            };
-        };
-    };
-
-    // ---- 5. Drive the van to the captive ----------------------
-    _veh engineOn true;
-    _veh forceSpeed -1;
-    _driverUnit doMove (getPosATL _captive);
-
-    private _approachDeadline = time + 90;
-    waitUntil {
-        sleep 1;
-        !alive _veh ||
-        !alive _captive ||
-        isNull (driver _veh) ||
-        (_veh distance2D _captive) < 14 ||
-        time > _approachDeadline
-    };
-
-    if (!alive _veh || !alive _captive) exitWith {
-        diag_log "[CO] Capture transport aborted (van or captive dead during approach).";
-        _captive setVariable ["CO_transportInProgress", false, true];
-    };
-
-    // Stop the van
-    private _drv = driver _veh;
-    if (!isNull _drv) then { doStop _drv };
-    _veh forceSpeed 0;
-
-    // ---- 6. Load the captive + jailer -------------------------
-    sleep 0.5;
+    // ---- 5. FORCE-LOAD the captive immediately ----------------
+    // Don't drive to the captive — too unreliable. Teleport them
+    // directly into cargo. They're already "captured" (setCaptive
+    // true, possibly knocked out); doing this on-spawn is the
+    // most robust path and matches the user's expectation that
+    // detention = "get put in the van".
     _captive setCaptive true;
-    if (!isNull _captive && alive _captive) then {
+    _captive assignAsCargo _veh;
+    _captive moveInCargo _veh;
+
+    // Verify the load took (moveInCargo silently fails on
+    // unconscious players in some edge cases). Retry, then fall
+    // back to a hard setPos teleport into the vehicle's cargo
+    // position.
+    private _loadOk = false;
+    for "_attempt" from 0 to 3 do {
+        sleep 0.4;
+        if (_captive in _veh) exitWith { _loadOk = true };
+        // Wake them up if knocked out — moveInCargo is more
+        // reliable on a conscious unit.
+        if (_captive getVariable ["CO_knockedOut", false]) then {
+            _captive setUnconscious false;
+            _captive setVariable ["CO_knockedOut", false, true];
+        };
+        _captive setPos (getPosATL _veh);
+        _captive assignAsCargo _veh;
         _captive moveInCargo _veh;
     };
+
+    if (!_loadOk) then {
+        diag_log format [
+            "[CO] Capture transport: FAILED to load captive %1 after retries (in: %2). Hard teleport.",
+            name _captive, _captive in _veh
+        ];
+        // Last resort: setPos into vehicle and hope
+        _captive setPos (getPosATL _veh);
+    };
+
+    // Wake the captive so they ride in the seat properly (still
+    // captive — can't exit until the van unlocks doors).
+    if (_captive getVariable ["CO_knockedOut", false]) then {
+        _captive setUnconscious false;
+        _captive setVariable ["CO_knockedOut", false, true];
+        _captive setVariable ["CO_knockedOutUntil", time, true];
+    };
+    _captive setCaptive true;
+    _captive setVariable ["CO_detainPhase", "transport", true];
+
+    // Notify player so they understand what's happening
+    if (isPlayer _captive) then {
+        [_captive] remoteExecCall ["co_main_fnc_showDetentionHUD", _captive];
+    };
+
+    // Lock cargo so the captive can't bail mid-route
+    _veh lockCargo true;
+
+    // Load the jailer
     if (!isNull _jailerUnit && alive _jailerUnit) then {
+        _jailerUnit setVariable ["CO_isJailer", true, true];
         _jailerUnit assignAsCargo _veh;
         _jailerUnit moveInCargo _veh;
     };
 
-    sleep 1;
-    // ---- 7. Drive to destination ------------------------------
-    _veh setVariable ["CO_busCaptives", [_captive], true];
-    _veh forceSpeed -1;
-    if (!isNull _drv) then {
-        _drv doMove _dest;
-    };
+    // ---- 6. Drive to training camp via engine waypoint --------
+    // Use a real waypoint (proven pattern from fn_policePatrols)
+    // rather than fighting the engine with doMove on a freshly
+    // seated driver.
+    private _drvGrp = group _driverUnit;
+    // Clear any pre-existing waypoints
+    { deleteWaypoint _x } forEach +waypoints _drvGrp;
+    private _wp = _drvGrp addWaypoint [_dest, 0];
+    _wp setWaypointType "MOVE";
+    _wp setWaypointSpeed "NORMAL";
+    _wp setWaypointBehaviour "SAFE";
+    _wp setWaypointCombatMode "BLUE";
+    _wp setWaypointFormation "FILE";
+    _wp setWaypointCompletionRadius 30;
+    _drvGrp setCurrentWaypoint _wp;
 
+    _veh engineOn true;
+    _veh setFuel 1;
+    _veh forceSpeed -1;
+    _veh setVariable ["CO_busCaptives", [_captive], true];
+
+    // Belt-and-braces: also issue a doMove so the driver kicks off
+    // motion on the first tick even if the waypoint hasn't ticked
+    // yet.
+    sleep 0.5;
+    _driverUnit doMove _dest;
+
+    // Watchdog: if the van is stuck (no progress for 30 s) snap
+    // it to a road and re-issue the waypoint.
     private _arrivalDeadline = time + 600;
+    private _lastPos = getPosATL _veh;
+    private _lastMoveCheck = time;
+
     waitUntil {
         sleep 3;
-        !alive _veh ||
-        isNull (driver _veh) ||
-        (_veh distance2D _dest) < 30 ||
-        time > _arrivalDeadline
+        if (!alive _veh) exitWith { true };
+        if (isNull (driver _veh)) exitWith { true };
+        if ((_veh distance2D _dest) < 35) exitWith { true };
+        if (time > _arrivalDeadline) exitWith { true };
+
+        // Stuck recovery
+        if (time - _lastMoveCheck > 20) then {
+            if ((getPosATL _veh) distance _lastPos < 4) then {
+                diag_log format [
+                    "[CO] Capture transport stuck at %1 — snapping to road.",
+                    mapGridPosition _veh
+                ];
+                private _roads = (getPosATL _veh) nearRoads 80;
+                if (count _roads > 0) then {
+                    private _rp = getPos (_roads select 0);
+                    _veh setPos [_rp select 0, _rp select 1, 0.2];
+                    _veh setVectorUp [0,0,1];
+                };
+                _drvGrp setCurrentWaypoint _wp;
+                _driverUnit doMove _dest;
+            };
+            _lastPos = getPosATL _veh;
+            _lastMoveCheck = time;
+        };
+        false
     };
 
     if (!alive _veh) exitWith {
         diag_log "[CO] Capture transport destroyed en route.";
         _captive setVariable ["CO_transportInProgress", false, true];
+        if (alive _captive) then {
+            // Fail-safe: still deliver the player to training so
+            // gameplay doesn't dead-end.
+            _captive setPos (CO_trainingFieldPos vectorAdd [random 20 - 10, random 20 - 10, 0]);
+            [_captive] call co_main_fnc_trainingPhase;
+        };
     };
 
-    // ---- 8. Unload at destination -----------------------------
-    if (!isNull _drv) then { doStop _drv; _veh forceSpeed 0 };
+    // ---- 7. Unload at training camp ---------------------------
+    _veh forceSpeed 0;
+    if (!isNull (driver _veh)) then { doStop (driver _veh) };
     sleep 1;
 
-    if (alive _captive && (_captive in crew _veh)) then {
-        unassignVehicle _captive;
-        _captive leaveVehicle _veh;
+    _veh lockCargo false;
+    _veh lockDriver false;
+
+    if (alive _captive) then {
+        // Force out — try the polite path then the hard teleport.
+        if (_captive in _veh) then {
+            unassignVehicle _captive;
+            _captive action ["GetOut", _veh];
+            sleep 0.5;
+            if (_captive in _veh) then { moveOut _captive };
+        };
         _captive setPosATL (_dest vectorAdd [4 + random 4, random 8 - 4, 0]);
-        // Hand off to the existing prison sequence (covers training transfer)
-        [_dest] call co_main_fnc_spawnDetentionGuards;
-        [_captive] call co_main_fnc_prisonSequence;
+
+        // Clear any lingering knockout state
+        _captive setUnconscious false;
+        _captive setVariable ["CO_knockedOut", false, true];
+        _captive setVariable ["CO_knockedOutUntil", time, true];
+        _captive setVariable ["CO_captureInProgress", false, true];
+        _captive setCaptive true;  // stay flagged conscript
+
+        // Hand off to training phase (handles HUD, drills,
+        // 10-min window, deployment to front).
+        [_captive] call co_main_fnc_trainingPhase;
     };
 
     // Release the driver and jailer back into the world
-    if (!isNull _drv && alive _drv) then {
-        _drv setVariable ["CO_vehicleChaseDriver", false, true];
-        unassignVehicle _drv;
-        moveOut _drv;
+    private _drv2 = driver _veh;
+    if (!isNull _drv2 && alive _drv2) then {
+        _drv2 setVariable ["CO_vehicleChaseDriver", false, true];
+        unassignVehicle _drv2;
+        moveOut _drv2;
     };
     if (!isNull _jailerUnit && alive _jailerUnit && (_jailerUnit in crew _veh)) then {
         unassignVehicle _jailerUnit;
@@ -261,5 +322,5 @@ if !(_captive getVariable ["CO_knockedOut", false]) then {
 
     _captive setVariable ["CO_transportInProgress", false, true];
 
-    diag_log format ["[CO] Capture transport delivery complete at %1.", _dest];
+    diag_log format ["[CO] Capture transport delivery complete at NWAF training %1.", _dest];
 };
