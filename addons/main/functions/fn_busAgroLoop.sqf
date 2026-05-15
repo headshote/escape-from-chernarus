@@ -58,7 +58,6 @@ private _maxCaptives = missionNamespace getVariable ["CO_bus_maxCaptives", 3];
 private _routeWps = _veh getVariable ["CO_busRouteWps", []];
 if (count _routeWps == 0) then { _routeWps = [getPosATL _veh] };
 
-private _wpIdx          = 0;
 private _stuckSince     = -1;
 private _lastDoMove     = 0;
 private _huntTarget     = objNull;
@@ -68,26 +67,41 @@ private _approachStarted = -1;
 
 _veh setVariable ["CO_busState", "traveling", true];
 
-private _kickDriver = {
-    params ["_drv", "_veh", "_dest"];
+// Make sure the engine is on and a couple of seconds of breathing room
+// for the waypoint pathing to kick in before the controller starts
+// observing motion. ARMA waypoints (added in fn_spawnBusOnRoute) drive
+// the cruise; the controller only overrides via doMove during a hunt.
+_veh engineOn true;
+_veh forceSpeed -1;
+sleep 2;
+
+private _resumeRoute = {
+    params ["_drvGrp", "_veh"];
+    if (isNull _drvGrp) exitWith {};
+    private _drv = driver _veh;
     if (isNull _drv || !alive _drv) exitWith {};
     _drv setBehaviour "SAFE";
     _drv setCombatMode "BLUE";
     _drv enableAI "MOVE";
     _drv enableAI "PATH";
     _drv enableAI "FSM";
+    _drvGrp setBehaviour "SAFE";
+    _drvGrp setCombatMode "BLUE";
+    _drvGrp setSpeedMode "NORMAL";
     _veh engineOn true;
-    _drv doMove _dest;
     _veh forceSpeed -1;
+    // Snap focus back to the current waypoint so the engine resumes
+    // routing after a doMove override.
+    private _wpIdx = currentWaypoint _drvGrp;
+    private _wpCount = count (waypoints _drvGrp);
+    if (_wpCount > 0) then {
+        _drvGrp setCurrentWaypoint [_drvGrp, _wpIdx min (_wpCount - 1)];
+    };
 };
 
-// Initial kick
-private _initDriver = driver _veh;
-[_initDriver, _veh, _routeWps select 0] call _kickDriver;
-
 diag_log format [
-    "[CO] busAgroLoop online: veh=%1 route=%2wps spawnGrid=%3.",
-    netId _veh, count _routeWps, mapGridPosition _veh
+    "[CO] busAgroLoop online: veh=%1 route=%2wps wps=%3 spawnGrid=%4.",
+    netId _veh, count _routeWps, count (waypoints _driverGrp), mapGridPosition _veh
 ];
 
 // ---------------------------------------------------------------
@@ -321,7 +335,7 @@ while { alive _veh } do {
                 _veh setVariable ["CO_busState", "traveling", true];
                 _huntTarget = objNull;
                 _lastDoMove = 0;
-                [_driver, _veh, _routeWps select (_wpIdx mod count _routeWps)] call _kickDriver;
+                [_driverGrp, _veh] call _resumeRoute;
             };
         };
         continue;
@@ -390,6 +404,7 @@ while { alive _veh } do {
             _state = "traveling";
             _approachStarted = -1;
             _lastDoMove = 0;
+            [_driverGrp, _veh] call _resumeRoute;
         } else {
             if (_approachStarted < 0) then { _approachStarted = time };
 
@@ -475,7 +490,8 @@ while { alive _veh } do {
     };
 
     // ====================================================================
-    // STATE: traveling — follow route, watch for targets, watch for stuck
+    // STATE: traveling — engine waypoints drive the cruise. We only watch
+    // for targets to acquire and do stuck recovery as a safety net.
     // ====================================================================
     if (_state == "traveling") then {
         // Acquire target?
@@ -485,6 +501,7 @@ while { alive _veh } do {
             _veh setVariable ["CO_busState", "approaching", true];
             _state = "approaching";
             _lastDoMove = 0;
+            _approachStarted = time;
             diag_log format [
                 "[CO] Bus %1 hunting %2 at %3m.",
                 netId _veh,
@@ -492,27 +509,19 @@ while { alive _veh } do {
                 round (_veh distance2D _bestTarget)
             ];
         } else {
-            // Route following
-            if (count _routeWps > 0) then {
-                private _wp = _routeWps select (_wpIdx mod count _routeWps);
-                if (_veh distance2D _wp < BUS_WP_REACHED_DIST) then {
-                    _wpIdx = _wpIdx + 1;
-                    _lastDoMove = 0;
-                } else {
-                    if ((time - _lastDoMove) > BUS_DOMOVE_INTERVAL) then {
-                        [_driver, _veh, _wp] call _kickDriver;
-                        _lastDoMove = time;
-                    };
-                };
-            };
+            // Keep engine on + speed unforced so engine waypoints handle motion.
+            if (!isEngineOn _veh) then { _veh engineOn true };
 
-            // Stuck recovery
+            // Stuck recovery: if the engine waypoints are failing to make
+            // progress, snap to a nearby road and force a fresh waypoint
+            // focus.
             if ((speed _veh) < BUS_STUCK_SPEED) then {
                 if (_stuckSince < 0) then { _stuckSince = time };
                 if ((time - _stuckSince) > BUS_STUCK_GRACE) then {
                     diag_log format [
-                        "[CO] Bus %1 stuck %2s at %3 — relocating.",
-                        netId _veh, round (time - _stuckSince), mapGridPosition _veh
+                        "[CO] Bus %1 stuck %2s at %3 (wp=%4/%5) — relocating.",
+                        netId _veh, round (time - _stuckSince), mapGridPosition _veh,
+                        currentWaypoint _driverGrp, count (waypoints _driverGrp)
                     ];
                     private _rds = (getPosATL _veh) nearRoads 200;
                     if (count _rds > 0) then {
@@ -521,8 +530,8 @@ while { alive _veh } do {
                         _veh setVectorUp [0,0,1];
                     };
                     _veh engineOn true;
+                    [_driverGrp, _veh] call _resumeRoute;
                     _stuckSince = time;
-                    _lastDoMove = 0;
                 };
             } else {
                 _stuckSince = -1;

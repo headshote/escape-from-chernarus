@@ -179,6 +179,30 @@ _veh setVariable ["CO_busCaptives", [], true];
 _veh setVariable ["CO_busDriverGrp", _driverGrp, true];
 _veh setVariable ["CO_busEscortGrp", _escortGrp, true];
 
+// ---- 6. Engine waypoints for the cruise route -------------------------
+// SCRIPTED doMove turned out to be unreliable for long-haul routes:
+// SAFE-behaviour drivers with disableAI "TARGET" frequently swallow the
+// command on first tick (vehicle just placed, driver just seated, route
+// point >1 km away) and the truck never moves. ARMA waypoints with a
+// CYCLE close-out are the proven pattern (see fn_policePatrols) — the
+// engine handles long-haul pathing, road preference, and stuck recovery
+// for us. The controller loop in fn_busAgroLoop now only OVERRIDES this
+// via doMove when actively hunting a target.
+{
+    private _wp = _driverGrp addWaypoint [_x, 0];
+    _wp setWaypointType "MOVE";
+    _wp setWaypointSpeed "NORMAL";
+    _wp setWaypointBehaviour "SAFE";
+    _wp setWaypointCombatMode "BLUE";
+    _wp setWaypointFormation "FILE";
+    _wp setWaypointCompletionRadius 30;
+} forEach _routeWps;
+private _cycleWp = _driverGrp addWaypoint [_routeWps select 0, 0];
+_cycleWp setWaypointType "CYCLE";
+_cycleWp setWaypointSpeed "NORMAL";
+_cycleWp setWaypointBehaviour "SAFE";
+_cycleWp setWaypointCombatMode "BLUE";
+
 // Hand off to the controller
 [_veh, _driverGrp, _escortGrp] spawn co_main_fnc_busAgroLoop;
 
