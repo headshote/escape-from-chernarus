@@ -40,28 +40,34 @@ if (count _routeWps == 0) exitWith {
 };
 
 // ---- 1. Find a safe road position to spawn on -------------------------
-private _seedPos = _routeWps select 0;
+// Per-spawn seed jitter so multiple buses on the same route don't all
+// converge onto the same road object on the first try.
+private _seedPos = (_routeWps select 0) vectorAdd [(random 60) - 30, (random 60) - 30, 0];
 private _spawnPos = [];
-private _radius = 60;
-while { _spawnPos isEqualTo [] && _radius <= 600 } do {
+private _radius = 80;
+while { _spawnPos isEqualTo [] && _radius <= 700 } do {
     private _roads = _seedPos nearRoads _radius;
     // Prefer roads we can drive (not foot-paths, not road segments under
     // bridges where vehicles fall through).
     private _candidates = _roads select { !isNull _x && isOnRoad (getPos _x) };
     if (count _candidates > 0) then {
-        // Try several candidates, pick the first one with empty surroundings
+        // Try several candidates; reject any with another vehicle within 14 m
+        // (catches the case of multiple buses spawning back-to-back).
         private _tries = _candidates call BIS_fnc_arrayShuffle;
-        if (count _tries > 12) then { _tries resize 12 };
+        if (count _tries > 18) then { _tries resize 18 };
         {
             private _p = getPos _x;
+            // Already a vehicle here? skip.
+            private _nearVehs = _p nearEntities [["Car","Truck","Tank","Ship"], 14];
+            if (count _nearVehs > 0) then { continue };
+
             private _empty = _p findEmptyPosition [0, 6, "C_Truck_02_transport_F"];
             if !(_empty isEqualTo []) exitWith { _spawnPos = _empty };
-            // Fallback: accept road object position itself if findEmpty failed
-            private _empty2 = _p findEmptyPosition [4, 18, "C_Truck_02_transport_F"];
+            private _empty2 = _p findEmptyPosition [4, 22, "C_Truck_02_transport_F"];
             if !(_empty2 isEqualTo []) exitWith { _spawnPos = _empty2 };
         } forEach _tries;
     };
-    if (_spawnPos isEqualTo []) then { _radius = _radius + 100 };
+    if (_spawnPos isEqualTo []) then { _radius = _radius + 120 };
 };
 
 if (_spawnPos isEqualTo []) exitWith {
@@ -76,8 +82,16 @@ private _vehiclePool = missionNamespace getVariable [
 ];
 private _vehClass = selectRandom _vehiclePool;
 private _veh = createVehicle [_vehClass, _spawnPos, [], 0, "NONE"];
+// Immediate damage immunity — some Chernarus road tiles have invisible
+// geometry that registers a collision on the same frame the vehicle is
+// placed, which is what was blowing trucks up on spawn. We re-enable
+// damage a few seconds later when the truck is settled.
+_veh allowDamage false;
+// Order matters: setPosATL CAN re-snap vector up, so position FIRST then
+// straighten the truck.
+_veh setPosATL [_spawnPos select 0, _spawnPos select 1, 0.15];
 _veh setVectorUp [0, 0, 1];
-_veh setPosATL [_spawnPos select 0, _spawnPos select 1, 0.1];
+_veh setVelocity [0, 0, 0];
 
 // Face toward the next route point so the first doMove doesn't make the
 // truck pivot in place on top of nearby buildings.
@@ -85,6 +99,13 @@ private _aimAt = if (count _routeWps > 1) then { _routeWps select 1 } else { _sp
 private _dx = (_aimAt select 0) - (_spawnPos select 0);
 private _dy = (_aimAt select 1) - (_spawnPos select 1);
 _veh setDir (_dx atan2 _dy);
+
+// Re-enable damage after a short settle window
+[_veh] spawn {
+    params ["_v"];
+    sleep 5;
+    if (!isNull _v && alive _v) then { _v allowDamage true };
+};
 
 // ---- 3. Create separate driver group (SAFE BLUE) ----------------------
 // SAFE is the proven pattern for AI vehicle drivers (see fn_policePatrols).

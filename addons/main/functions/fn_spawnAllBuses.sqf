@@ -48,6 +48,11 @@ for "_i" from 1 to _remaining do {
     private _count = _x select 1;
     for "_spawnIndex" from 1 to _count do {
         [_route, _hostilesPerBus] call co_main_fnc_spawnBusOnRoute;
+        // Yield between spawns so the engine registers each vehicle
+        // before the next findEmptyPosition runs. Without this, multiple
+        // trucks on the same route pick overlapping road candidates and
+        // detonate against each other on the same frame.
+        sleep 0.4;
     };
 } forEach _allocations;
 

@@ -42,15 +42,23 @@ if (!isServer) exitWith {};
 if (missionNamespace getVariable ["CO_tckGlobalAggression_running", false]) exitWith {};
 CO_tckGlobalAggression_running = true;
 
-#define TCK_SCAN_RADIUS 35
+#define TCK_SCAN_RADIUS 60
 #define TCK_MELEE_RANGE  3.0
-#define TCK_TICK         4
+#define TCK_TICK         3
 
-diag_log "[CO] tckGlobalAggression: starting global failsafe loop.";
+diag_log "[CO] tckGlobalAggression: starting global failsafe loop (radius=60m, tick=3s).";
 
 [] spawn {
+    private _heartbeat = 0;
     while { true } do {
         sleep TCK_TICK;
+        _heartbeat = _heartbeat + 1;
+        if (_heartbeat % 20 == 0) then {
+            private _grpCount = count (allGroups select {
+                (_x getVariable ["CO_faction", ""]) in ["CRN_ENF", "POLICE"]
+            });
+            diag_log format ["[CO] tckGlobalAggression heartbeat: %1 eligible groups.", _grpCount];
+        };
 
         private _groups = allGroups select {
             (_x getVariable ["CO_faction", ""]) in ["CRN_ENF", "POLICE"]
