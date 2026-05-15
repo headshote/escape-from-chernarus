@@ -42,6 +42,11 @@ _unit addEventHandler ["HandleDamage", {
     // war on the east side stays a real combat zone.
     if (!_isTCK) exitWith { _damage };
 
+    // Hard border fortifications (e.g. far-southwest checkpoint past
+    // Kamenka) are shoot-to-kill zones — their guards bypass the
+    // non-lethal cap entirely.
+    if ((group _shooter) getVariable ["CO_lethalShooter", false]) exitWith { _damage };
+
     // Hard ceiling: this target can NEVER cross 0.85 cumulative damage
     // from TCK fire. We compute headroom and clamp the per-hit return
     // value below it so chained shots don't accidentally kill.
@@ -98,6 +103,8 @@ _unit addEventHandler ["Hit", {
     if (isNull _src || _src == _target) exitWith {};
     private _fac = group _src getVariable ["CO_faction", ""];
     if !(_fac in ["CRN_ENF","POLICE"]) exitWith {};
+    // Lethal border guards bypass the Hit-EH clamp too.
+    if ((group _src) getVariable ["CO_lethalShooter", false]) exitWith {};
 
     if ((damage _target) > 0.85) then {
         _target setDamage 0.85;

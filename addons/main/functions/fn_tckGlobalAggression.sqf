@@ -42,7 +42,7 @@ if (!isServer) exitWith {};
 if (missionNamespace getVariable ["CO_tckGlobalAggression_running", false]) exitWith {};
 CO_tckGlobalAggression_running = true;
 
-#define TCK_SCAN_RADIUS 22
+#define TCK_SCAN_RADIUS 35
 #define TCK_MELEE_RANGE  3.0
 #define TCK_TICK         4
 
@@ -62,9 +62,14 @@ diag_log "[CO] tckGlobalAggression: starting global failsafe loop.";
             // engagement — checkpointAlert sets CO_grpEngaging while it
             // owns the group.
             if (_grp getVariable ["CO_grpEngaging", false]) then { continue };
-            // Skip bus driver / escort groups — fn_busAgroLoop owns those
-            if (_grp getVariable ["CO_isBusDriverGrp", false]) then { continue };
-            if (_grp getVariable ["CO_isBusEscortGrp", false]) then { continue };
+            // Skip bus driver / escort groups ONLY while their bus is alive
+            // and the unit is mounted. Once the bus is destroyed (or the
+            // escort is on foot away from it), they become eligible for
+            // global aggression — otherwise wreck-survivors stand around.
+            private _isBusGrp = (_grp getVariable ["CO_isBusDriverGrp", false]) ||
+                                (_grp getVariable ["CO_isBusEscortGrp", false]);
+            private _busVeh = _grp getVariable ["CO_transportVehicle", objNull];
+            if (_isBusGrp && !isNull _busVeh && alive _busVeh) then { continue };
 
             {
                 private _u = _x;

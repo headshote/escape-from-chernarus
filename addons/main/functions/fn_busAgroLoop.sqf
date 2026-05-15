@@ -69,10 +69,11 @@ _veh setVariable ["CO_busState", "traveling", true];
 private _kickDriver = {
     params ["_drv", "_veh", "_dest"];
     if (isNull _drv || !alive _drv) exitWith {};
-    _drv setBehaviour "CARELESS";
+    _drv setBehaviour "SAFE";
     _drv setCombatMode "BLUE";
     _drv enableAI "MOVE";
     _drv enableAI "PATH";
+    _drv enableAI "FSM";
     _veh engineOn true;
     _drv doMove _dest;
     _veh forceSpeed -1;
@@ -215,10 +216,10 @@ while { alive _veh } do {
         if (count _alts > 0) then {
             private _new = _alts select 0;
             _new moveInDriver _veh;
-            _new setBehaviour "CARELESS";
+            _new setBehaviour "SAFE";
             _new setCombatMode "BLUE";
             _new disableAI "AUTOTARGET";
-            _new disableAI "AUTOCOMBAT";
+            _new disableAI "TARGET";
             _driver = driver _veh;
             _lastDoMove = 0;
             diag_log format ["[CO] Bus %1 driver swapped.", netId _veh];
@@ -227,6 +228,23 @@ while { alive _veh } do {
     if (isNull driver _veh) then {
         diag_log format ["[CO] Bus %1 abandoned (no driver).", netId _veh];
         _veh setVariable ["CO_busState", "abandoned", true];
+        // Release the escort group so fn_tckGlobalAggression takes them
+        // over and they don't just stand around when the truck dies.
+        _escortGrp setVariable ["CO_isBusEscortGrp", false, true];
+        // Make sure surviving escorts can actually fight back: enable
+        // their combat AI and put them into AWARE/YELLOW.
+        {
+            if (alive _x) then {
+                _x enableAI "AUTOTARGET";
+                _x enableAI "TARGET";
+                _x enableAI "AUTOCOMBAT";
+                _x enableAI "SUPPRESSION";
+                _x enableAI "COVER";
+                _x setBehaviour "AWARE";
+                _x setCombatMode "YELLOW";
+                if (vehicle _x == _veh) then { unassignVehicle _x; moveOut _x };
+            };
+        } forEach (units _escortGrp);
         continue;
     };
     _driver = driver _veh;
@@ -246,11 +264,11 @@ while { alive _veh } do {
             // Reboard
             _veh setVariable ["CO_busState", "reboarding", true];
             // Calm the escort group so reboard doesn't get sidetracked
-            _escortGrp setBehaviour "CARELESS";
+            _escortGrp setBehaviour "SAFE";
             _escortGrp setCombatMode "BLUE";
             {
                 if (alive _x && vehicle _x == _x) then {
-                    _x setBehaviour "CARELESS";
+                    _x setBehaviour "SAFE";
                     _x setCombatMode "BLUE";
                     _x allowGetIn true;
                     _x assignAsCargo _veh;
@@ -452,3 +470,45 @@ while { alive _veh } do {
 };
 
 diag_log format ["[CO] busAgroLoop exit veh=%1.", netId _veh];
+
+// On exit (vehicle dead), release escort group so global aggression
+// picks the surviving escorts up. Also re-enable their combat AI in case
+// they were dismounted with reduced posture, and dump them out of the
+// wreck so they can actually fight.
+if (!isNull _escortGrp) then {
+    _escortGrp setVariable ["CO_isBusEscortGrp", false, true];
+    _escortGrp setBehaviour "AWARE";
+    _escortGrp setCombatMode "YELLOW";
+    {
+        if (alive _x) then {
+            _x enableAI "AUTOTARGET";
+            _x enableAI "TARGET";
+            _x enableAI "AUTOCOMBAT";
+            _x enableAI "SUPPRESSION";
+            _x enableAI "COVER";
+            _x setBehaviour "AWARE";
+            _x setCombatMode "YELLOW";
+            if (!isNull _veh && vehicle _x == _veh) then {
+                unassignVehicle _x;
+                moveOut _x;
+            };
+        };
+    } forEach (units _escortGrp);
+};
+if (!isNull _driverGrp) then {
+    _driverGrp setVariable ["CO_isBusDriverGrp", false, true];
+    {
+        if (alive _x) then {
+            _x enableAI "AUTOTARGET";
+            _x enableAI "TARGET";
+            _x enableAI "AUTOCOMBAT";
+            _x enableAI "FSM";
+            _x setBehaviour "AWARE";
+            _x setCombatMode "YELLOW";
+            if (!isNull _veh && vehicle _x == _veh) then {
+                unassignVehicle _x;
+                moveOut _x;
+            };
+        };
+    } forEach (units _driverGrp);
+};

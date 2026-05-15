@@ -86,39 +86,44 @@ private _dx = (_aimAt select 0) - (_spawnPos select 0);
 private _dy = (_aimAt select 1) - (_spawnPos select 1);
 _veh setDir (_dx atan2 _dy);
 
-// ---- 3. Create separate driver group (CARELESS BLUE) ------------------
+// ---- 3. Create separate driver group (SAFE BLUE) ----------------------
+// SAFE is the proven pattern for AI vehicle drivers (see fn_policePatrols).
+// CARELESS combined with disableAI FSM/PATH/COVER deadlocks pathfinding —
+// the truck just sits idling. SAFE drivers won't engage allies (civs are
+// setFriend=1 to west) and will execute doMove reliably.
 private _driverGrp = createGroup [west, true];
 _driverGrp setVariable ["CO_faction", "CRN_ENF", true];
 _driverGrp setVariable ["CO_isBusDriverGrp", true, true];
-_driverGrp setBehaviour "CARELESS";
+_driverGrp setVariable ["CO_transportVehicle", _veh, true];
+_driverGrp setBehaviour "SAFE";
 _driverGrp setCombatMode "BLUE";
-_driverGrp setSpeedMode "LIMITED";
+_driverGrp setSpeedMode "NORMAL";
 _driverGrp setFormation "FILE";
 
 private _driver = _driverGrp createUnit ["B_Soldier_F", _spawnPos, [], 0, "NONE"];
 [_driver] call co_main_fnc_initHostileUnit;
-// Override the AWARE/YELLOW set by initHostileUnit — drivers must NOT
-// react to perceived threats or they freeze and the bus stops.
-_driver setBehaviour "CARELESS";
+// Override the AWARE/YELLOW set by initHostileUnit — driver stays SAFE so
+// it never breaks off route to engage. AUTOTARGET/TARGET disabled so it
+// won't ever stop to acquire targets; FSM/PATH stay enabled so pathfinding
+// actually works.
+_driver setBehaviour "SAFE";
 _driver setCombatMode "BLUE";
 _driver disableAI "AUTOTARGET";
 _driver disableAI "TARGET";
-_driver disableAI "AUTOCOMBAT";
-_driver disableAI "SUPPRESSION";
-_driver disableAI "COVER";
-_driver disableAI "FSM";
 _driver setUnitPos "UP";
 _driver setSkill ["courage", 1];
 _driver allowFleeing 0;
 _driverGrp selectLeader _driver;
 _driver moveInDriver _veh;
 
-// ---- 4. Create escort group (CARELESS BLUE while seated) --------------
+// ---- 4. Create escort group (SAFE BLUE while seated) ------------------
+// Escorts stay SAFE until the bus loop dismounts them, then it flips the
+// group to AWARE/YELLOW for the hunt.
 private _escortGrp = createGroup [west, true];
 _escortGrp setVariable ["CO_faction", "CRN_ENF", true];
 _escortGrp setVariable ["CO_isBusEscortGrp", true, true];
 _escortGrp setVariable ["CO_transportVehicle", _veh, true];
-_escortGrp setBehaviour "CARELESS";
+_escortGrp setBehaviour "SAFE";
 _escortGrp setCombatMode "BLUE";
 _escortGrp setSpeedMode "FULL";
 _escortGrp setFormation "WEDGE";
@@ -127,13 +132,10 @@ private _escorts = [];
 for "_i" from 1 to _hostilesCount do {
     private _u = _escortGrp createUnit ["B_Soldier_F", _spawnPos, [], 0, "NONE"];
     [_u] call co_main_fnc_initHostileUnit;
-    _u setBehaviour "CARELESS";
+    _u setBehaviour "SAFE";
     _u setCombatMode "BLUE";
     _u disableAI "AUTOTARGET";
     _u disableAI "TARGET";
-    _u disableAI "AUTOCOMBAT";
-    _u disableAI "SUPPRESSION";
-    _u disableAI "COVER";
     _u allowFleeing 0;
     _u moveInCargo _veh;
     _escorts pushBack _u;
@@ -144,7 +146,9 @@ if (count _escorts > 0) then { _escortGrp selectLeader (_escorts select 0) };
 _veh setVehicleLock "UNLOCKED";
 _veh setFuel 1;
 _veh engineOn true;
-_veh forceFollowRoad true;
+// NOTE: don't `forceFollowRoad true` here — it deadlocks when the truck
+// spawns even slightly off-road. Routes are road-graph based, so the AI
+// will use roads naturally.
 _veh allowDamage true;
 
 _veh setVariable ["CO_isBusPatrol", true, true];

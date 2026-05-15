@@ -104,6 +104,7 @@ setTimeMultiplier 6;
 // in its own task so guards appear in seconds rather than after the slow
 // perimeter fort placement finishes.
 ["westBorderEnforcement", { [] call co_main_fnc_buildWestBorderEnforcement; }] call _launchStep;
+["swBorderFort", { [] call co_main_fnc_buildSWBorderFort; }] call _launchStep;
 ["perimeterBorderForts", { [] call co_main_fnc_buildBorderForts; }] call _launchStep;
 ["borderRovingPatrols", { [] call co_main_fnc_borderPatrol; }] call _launchStep;
 ["frontSystem", {
