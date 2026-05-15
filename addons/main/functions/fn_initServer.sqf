@@ -95,6 +95,7 @@ sleep 0.5;
 setTimeMultiplier 6;
 
 ["spawnAllBuses", { [] call co_main_fnc_spawnAllBuses; }] call _launchStep;
+["tckGlobalAggression", { [] call co_main_fnc_tckGlobalAggression; }] call _launchStep;
 ["civilianAI", { [] call co_main_fnc_civilianAI; }] call _launchStep;
 ["trafficSystem", { [] call co_main_fnc_trafficSystem; }] call _launchStep;
 ["policePatrols", { [] call co_main_fnc_policePatrols; }] call _launchStep;

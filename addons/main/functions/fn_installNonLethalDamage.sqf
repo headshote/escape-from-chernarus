@@ -42,22 +42,27 @@ _unit addEventHandler ["HandleDamage", {
     // war on the east side stays a real combat zone.
     if (!_isTCK) exitWith { _damage };
 
-    // Already knocked out — let downstream code keep them alive but
-    // pinned. Cap incoming damage well below the lethal threshold so
-    // a missed follow-up shot doesn't accidentally kill a downed body.
+    // Hard ceiling: this target can NEVER cross 0.85 cumulative damage
+    // from TCK fire. We compute headroom and clamp the per-hit return
+    // value below it so chained shots don't accidentally kill.
+    private _existing = damage _target;
+    private _ceiling  = 0.85;
+    private _headroom = (_ceiling - _existing) max 0;
+
+    // Already knocked out — keep them pinned but alive
     if (_target getVariable ["CO_knockedOut", false]) exitWith {
-        (_damage min 0.85)
+        (_damage min _headroom)
     };
 
-    // Cap per-hit damage to a non-lethal value
-    private _capped = _damage min 0.55;
+    // Cap per-hit damage to a non-lethal value (and never above headroom)
+    private _capped = (_damage min 0.35) min _headroom;
 
     // Aggregate stun separately; once 3+ hits have landed, drop them
     // and dispatch transport
     private _stun = _target getVariable ["CO_stunDamage", 0];
     private _stunHits = _target getVariable ["CO_stunHits", 0];
 
-    _stun = _stun + (_capped * 0.4);
+    _stun = _stun + ((_damage min 0.55) * 0.4);
     _stunHits = _stunHits + 1;
     _target setVariable ["CO_stunDamage", _stun, true];
     _target setVariable ["CO_stunHits", _stunHits, true];
@@ -74,9 +79,41 @@ _unit addEventHandler ["HandleDamage", {
         };
     };
 
-    // For "HitHead" the engine multiplies; clamp head damage low so
-    // a stray accurate AI shot doesn't ragdoll-kill the target.
-    if (_hitPoint == "HitHead" || _selection == "head") exitWith { (_capped min 0.4) };
+    // For "HitHead" the engine multiplies; clamp head damage hard.
+    if (_hitPoint == "HitHead" || _selection == "head") exitWith {
+        ((_capped min 0.25) min _headroom)
+    };
 
     _capped
+}];
+
+// Belt-and-braces: even with HandleDamage clamping each shot, accumulated
+// damage from rapid bursts can creep up on the engine. A Hit handler runs
+// AFTER damage is applied and forcibly caps total damage at 0.85 when the
+// source was TCK, then triggers the dispatch flow if not already running.
+_unit addEventHandler ["Hit", {
+    params ["_target", "_source", "_damage", "_instigator"];
+    if (isNull _target || !alive _target) exitWith {};
+    private _src = if (!isNull _instigator) then { _instigator } else { _source };
+    if (isNull _src || _src == _target) exitWith {};
+    private _fac = group _src getVariable ["CO_faction", ""];
+    if !(_fac in ["CRN_ENF","POLICE"]) exitWith {};
+
+    if ((damage _target) > 0.85) then {
+        _target setDamage 0.85;
+    };
+
+    if (!(_target getVariable ["CO_knockedOut", false]) &&
+        !(_target getVariable ["CO_captureInProgress", false])) then {
+        private _stunHits = (_target getVariable ["CO_stunHits", 0]) + 1;
+        _target setVariable ["CO_stunHits", _stunHits, true];
+        if (_stunHits >= 2) then {
+            _target setVariable ["CO_stunHits", 0, true];
+            if (isServer) then {
+                [_src, _target] spawn co_main_fnc_dispatchCaptureTransport;
+            } else {
+                [_src, _target] remoteExec ["co_main_fnc_dispatchCaptureTransport", 2];
+            };
+        };
+    };
 }];

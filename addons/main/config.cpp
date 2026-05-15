@@ -99,6 +99,7 @@ class CfgFunctions {
             class guardAggroLoop  {};
             class installNonLethalDamage {};
             class dispatchCaptureTransport {};
+            class tckGlobalAggression {};
             class buildTrainingGround {};
             class showEscapeUnlockScreen {};
             class crowdResistance  {};
