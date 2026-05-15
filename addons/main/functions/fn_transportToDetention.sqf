@@ -121,22 +121,14 @@ if (_bus getVariable ["CO_isBusPatrol", false]) exitWith {
 
             _transportBus setVariable ["CO_busCaptives", [], true];
 
+            // The bus is driven by fn_busAgroLoop via doMove; flush any
+            // stale engine waypoints from earlier revisions so they don't
+            // fight the scripted driving.
             {
                 deleteWaypoint _x;
             } forEach +waypoints _transportGroup;
 
-            {
-                private _wp = _transportGroup addWaypoint [_x, 10];
-                _wp setWaypointType "MOVE";
-                _wp setWaypointSpeed "NORMAL";
-            } forEach _routeWps;
-
-            if !(_routeWps isEqualTo []) then {
-                private _cycleWp = _transportGroup addWaypoint [_routeWps select 0, 0];
-                _cycleWp setWaypointType "CYCLE";
-            };
-
-            _transportBus setVariable ["CO_busState", "patrol", true];
+            _transportBus setVariable ["CO_busState", "cruising", true];
             _transportBus setVariable ["CO_busNextEngageAt", time + 20, false];
         };
     };
@@ -157,8 +149,8 @@ if (_bus getVariable ["CO_isBusPatrol", false]) exitWith {
 
                 if (_captivesStillAboard isEqualTo []) then {
                     _transportBus setVariable ["CO_busDeliveryScheduled", false, true];
-                    if ((_transportBus getVariable ["CO_busState", "patrol"]) != "delivering") then {
-                        _transportBus setVariable ["CO_busState", "patrol", true];
+                    if ((_transportBus getVariable ["CO_busState", "cruising"]) != "delivering") then {
+                        _transportBus setVariable ["CO_busState", "cruising", true];
                     };
                 } else {
                     [_transportBus, _transportGroup] call _requestDelivery;
@@ -166,8 +158,8 @@ if (_bus getVariable ["CO_isBusPatrol", false]) exitWith {
             };
         };
 
-        if ((_bus getVariable ["CO_busState", "patrol"]) == "engaging") then {
-            _bus setVariable ["CO_busState", "patrol", true];
+        if ((_bus getVariable ["CO_busState", "cruising"]) == "engaging") then {
+            _bus setVariable ["CO_busState", "cruising", true];
         };
     };
 };

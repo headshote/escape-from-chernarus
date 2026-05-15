@@ -1,77 +1,86 @@
 // ============================================================
 // fn_spawnBusOnRoute.sqf
-// Spawns a single bus on a given waypoint route.
+// Spawns a single hostile press-gang vehicle on a route. The
+// vehicle is driven entirely by fn_busAgroLoop via scripted
+// doMove commands; we do NOT use engine waypoints here because
+// they were unreliable (drivers hesitating, paths failing).
 // ============================================================
 
 params ["_routeWps", "_hostilesCount"];
 
-private _spawnPos  = _routeWps select 0;
-private _nearRoad  = _spawnPos nearRoads 20;
-if (count _nearRoad > 0) then { _spawnPos = getPos (_nearRoad select 0); };
+if (count _routeWps == 0) exitWith { diag_log "[CO] spawnBusOnRoute called with empty route." };
 
-private _vehiclePool = missionNamespace getVariable ["CO_bus_vehiclePool", ["C_Van_01_transport_F", "C_Truck_02_transport_F"]];
-private _veh = selectRandom _vehiclePool createVehicle _spawnPos;
+private _spawnPos = _routeWps select 0;
+private _nearRoads = _spawnPos nearRoads 60;
+if (count _nearRoads > 0) then {
+    _spawnPos = getPos (selectRandom _nearRoads);
+};
+
+// Ensure a clear empty spot
+private _empty = _spawnPos findEmptyPosition [0, 25, "C_Van_01_transport_F"];
+if !(_empty isEqualTo []) then { _spawnPos = _empty };
+
+private _vehiclePool = missionNamespace getVariable [
+    "CO_bus_vehiclePool",
+    ["C_Van_01_transport_F","C_Truck_02_transport_F"]
+];
+private _vehClass = selectRandom _vehiclePool;
+private _veh = createVehicle [_vehClass, _spawnPos, [], 0, "NONE"];
+_veh setDir random 360;
+_veh setVectorUp [0,0,1];
+
 private _grp = createGroup west;
-_grp setVariable ["CO_faction", "CRN_ENF"];
+_grp setVariable ["CO_faction", "CRN_ENF", true];
 _grp setVariable ["CO_transportVehicle", _veh, false];
 _grp deleteGroupWhenEmpty true;
 
-// Driver
-private _driver = _grp createUnit ["B_Soldier_F", _spawnPos, [], 0, "CARGO"];
-_driver moveInDriver _veh;
+// --- Driver ---
+private _driver = _grp createUnit ["B_Soldier_F", _spawnPos, [], 0, "NONE"];
 [_driver] call co_main_fnc_initHostileUnit;
+_driver moveInDriver _veh;
 _grp selectLeader _driver;
 _driver setRank "SERGEANT";
 
-// Hostile cargo
+// --- Cargo escorts ---
 for "_i" from 1 to _hostilesCount do {
-    private _u = _grp createUnit ["B_Soldier_F", _spawnPos, [], 0, "CARGO"];
-    _u moveInCargo _veh;
+    private _u = _grp createUnit ["B_Soldier_F", _spawnPos, [], 0, "NONE"];
     [_u] call co_main_fnc_initHostileUnit;
+    _u moveInCargo _veh;
 };
 
-// Assign waypoints from route
-{
-    private _wp = _grp addWaypoint [_x, 10];
-    _wp setWaypointType "MOVE";
-    _wp setWaypointBehaviour "AWARE";
-    _wp setWaypointCombatMode "YELLOW";
-    _wp setWaypointSpeed "NORMAL";
-} forEach _routeWps;
-private _cycleWp = _grp addWaypoint [_routeWps select 0, 0];
-_cycleWp setWaypointType "CYCLE";
-
+// Group posture — kept AWARE/YELLOW so escorts open fire when ordered
+// during engage, but cruise behavior is fully scripted (doMove + forceSpeed).
 _grp setBehaviour "AWARE";
 _grp setCombatMode "YELLOW";
 _grp setSpeedMode "NORMAL";
-_grp setFormation "FILE";
 
-// Make sure the engine is on so the AI driver actually moves immediately
-// (vans sometimes spawn with engine off and the driver waits for a fuel-up
-// behaviour cycle before starting). Force the bus toward the first waypoint.
-_veh engineOn true;
-_veh forceSpeed -1;
 {
     _x enableAI "MOVE";
     _x enableAI "PATH";
     _x enableAI "AUTOCOMBAT";
-    _x setBehaviour "AWARE";
-    _x setCombatMode "YELLOW";
-    _x setSkill ["aimingAccuracy", 0.25];
-    _x setSkill ["aimingShake", 0.4];
-    _x setSkill ["spotDistance", 0.6];
-    _x setSkill ["spotTime", 0.7];
-    _x setSkill ["courage", 0.8];
+    _x enableAI "FSM";
 } forEach (units _grp);
 
+// Mark the patrol so other scripts (aggro loops, dispatchers) can find it
 _veh setVariable ["CO_isBusPatrol", true, true];
-_veh setVariable ["CO_busState", "patrol", true];
+_veh setVariable ["CO_busState", "cruising", true];
 _veh setVariable ["CO_busRouteWps", _routeWps, false];
 _veh setVariable ["CO_busCaptives", [], true];
 _veh setVariable ["CO_busNextEngageAt", 0, false];
-private _patrolStopInterval = missionNamespace getVariable ["CO_bus_patrolStopInterval", 75];
-_veh setVariable ["CO_busLastPatrolStop", time - _patrolStopInterval + random 25, false];
 _veh setVehicleLock "UNLOCKED";
 
-// Attach aggro loop
+_veh engineOn true;
+_veh setFuel 1;
+
+// Hand off to the active control loop
 [_veh, _grp] spawn co_main_fnc_busAgroLoop;
+
+diag_log format [
+    "[CO] Spawned bus %1 on route '%2' (%3 wps) at %4.",
+    _vehClass,
+    (_routeWps select 0),
+    count _routeWps,
+    mapGridPosition _veh
+];
+
+_veh
