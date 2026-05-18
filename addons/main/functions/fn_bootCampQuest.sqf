@@ -27,19 +27,26 @@ _player setVariable ["CO_bootCampActive", true, true];
 _player setVariable ["CO_bootCampGraduated", false, true];
 
 if (isNil "CO_airfieldCenter") then { CO_airfieldCenter = [2100, 12800, 0] };
+if (isNil "CO_trainingFieldPos") then { CO_trainingFieldPos = [2160, 12800, 0] };
 
-// ----- Stage positions (relative to airfield center) ----------
+// ----- Stage positions (relative to training-field anchor) ----------
+// NWAF runway runs roughly east-west. Place the firing line on the
+// flat apron and put the targets ~120 m WEST so the player has clear,
+// downhill LOS over the open runway (the previous south-facing layout
+// put targets in the wooded hill behind the airfield where LOS was
+// blocked, breaking both the shoot and the hit-detection check).
 private _obstacleA       = CO_airfieldCenter vectorAdd [-90,  -20, 0];
 private _obstacleB       = CO_airfieldCenter vectorAdd [ 90,   20, 0];
-private _weaponRackPos   = CO_airfieldCenter vectorAdd [ 55,  -75, 0];
-private _riflePos        = CO_airfieldCenter vectorAdd [ 60,  -80, 0];
+private _weaponRackPos   = CO_trainingFieldPos vectorAdd [ 20, -22, 0];
+private _riflePos        = CO_trainingFieldPos vectorAdd [ 10, -25, 0];
+private _rifleFireLine   = _riflePos;
 private _rifleTargetPositions = [
-    CO_airfieldCenter vectorAdd [ 60, -130, 0],
-    CO_airfieldCenter vectorAdd [ 70, -135, 0],
-    CO_airfieldCenter vectorAdd [ 80, -130, 0]
+    CO_trainingFieldPos vectorAdd [-110, -32, 0],
+    CO_trainingFieldPos vectorAdd [-115, -25, 0],
+    CO_trainingFieldPos vectorAdd [-110, -18, 0]
 ];
-private _grenadePos       = CO_airfieldCenter vectorAdd [-70,  80, 0];
-private _grenadeTargetPos = CO_airfieldCenter vectorAdd [-70, 110, 0];
+private _grenadePos       = CO_trainingFieldPos vectorAdd [-30,  60, 0];
+private _grenadeTargetPos = CO_trainingFieldPos vectorAdd [-30,  90, 0];
 
 // ----- Markers + Task IDs -----
 private _suffix = format ["%1", round (random 1e6)];
@@ -142,10 +149,18 @@ _rack setDir 180;
 clearWeaponCargoGlobal _rack;
 clearMagazineCargoGlobal _rack;
 clearItemCargoGlobal _rack;
-_rack addWeaponCargoGlobal ["arifle_AKM_F", 4];
-_rack addMagazineCargoGlobal ["30Rnd_762x39_Mag_F", 16];
+// Bulk training stockpile (per user spec): ample weapons & ammo so an
+// entire wave of conscripts can pull from the same rack without it
+// emptying. clearWeaponCargoGlobal + addWeaponCargoGlobal is the safe
+// network-replicated path.
+_rack addWeaponCargoGlobal   ["arifle_AKM_F", 900];
+_rack addMagazineCargoGlobal ["30Rnd_762x39_Mag_F", 100000];
 
-[
+// addAction must be added on every client to be usable; remoteExec
+// with JIP=false (no persistent JIP entry — the rack is deleted at the
+// end of stage 2, so late-joiners never need it and a persistent JIP
+// queue entry per training run accumulates and degrades performance).
+private _rackAction = [
     _rack,
     [
         "<t color='#00ff00'>Pick up training rifle</t>",
@@ -165,12 +180,31 @@ _rack addMagazineCargoGlobal ["30Rnd_762x39_Mag_F", 16];
         nil, 1.5, true, true, "",
         "_this distance _target < 3 && (_this getVariable ['CO_bootCampActive', false])"
     ]
-] remoteExec ["addAction", 0, true];
+] remoteExec ["addAction", 0, false];
 
+// Pop-up wooden targets. Engine `damage` on TargetP_Inf_F does NOT rise
+// reliably from rifle hits (it animates rather than taking damage),
+// which is why "shooting them up close with a rifle didn't register"
+// in earlier runs. We attach a HitPart event handler — fires on ANY
+// projectile impact regardless of damage — and pop the target down for
+// visible feedback. Tracked via a setVariable flag so the waitUntil
+// check is deterministic.
 private _targets = [];
 {
     private _t = createVehicle ["TargetP_Inf_F", _x, [], 0, "CAN_COLLIDE"];
     _t setPos _x;
+    _t setVariable ["CO_targetHit", false, true];
+    _t addEventHandler ["HitPart", {
+        params ["_arr"];
+        private _entry = _arr select 0;
+        private _tgt   = _entry select 0;
+        private _shooter = _entry select 1;
+        // Only count hits from a player (or anything the player owns)
+        if (isPlayer _shooter) then {
+            _tgt setVariable ["CO_targetHit", true, true];
+            _tgt animate ["terc", 1];
+        };
+    }];
     _targets pushBack _t;
 } forEach _rifleTargetPositions;
 
@@ -180,7 +214,7 @@ waitUntil {
     !alive _player ||
     !(_player getVariable ["CO_bootCampActive", false]) ||
     time > _stage2Deadline ||
-    ({ !alive _x || damage _x > 0.8 } count _targets) >= count _targets
+    ({ _x getVariable ["CO_targetHit", false] } count _targets) >= count _targets
 };
 
 { if (!isNull _x) then { deleteVehicle _x } } forEach _targets;

@@ -155,15 +155,60 @@ if (_bus getVariable ["CO_isBusPatrol", false]) exitWith {
 
             _transportBus setVariable ["CO_busCaptives", [], true];
 
-            // The bus is driven by fn_busAgroLoop via doMove; flush any
-            // stale engine waypoints from earlier revisions so they don't
-            // fight the scripted driving.
+            // ----- Hand the bus back to the cruise controller --------
+            // The bus is driven by fn_busAgroLoop, which expects state
+            // "traveling" + an active engine waypoint list to resume
+            // patrolling. The original implementation deleted ALL
+            // waypoints here and set state to "cruising" — a value
+            // that fn_busAgroLoop does not handle, so the bus sat
+            // idle forever after a single delivery (the root cause of
+            // "TCK trucks just stand uselessly" reports). We now re-
+            // install the original cruise waypoints from CO_busRouteWps
+            // and reset state to "traveling".
             {
                 deleteWaypoint _x;
             } forEach +waypoints _transportGroup;
 
-            _transportBus setVariable ["CO_busState", "cruising", true];
+            private _cruiseRoute = _transportBus getVariable ["CO_busRouteWps", []];
+            if (count _cruiseRoute > 0) then {
+                {
+                    private _wp = _transportGroup addWaypoint [_x, 0];
+                    _wp setWaypointType "MOVE";
+                    _wp setWaypointSpeed "NORMAL";
+                    _wp setWaypointBehaviour "SAFE";
+                    _wp setWaypointCombatMode "BLUE";
+                    _wp setWaypointFormation "FILE";
+                    _wp setWaypointCompletionRadius 30;
+                } forEach _cruiseRoute;
+                private _cycleWp = _transportGroup addWaypoint [_cruiseRoute select 0, 0];
+                _cycleWp setWaypointType "CYCLE";
+                _cycleWp setWaypointSpeed "NORMAL";
+                _cycleWp setWaypointBehaviour "SAFE";
+                _cycleWp setWaypointCombatMode "BLUE";
+                _transportGroup setCurrentWaypoint [_transportGroup, 0];
+            };
+
+            // Kick the engine on the driver so the cruise begins
+            // immediately instead of waiting for the next loop tick.
+            if (alive _transportBus) then {
+                _transportBus engineOn true;
+                _transportBus forceSpeed -1;
+                private _drv = driver _transportBus;
+                if (!isNull _drv) then {
+                    _drv setBehaviour "SAFE";
+                    _drv setCombatMode "BLUE";
+                    _drv enableAI "MOVE";
+                    _drv enableAI "PATH";
+                    _drv enableAI "FSM";
+                    if (count _cruiseRoute > 0) then {
+                        _drv doMove (_cruiseRoute select 0);
+                    };
+                };
+            };
+
+            _transportBus setVariable ["CO_busState", "traveling", true];
             _transportBus setVariable ["CO_busNextEngageAt", time + 20, false];
+            _transportBus setVariable ["CO_busLastIdleReset", time, true];
         };
     };
 

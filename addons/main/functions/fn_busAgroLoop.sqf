@@ -46,10 +46,11 @@ if (isNull _veh || isNull _driverGrp) exitWith {};
 #define BUS_MELEE_RANGE          2.6
 #define BUS_WP_REACHED_DIST     35
 #define BUS_DOMOVE_INTERVAL      5
-#define BUS_DISMOUNT_DURATION   75
+#define BUS_DISMOUNT_DURATION   45
 #define BUS_REBOARD_TIMEOUT     15
 #define BUS_STUCK_SPEED          1.8
-#define BUS_STUCK_GRACE         22
+#define BUS_STUCK_GRACE         10
+#define BUS_IDLE_DISMOUNT_GRACE 12
 #define BUS_APPROACH_TIMEOUT    90
 
 private _aggroRadius = missionNamespace getVariable ["CO_bus_aggroRadius", BUS_SCAN_RADIUS];
@@ -288,6 +289,16 @@ while { alive _veh } do {
 
     private _state  = _veh getVariable ["CO_busState", "traveling"];
     if (_state in ["delivering","abandoned"]) then { continue };
+    // Defensive: legacy code paths set state to "cruising" after a
+    // delivery. Treat it as a synonym for "traveling" so this loop
+    // doesn't drop the bus into a do-nothing state. (The proper post-
+    // delivery handover in fn_transportToDetention now sets "traveling"
+    // directly, but old saves / racing state changes can still leave
+    // this value behind.)
+    if (_state == "cruising") then {
+        _veh setVariable ["CO_busState", "traveling", true];
+        _state = "traveling";
+    };
 
     // ---- Driver replacement / abandon detection -----------------------
     private _driver = driver _veh;
@@ -351,7 +362,7 @@ while { alive _veh } do {
             _lastIdlePos = _curPos;
             _idleSince = time;
         };
-        if ((time - _idleSince) > 20) then {
+        if ((time - _idleSince) > BUS_IDLE_DISMOUNT_GRACE) then {
             diag_log format [
                 "[CO] Bus %1 idle %2s in state '%3' — forcing partial dismount.",
                 netId _veh, round (time - _idleSince), _state
@@ -559,6 +570,12 @@ while { alive _veh } do {
                     _tgtPos = _tgtPos vectorAdd (_vel vectorMultiply 3);
                 };
                 _veh engineOn true;
+                // doMove on the vehicle itself is the engine-supported
+                // path for AI-driven vehicles (more reliable than
+                // doMove on the driver unit, which the engine routes
+                // through the same logic but can swallow on first tick
+                // after a state change).
+                _veh doMove _tgtPos;
                 _driver doMove _tgtPos;
                 _veh forceSpeed -1;
                 _lastDoMove = time;
@@ -644,6 +661,23 @@ while { alive _veh } do {
         } else {
             // Keep engine on + speed unforced so engine waypoints handle motion.
             if (!isEngineOn _veh) then { _veh engineOn true };
+
+            // Cruise watchdog: even when not stuck "too long" yet, if
+            // the truck has nothing currently happening and isn't
+            // moving, re-issue a doMove to the next waypoint so the
+            // engine can't sit on a stale path. Cheap and idempotent.
+            if ((speed _veh) < BUS_STUCK_SPEED) then {
+                private _wps = waypoints _driverGrp;
+                if (count _wps > 0) then {
+                    private _idx = currentWaypoint _driverGrp;
+                    if (_idx >= count _wps) then { _idx = 0 };
+                    private _wpPos = waypointPosition [_driverGrp, _idx];
+                    if !(_wpPos isEqualTo [0,0,0]) then {
+                        _driverGrp setCurrentWaypoint [_driverGrp, _idx];
+                        _veh doMove _wpPos;
+                    };
+                };
+            };
 
             // Stuck recovery: if the engine waypoints are failing to make
             // progress, snap to a nearby road and force a fresh waypoint
