@@ -51,7 +51,7 @@ if (count _settlementPlan > _totalCivs) then {
     private _townHotspots = switch (_townName) do {
         case "Chernogorsk":    { [[6400, 2400, 0], [6575, 2510, 0], [6240, 2285, 0]] };
         case "Elektrozavodsk": { [[10200, 2300, 0], [10370, 2440, 0], [10035, 2175, 0]] };
-        case "Berezino":       { [[11600, 7800, 0], [11810, 7705, 0], [11420, 7920, 0]] };
+        case "Berezino":       { [[12300, 9700, 0], [12410, 9810, 0], [12200, 9600, 0], [12330, 9550, 0], [12180, 9780, 0]] };
         case "Stary Sobor":    { [[7300, 7900, 0], [7190, 8045, 0]] };
         case "Zelenogorsk":    { [[3900, 7200, 0], [4040, 7340, 0]] };
         default                 { [_basePos] };

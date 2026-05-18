@@ -13,7 +13,7 @@ CO_rus_advanceSpeed = 0.5;     // front moves this many meters per second of gam
 // Town capture checkpoints west to east
 CO_rus_townObjectives = [
     ["Krasnostav",     11200, "marker_krasnostav", [11200, 12300, 0]],
-    ["Berezino",       11600, "marker_berezino",   [11600,  7800, 0]],
+    ["Berezino",       12300, "marker_berezino",   [12300,  9700, 0]],
     ["Elektrozavodsk", 10200, "marker_elektro",    [10200,  2300, 0]],
     ["Chernogorsk",     6400, "marker_cherno",     [ 6400,  2400, 0]],
     ["Balota",          4500, "marker_balota",     [ 4500,  2500, 0]]

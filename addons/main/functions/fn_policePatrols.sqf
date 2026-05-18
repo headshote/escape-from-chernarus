@@ -10,7 +10,7 @@ CO_policeTownPosts = [
     // [town pos, patrol radius, car count]
     [[6400,  2400, 0], 600, 3],   // Chernogorsk
     [[10200, 2300, 0], 500, 3],   // Elektrozavodsk
-    [[11600, 7800, 0], 500, 2],   // Berezino
+    [[12300, 9700, 0], 550, 3],   // Berezino
     [[3900,  7200, 0], 400, 2],   // Zelenogorsk
     [[7300,  7900, 0], 350, 2]    // Stary Sobor
 ];

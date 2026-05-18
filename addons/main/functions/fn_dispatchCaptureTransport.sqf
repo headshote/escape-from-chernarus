@@ -33,8 +33,23 @@ if (isPlayer _target) then {
     _target setVariable ["CO_wantedLevel", _wl min 100, true];
 };
 
-// 1) If the shooter's group already owns a transport vehicle (bus
-//    patrol), re-use that. Otherwise look for the nearest patrol bus.
+// PLAYERS ALWAYS get a dedicated capture truck. The old "reuse nearest
+// bus" path routed the player into a NPC-loading bus that delivered to
+// a detention center instead of training, and moveInCargo on a remote
+// player owner was unreliable. The dedicated truck flow (fn_spawnCaptureTransport)
+// spawns a van at the nearest road, force-teleports the player into
+// cargo with retries, and drives to NWAF training. This mirrors what
+// the border patrol / SW fort already do for player captures and is
+// what the gameplay spec calls for.
+if (isPlayer _target) exitWith {
+    diag_log format [
+        "[CO] Player %1 captured by %2 group — dispatching dedicated truck to training.",
+        name _target, (group _shooter) getVariable ["CO_faction", "?"]
+    ];
+    [_target, group _shooter] call co_main_fnc_spawnCaptureTransport;
+};
+
+// NPC civilians: prefer a patrol bus if one is nearby, else dedicated van.
 private _shooterGrp = group _shooter;
 private _bus = _shooterGrp getVariable ["CO_transportVehicle", objNull];
 if (isNull _bus || !alive _bus) then {
@@ -49,10 +64,6 @@ if (isNull _bus || !alive _bus) then {
 };
 
 if (isNull _bus) exitWith {
-    // No patrol bus available — fall back to spawning a dedicated capture
-    // van at the nearest road. This is the path used by the SW border fort,
-    // remote checkpoints, and the global TCK aggression failsafe whenever
-    // the player gets knocked out far from any active patrol route.
     diag_log format [
         "[CO] No nearby bus for %1 — dispatching dedicated capture transport.",
         name _target

@@ -87,7 +87,15 @@ params ["_detectedUnits", "_hostileGrp"];
 
                     if (_result == "captured") then {
                         _target setCaptive true;
-                        [_target, _grp] call co_main_fnc_transportToDetention;
+                        // TCK (CRN_ENF) ships players directly to TRAINING via
+                        // a dedicated truck. Police / other factions still use
+                        // the bus-or-van detention path.
+                        private _grpFac = _grp getVariable ["CO_faction", ""];
+                        if (_grpFac == "CRN_ENF") then {
+                            [_target, _grp] spawn co_main_fnc_spawnCaptureTransport;
+                        } else {
+                            [_target, _grp] call co_main_fnc_transportToDetention;
+                        };
                         _finished = true;
                     };
                     // Escaped: give brief head-start

@@ -17,12 +17,33 @@ removeHeadgear     _conscript;
 _conscript forceAddUniform "U_O_CombatUniform_ocamo";
 _conscript addVest "V_PlateCarrierGL_oli";
 _conscript addHeadgear "H_HelmetO_ocamo";
+_conscript addBackpack "B_AssaultPack_rgr";
+
+// Primary: AK-12 + 8 mags
 _conscript addWeapon "arifle_AK12_F";
-for "_i" from 1 to 6 do { _conscript addMagazine "30Rnd_762x39_Mag_F" };
+for "_i" from 1 to 8 do { _conscript addMagazine "30Rnd_762x39_Mag_F" };
+
+// Secondary: single-shot AT launcher with one rocket — enough to
+// crack a BTR or one wave's APC, not enough to solo-armor-clear.
+_conscript addWeapon "launch_RPG7_F";
+_conscript addMagazine "RPG7_F";
+
+// Throwables / aids
 _conscript addMagazine "HandGrenade";
 _conscript addMagazine "HandGrenade";
+_conscript addMagazine "HandGrenade";
+_conscript addMagazine "SmokeShell";
+_conscript addMagazine "SmokeShell";
+
+// Standard kit
 _conscript addItem "FirstAidKit";
 _conscript addItem "FirstAidKit";
+_conscript addItem "FirstAidKit";
+_conscript linkItem "ItemMap";
+_conscript linkItem "ItemCompass";
+_conscript linkItem "ItemWatch";
+_conscript linkItem "ItemRadio";
+_conscript addWeapon "Binocular";
 
 _conscript setCaptive false;
 _conscript setVariable ["CO_isCleared", true, true];
@@ -57,4 +78,14 @@ if (isPlayer _conscript) then {
     // Krasnostav for more than 60 s, flag them AWOL and every
     // faction (TCK, border, police, RUS_ADV) becomes lethal.
     [_conscript, _krasnostav] spawn co_main_fnc_awolMonitor;
+
+    // Engine sides cannot be changed at runtime (the player's mission
+    // slot binds them to "civilian"). joinSilent above silently no-ops
+    // on side mismatch, leaving the deployed conscript civilian-coded
+    // — which means Russian invaders (east) and Chernarus army (west)
+    // both ignore them by default. Resolve via a scripted hostility
+    // tick: any RUS_ADV unit within 350 m of a CO_isCleared player
+    // gets a direct reveal/fireAtTarget order, bypassing engine side
+    // relations.
+    [_conscript] spawn co_main_fnc_russianHostilityTick;
 };

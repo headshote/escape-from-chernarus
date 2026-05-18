@@ -97,8 +97,17 @@ if (_bus getVariable ["CO_isBusPatrol", false]) exitWith {
 
             if (!alive _transportBus) exitWith {};
 
-            private _destinations = [CO_detentionCenters, [], { _x distance2D _transportBus }, "ASCEND"] call BIS_fnc_sortBy;
-            private _dest = _destinations select 0;
+            // TCK conscription buses ship captives to the TRAINING ground
+            // (NWAF airfield). Other factions (police, etc.) ship to the
+            // nearest standard detention center.
+            private _grpFac = _transportGroup getVariable ["CO_faction", ""];
+            private _dest = if (_grpFac == "CRN_ENF") then {
+                if (isNil "CO_trainingFieldPos") then { CO_trainingFieldPos = [2160, 12800, 0] };
+                +CO_trainingFieldPos
+            } else {
+                private _destinations = [CO_detentionCenters, [], { _x distance2D _transportBus }, "ASCEND"] call BIS_fnc_sortBy;
+                _destinations select 0
+            };
 
             {
                 deleteWaypoint _x;
@@ -119,7 +128,10 @@ if (_bus getVariable ["CO_isBusPatrol", false]) exitWith {
 
             if (!alive _transportBus) exitWith {};
 
-            [_dest] call co_main_fnc_spawnDetentionGuards;
+            private _grpFacUnload = _transportGroup getVariable ["CO_faction", ""];
+            if (_grpFacUnload != "CRN_ENF") then {
+                [_dest] call co_main_fnc_spawnDetentionGuards;
+            };
 
             private _captivesToUnload = (_transportBus getVariable ["CO_busCaptives", []]) select {
                 !isNull _x && alive _x && captive _x
@@ -129,7 +141,16 @@ if (_bus getVariable ["CO_isBusPatrol", false]) exitWith {
                 unassignVehicle _x;
                 _x leaveVehicle _transportBus;
                 _x setPosATL (_dest vectorAdd [4 + random 5, random 8 - 4, 0]);
-                [_x] call co_main_fnc_prisonSequence;
+                // TCK buses hand off to trainingPhase (boot camp); other
+                // buses hand off to the prison sequence at detention.
+                if (_grpFacUnload == "CRN_ENF") then {
+                    _x setCaptive true;
+                    _x setVariable ["CO_knockedOut", false, true];
+                    _x setUnconscious false;
+                    [_x] call co_main_fnc_trainingPhase;
+                } else {
+                    [_x] call co_main_fnc_prisonSequence;
+                };
             } forEach _captivesToUnload;
 
             _transportBus setVariable ["CO_busCaptives", [], true];

@@ -111,6 +111,7 @@ setTimeMultiplier 6;
 ["frontSystem", {
     [] call co_main_fnc_buildEasternFront;
     [] call co_main_fnc_frontMilitary;
+    [] call co_main_fnc_buildKrasnostavGarrison;
     [] call co_main_fnc_russianAdvance;
 }] call _launchStep;
 ["airfieldCamp", { [] call co_main_fnc_buildAirfieldCamp; }] call _launchStep;

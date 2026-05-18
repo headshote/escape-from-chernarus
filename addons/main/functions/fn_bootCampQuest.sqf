@@ -1,18 +1,22 @@
 // ============================================================
 // fn_bootCampQuest.sqf
 //
-// Player-driven 3-stage boot camp quest at NWAF training ground.
-// Runs on the server; UI is remote-exec'd to the conscript.
+// Player-driven 3-stage boot camp at the NWAF training ground.
+// Server-authoritative; the Arma 3 Task system (BIS_fnc_taskCreate)
+// drives the map UI and notifications. Tasks are owned by the
+// individual conscript so co-op players each get their own quest.
 //
 // Stages:
-//   1. Obstacle course — visit two waypoints in the airfield interior.
-//   2. Rifle range — destroy 3 wooden targets with the issued AK.
-//   3. Grenade range — destroy 1 target at the grenade pit with a grenade.
+//   1. Obstacle course — visit two waypoints inside the airfield.
+//   2. Rifle range — pick up an AK from the weapon rack and destroy
+//      3 pop-up wooden targets.
+//   3. Grenade range — detonate 2 grenades inside the pit.
 //
-// On completion: setVariable CO_isCleared=true, then deployToFront
-// teleports the player to Krasnostav with a full military loadout.
-// If the player breaches the airfield perimeter mid-quest, the
-// perimeter sentinel in fn_trainingPhase takes over (lethal engagement).
+// On graduation: CO_isCleared=true (Russian advance starts engaging
+// the player, every faction stops trying to detain them), then
+// fn_deployToFront teleports the player to Krasnostav with a
+// proper kit. If the player breaches the perimeter the trainingPhase
+// sentinel takes over (lethal pursuit, no graduation).
 // ============================================================
 params ["_player"];
 
@@ -20,73 +24,148 @@ if (!isServer) exitWith {};
 if (isNull _player || !alive _player) exitWith {};
 if (_player getVariable ["CO_bootCampActive", false]) exitWith {};
 _player setVariable ["CO_bootCampActive", true, true];
+_player setVariable ["CO_bootCampGraduated", false, true];
 
 if (isNil "CO_airfieldCenter") then { CO_airfieldCenter = [2100, 12800, 0] };
 
-// Stage positions (relative to airfield center)
-private _obstacleA   = CO_airfieldCenter vectorAdd [-90,  -20, 0];
-private _obstacleB   = CO_airfieldCenter vectorAdd [ 90,   20, 0];
-private _riflePos    = CO_airfieldCenter vectorAdd [ 60,  -80, 0];
+// ----- Stage positions (relative to airfield center) ----------
+private _obstacleA       = CO_airfieldCenter vectorAdd [-90,  -20, 0];
+private _obstacleB       = CO_airfieldCenter vectorAdd [ 90,   20, 0];
+private _weaponRackPos   = CO_airfieldCenter vectorAdd [ 55,  -75, 0];
+private _riflePos        = CO_airfieldCenter vectorAdd [ 60,  -80, 0];
 private _rifleTargetPositions = [
     CO_airfieldCenter vectorAdd [ 60, -130, 0],
     CO_airfieldCenter vectorAdd [ 70, -135, 0],
     CO_airfieldCenter vectorAdd [ 80, -130, 0]
 ];
-private _grenadePos  = CO_airfieldCenter vectorAdd [-70,  80, 0];
+private _grenadePos       = CO_airfieldCenter vectorAdd [-70,  80, 0];
 private _grenadeTargetPos = CO_airfieldCenter vectorAdd [-70, 110, 0];
 
-// ---- HUD intro ---------------------------------------------------
-[["BOOT CAMP\nFollow markers. Stage 1: obstacle course."]] remoteExec ["hint", _player];
-sleep 3;
+// ----- Markers + Task IDs -----
+private _suffix = format ["%1", round (random 1e6)];
+private _mkA = format ["co_bc_A_%1", _suffix];
+private _mkB = format ["co_bc_B_%1", _suffix];
+private _mkR = format ["co_bc_R_%1", _suffix];
+private _mkG = format ["co_bc_G_%1", _suffix];
 
-// ===== STAGE 1: Obstacle course =====
-private _mkA = format ["co_bootcamp_A_%1", _player];
-private _mkB = format ["co_bootcamp_B_%1", _player];
+private _tStage1 = format ["co_bc_t1_%1", _suffix];
+private _tStage2 = format ["co_bc_t2_%1", _suffix];
+private _tStage3 = format ["co_bc_t3_%1", _suffix];
+
+// Helper: BIS_fnc_taskCreate wrapper that targets a single owner.
+private _fnc_makeTask = {
+    params ["_owner", "_id", "_desc", "_title", "_dest", "_state", "_priority"];
+    [
+        [_owner],
+        _id,
+        [_desc, _title, ""],
+        _dest,
+        _state,
+        _priority,
+        true,
+        "scout",
+        true
+    ] call BIS_fnc_taskCreate;
+};
+
+[["BOOT CAMP\nCheck your map (M) for objectives.\nReport to the obstacle course."]] remoteExec ["hint", _player];
+sleep 2;
+
+// =========================================================
+// STAGE 1 — Obstacle course
+// =========================================================
 createMarker [_mkA, _obstacleA];
-_mkA setMarkerType "mil_start";
-_mkA setMarkerText "OBSTACLE START";
-_mkA setMarkerColor "ColorRED";
+_mkA setMarkerType  "mil_start";
+_mkA setMarkerText  "OBSTACLE START";
+_mkA setMarkerColor "ColorBLUFOR";
 createMarker [_mkB, _obstacleB];
-_mkB setMarkerType "mil_end";
-_mkB setMarkerText "OBSTACLE FINISH";
-_mkB setMarkerColor "ColorRED";
+_mkB setMarkerType  "mil_end";
+_mkB setMarkerText  "OBSTACLE FINISH";
+_mkB setMarkerColor "ColorBLUFOR";
 
-// Wait for player to reach A then B (3 min cap per stage)
-private _stage1Deadline = time + 180;
+[_player, _tStage1,
+ "Run the obstacle course. Sprint to the START flag, then to the FINISH flag inside the airfield perimeter.",
+ "1/3  Obstacle Course",
+ _obstacleA, "ASSIGNED", 3
+] call _fnc_makeTask;
+
+private _stage1Deadline = time + 240;
 waitUntil {
     sleep 1;
     !alive _player ||
     !(_player getVariable ["CO_bootCampActive", false]) ||
     time > _stage1Deadline ||
-    (_player distance _obstacleA < 6)
+    (_player distance _obstacleA < 8)
 };
-if (alive _player && (_player getVariable ["CO_bootCampActive", false])) then {
-    [["Stage 1: reach the FINISH marker."]] remoteExec ["hint", _player];
+
+if (alive _player && (_player getVariable ["CO_bootCampActive", false]) && time <= _stage1Deadline) then {
+    [[_player], _tStage1, _obstacleB] call BIS_fnc_taskSetDestination;
+    [["Halfway there — reach the FINISH flag."]] remoteExec ["hint", _player];
+    waitUntil {
+        sleep 1;
+        !alive _player ||
+        !(_player getVariable ["CO_bootCampActive", false]) ||
+        time > _stage1Deadline ||
+        (_player distance _obstacleB < 8)
+    };
 };
-waitUntil {
-    sleep 1;
-    !alive _player ||
-    !(_player getVariable ["CO_bootCampActive", false]) ||
-    time > _stage1Deadline ||
-    (_player distance _obstacleB < 6)
-};
+
 deleteMarker _mkA;
 deleteMarker _mkB;
-if (!alive _player || !(_player getVariable ["CO_bootCampActive", false])) exitWith {};
 
-// ===== STAGE 2: Rifle range =====
-[["Stage 2: rifle range — DESTROY all 3 wooden targets."]] remoteExec ["hint", _player];
-// Issue weapon (in case they're disarmed)
-_player addWeapon "arifle_AKM_F";
-_player addMagazine "30Rnd_762x39_Mag_F";
-_player addMagazine "30Rnd_762x39_Mag_F";
-_player selectWeapon "arifle_AKM_F";
+if (!alive _player || !(_player getVariable ["CO_bootCampActive", false])) exitWith {
+    [_player, _tStage1, "FAILED"] call BIS_fnc_taskSetState;
+};
+if (time > _stage1Deadline) then {
+    [_player, _tStage1, "FAILED"] call BIS_fnc_taskSetState;
+} else {
+    [_player, _tStage1, "SUCCEEDED"] call BIS_fnc_taskSetState;
+};
 
-private _mkR = format ["co_bootcamp_R_%1", _player];
+// =========================================================
+// STAGE 2 — Rifle range (weapon rack pickup)
+// =========================================================
 createMarker [_mkR, _riflePos];
-_mkR setMarkerType "mil_dot";
-_mkR setMarkerText "FIRING LINE";
-_mkR setMarkerColor "ColorRED";
+_mkR setMarkerType  "mil_dot";
+_mkR setMarkerText  "FIRING LINE";
+_mkR setMarkerColor "ColorBLUFOR";
+
+[_player, _tStage2,
+ "At the firing line, pick up a training rifle from the weapon rack (mouse-wheel action). Destroy ALL THREE wooden pop-up targets.",
+ "2/3  Rifle Range",
+ _riflePos, "ASSIGNED", 2
+] call _fnc_makeTask;
+
+private _rack = createVehicle ["Box_NATO_WpsSpecial_F", _weaponRackPos, [], 0, "CAN_COLLIDE"];
+_rack setPos _weaponRackPos;
+_rack setDir 180;
+clearWeaponCargoGlobal _rack;
+clearMagazineCargoGlobal _rack;
+clearItemCargoGlobal _rack;
+_rack addWeaponCargoGlobal ["arifle_AKM_F", 4];
+_rack addMagazineCargoGlobal ["30Rnd_762x39_Mag_F", 16];
+
+[
+    _rack,
+    [
+        "<t color='#00ff00'>Pick up training rifle</t>",
+        {
+            params ["_target", "_caller"];
+            if (!(_caller getVariable ["CO_bootCampActive", false])) exitWith {};
+            if ("arifle_AKM_F" in (weapons _caller)) exitWith {
+                hint "You already have the training rifle.";
+            };
+            _caller addWeapon "arifle_AKM_F";
+            _caller addMagazine "30Rnd_762x39_Mag_F";
+            _caller addMagazine "30Rnd_762x39_Mag_F";
+            _caller addMagazine "30Rnd_762x39_Mag_F";
+            _caller selectWeapon "arifle_AKM_F";
+            hint "Training rifle issued.\nDestroy the three wooden targets downrange.";
+        },
+        nil, 1.5, true, true, "",
+        "_this distance _target < 3 && (_this getVariable ['CO_bootCampActive', false])"
+    ]
+] remoteExec ["addAction", 0, true];
 
 private _targets = [];
 {
@@ -95,7 +174,7 @@ private _targets = [];
     _targets pushBack _t;
 } forEach _rifleTargetPositions;
 
-private _stage2Deadline = time + 240;
+private _stage2Deadline = time + 360;
 waitUntil {
     sleep 1.5;
     !alive _player ||
@@ -103,52 +182,42 @@ waitUntil {
     time > _stage2Deadline ||
     ({ !alive _x || damage _x > 0.8 } count _targets) >= count _targets
 };
+
 { if (!isNull _x) then { deleteVehicle _x } } forEach _targets;
+if (!isNull _rack) then { deleteVehicle _rack };
 deleteMarker _mkR;
-if (!alive _player || !(_player getVariable ["CO_bootCampActive", false])) exitWith {};
 
-// ===== STAGE 3: Grenade range =====
-[["Stage 3: grenade range — DETONATE a grenade at the marked pit."]] remoteExec ["hint", _player];
-_player addMagazine "HandGrenade";
-_player addMagazine "HandGrenade";
-_player addMagazine "HandGrenade";
+if (!alive _player || !(_player getVariable ["CO_bootCampActive", false])) exitWith {
+    [_player, _tStage2, "FAILED"] call BIS_fnc_taskSetState;
+};
+if (time > _stage2Deadline) then {
+    [_player, _tStage2, "FAILED"] call BIS_fnc_taskSetState;
+} else {
+    [_player, _tStage2, "SUCCEEDED"] call BIS_fnc_taskSetState;
+};
 
-private _mkG = format ["co_bootcamp_G_%1", _player];
+// =========================================================
+// STAGE 3 — Grenade range
+// =========================================================
 createMarker [_mkG, _grenadeTargetPos];
-_mkG setMarkerType "mil_destroy";
-_mkG setMarkerText "GRENADE PIT";
-_mkG setMarkerColor "ColorRED";
+_mkG setMarkerType  "mil_destroy";
+_mkG setMarkerText  "GRENADE PIT";
+_mkG setMarkerColor "ColorBLUFOR";
 
-// Track grenade detonations near the pit via a per-player Fired EH that
-// sets CO_bootCampGrenadeOK true when a grenade fires AND lands close.
-_player setVariable ["CO_bootCampGrenadeOK", false, true];
-private _ehId = _player addEventHandler ["Fired", {
-    params ["_unit","_weapon","_muzzle","_mode","_ammo","_magazine","_projectile"];
-    if (_ammo isKindOf "GrenadeHand" || _ammo isKindOf "Grenade") then {
-        [_unit, _projectile] spawn {
-            params ["_u","_p"];
-            // Wait for impact (up to 6 s) then check distance to pit.
-            private _deadline = time + 6;
-            waitUntil {
-                sleep 0.1;
-                isNull _p || time > _deadline
-            };
-            // Use last-known position as a best-effort impact location.
-            // Engine clears _p on detonation, so we use a position
-            // sampled mid-flight from a parallel watcher — but the
-            // simplest robust signal: any grenade thrown within 20 m
-            // of the pit at the moment of firing counts.
-        };
-    };
-}];
+[_player, _tStage3,
+ "Move to the grenade pit and detonate TWO grenades inside the marked area.",
+ "3/3  Grenade Range",
+ _grenadeTargetPos, "ASSIGNED", 1
+] call _fnc_makeTask;
 
-// Simpler robust check: poll player distance to grenade pit and detect
-// any nearby explosion mark on the ground (we just require the player
-// to actually throw 2 grenades anywhere within 30 m of the pit while
-// standing nearby).
-private _stage3Deadline = time + 180;
+_player addMagazine "HandGrenade";
+_player addMagazine "HandGrenade";
+_player addMagazine "HandGrenade";
+
+private _stage3Deadline = time + 240;
 private _grenadesThrown = 0;
-private _lastGrenadeCount = {_x == "HandGrenade"} count (magazines _player);
+private _lastGrenadeCount = { _x == "HandGrenade" } count (magazines _player);
+
 while {
     alive _player &&
     (_player getVariable ["CO_bootCampActive", false]) &&
@@ -156,7 +225,7 @@ while {
     _grenadesThrown < 2
 } do {
     sleep 1;
-    private _have = {_x == "HandGrenade"} count (magazines _player);
+    private _have = { _x == "HandGrenade" } count (magazines _player);
     if (_have < _lastGrenadeCount &&
         _player distance _grenadeTargetPos < 35) then {
         _grenadesThrown = _grenadesThrown + (_lastGrenadeCount - _have);
@@ -164,14 +233,24 @@ while {
     _lastGrenadeCount = _have;
 };
 
-_player removeEventHandler ["Fired", _ehId];
 deleteMarker _mkG;
-if (!alive _player || !(_player getVariable ["CO_bootCampActive", false])) exitWith {};
 
-// ===== GRADUATION =====
-[["BOOT CAMP COMPLETE\nReporting to the front at Krasnostav."]] remoteExec ["hint", _player];
+if (!alive _player || !(_player getVariable ["CO_bootCampActive", false])) exitWith {
+    [_player, _tStage3, "FAILED"] call BIS_fnc_taskSetState;
+};
+if (_grenadesThrown < 2) then {
+    [_player, _tStage3, "FAILED"] call BIS_fnc_taskSetState;
+} else {
+    [_player, _tStage3, "SUCCEEDED"] call BIS_fnc_taskSetState;
+};
+
+// =========================================================
+// GRADUATION
+// =========================================================
+[["BOOT CAMP COMPLETE\nMoving you to the front at Krasnostav."]] remoteExec ["hint", _player];
 sleep 4;
 _player setVariable ["CO_isCleared", true, true];
+_player setVariable ["CO_bootCampGraduated", true, true];
 _player setVariable ["CO_bootCampActive", false, true];
 _player setVariable ["CO_detainPhase", "deployed", true];
 [_player] call co_main_fnc_deployToFront;

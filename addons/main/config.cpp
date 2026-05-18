@@ -84,6 +84,8 @@ class CfgFunctions {
             class trainingDrills   {};
             class bootCampQuest    {};
             class awolMonitor      {};
+            class russianHostilityTick {};
+            class buildKrasnostavGarrison {};
             class spawnRussianReplacement {};
             class deployToFront    {};
             class transportToDetention {};

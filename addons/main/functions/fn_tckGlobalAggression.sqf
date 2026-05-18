@@ -86,6 +86,16 @@ diag_log "[CO] tckGlobalAggression: starting global failsafe loop (radius=60m, t
                 if (_u getVariable ["CO_knockedOut", false]) then { continue };
                 if (_u getVariable ["CO_vehicleChaseDriver", false]) then { continue };
 
+                // TRAINING SAFE ZONE: units physically standing inside the
+                // NWAF airfield (= training staff: drill instructor, minders,
+                // gate guards, roving interior guards) MUST NOT auto-detain
+                // anyone. The boot-camp script + perimeter sentinel own
+                // engagement decisions in that area.
+                if (!isNil "CO_airfieldCenter" &&
+                    {(getPosATL _u) distance2D CO_airfieldCenter < (CO_airfieldRadius + 50)}) then {
+                    continue
+                };
+
                 private _last = _u getVariable ["CO_lastAggressionAt", 0];
                 if ((time - _last) < 4) then { continue };
 
@@ -98,6 +108,15 @@ diag_log "[CO] tckGlobalAggression: starting global failsafe loop (radius=60m, t
                     if (_ok && (_t getVariable ["CO_knockedOut", false])) then { _ok = false };
                     if (_ok && (_t getVariable ["CO_isFemale", false])) then { _ok = false };
                     if (_ok && (_t getVariable ["CO_captureInProgress", false])) then { _ok = false };
+                    // Cleared conscripts (deployed military) are off-limits
+                    // unless they go AWOL.
+                    if (_ok && (_t getVariable ["CO_isCleared", false]) &&
+                        !(_t getVariable ["CO_isAWOL", false])) then { _ok = false };
+                    // Targets inside the airfield safe zone are off-limits
+                    // (training recruits).
+                    if (_ok && !isNil "CO_airfieldCenter" &&
+                        {(getPosATL _t) distance2D CO_airfieldCenter < (CO_airfieldRadius + 20)} &&
+                        !(_t getVariable ["CO_isAWOL", false])) then { _ok = false };
                     if (_ok) then {
                         private _f = group _t getVariable ["CO_faction", ""];
                         if (_f in ["CRN_ENF","POLICE","CRN_FRONT","RUS_ADV"]) then { _ok = false };

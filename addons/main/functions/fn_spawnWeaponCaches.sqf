@@ -17,8 +17,8 @@ private _cacheDefs = [
     [[10250, 2310, 0], "pistol"],
     [[10150, 2450, 0], "melee"],
     // Berezino
-    [[11580, 7850, 0], "rifle"],
-    [[11700, 7720, 0], "pistol"],
+    [[12280, 9740, 0], "rifle"],
+    [[12380, 9620, 0], "pistol"],
     // Rural / forest caches (well hidden)
     [[8200,  4800, 0], "rifle"],
     [[5800,  8400, 0], "pistol"],

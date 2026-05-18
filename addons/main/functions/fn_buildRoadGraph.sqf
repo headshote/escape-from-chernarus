@@ -8,7 +8,7 @@ CO_settlements = [
     // [name, pos, type]   type: "large" | "medium" | "small"
     ["Chernogorsk",    [6400,  2400,  0], "large"],
     ["Elektrozavodsk", [10200, 2300,  0], "large"],
-    ["Berezino",       [11600, 7800,  0], "large"],
+    ["Berezino",       [12300, 9700,  0], "large"],
     ["Balota",         [4500,  2200,  0], "medium"],
     ["Komarovo",       [3600,  2300,  0], "small"],
     ["Kamyshovo",      [11100, 2700,  0], "small"],
