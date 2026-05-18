@@ -32,14 +32,16 @@ CO_policeTownPosts = [
         private _partner = _grp createUnit ["B_Soldier_F", _spawnPos, [], 0, "CARGO"];
         _partner moveInCargo _car;
 
-        // Give police look: uniform only, pistol
+        // Give police look: uniform + helmet/cap, sidearm.
+        // forceAddUniform avoids the "underwear" failure mode where
+        // addUniform silently drops the item on the ground.
         {
             removeAllWeapons _x;
             removeAllItems _x;
             removeUniform _x;
             removeVest _x;
             removeHeadgear _x;
-            _x addUniform "U_B_GendarmerieSuit_01_F";
+            _x forceAddUniform "U_B_GendarmerieSuit_01_F";
             _x addVest "V_HarnessOGL_ghex_F";
             _x addHeadgear "H_Cap_blk_Raven";
             _x addWeapon "hgun_P07_F";
@@ -48,17 +50,38 @@ CO_policeTownPosts = [
             _x setCombatMode "YELLOW";
             _x setBehaviour "SAFE";
             _x allowFleeing 0;
+            // Driver must never autonomously engage — caused fast
+            // pursuit + ramming when civilians were nearby; the
+            // partner couldn't disembark because the driver kept
+            // racing past targets.
+            _x disableAI "AUTOTARGET";
+            _x disableAI "TARGET";
         } forEach [_driver, _partner];
 
-        // Cruise patrol loop around town
+        // Mark the driver so the dismount-pursuit code can pick the
+        // passenger as the on-foot chaser.
+        _driver setVariable ["CO_isPoliceDriver", true, true];
+        _partner setVariable ["CO_isPoliceDriver", false, true];
+
+        // Cruise patrol loop around town. Slow LIMITED speed + SAFE
+        // behaviour so they actually look around at civilians rather
+        // than rocketing past them.
+        _grp setBehaviour "SAFE";
+        _grp setSpeedMode "LIMITED";
         for "_w" from 0 to 5 do {
             private _wPos = _center getPos [_radius * (0.4 + random 0.6), random 360];
             private _wp = _grp addWaypoint [_wPos, 30];
             _wp setWaypointSpeed "LIMITED";
+            _wp setWaypointBehaviour "SAFE";
+            _wp setWaypointCombatMode "BLUE";
             _wp setWaypointType "MOVE";
         };
         private _cycleWp = _grp addWaypoint [_center getPos [_radius * 0.3, random 360], 20];
         _cycleWp setWaypointType "CYCLE";
+
+        // Mark the patrol car so dismount logic can reach it.
+        _car setVariable ["CO_policePatrolCar", _grp, true];
+        _grp setVariable ["CO_policePatrolCar", _car, true];
 
         // Behaviour loop: check all players for wanted status
         [_grp, _car, _center, _radius] spawn {
@@ -102,26 +125,16 @@ CO_policeTownPosts = [
                     if (!_trigger) then { continue };
 
                     if ([leader _grp, _p] call co_main_fnc_policeRecognise) then {
-                        // Demand stop: switch to combat, pursue
-                        { _x setCombatMode "RED"; _x doTarget _p; _x doMove getPosATL _p; } forEach units _grp;
-                        // Capture check same as enforcer
-                        [_p, _grp] spawn {
-                            params ["_target","_grp"];
-                            while { alive _target && !captive _target } do {
-                                private _nearest = [units _grp select { alive _x }, [], { _x distance _target }, "ASCEND"] call BIS_fnc_sortBy;
-                                if (count _nearest > 0 && (_nearest select 0) distance _target < 2.5) then {
-                                    [_target] remoteExecCall ["co_main_fnc_wrangleMinigame", _target];
-                                    waitUntil { !isNil { _target getVariable "CO_wrangleResult" } };
-                                    private _r = _target getVariable ["CO_wrangleResult","captured"];
-                                    _target setVariable ["CO_wrangleResult", nil, true];
-                                    if (_r == "captured") then {
-                                        _target setCaptive true;
-                                        [_target, _grp] call co_main_fnc_transportToDetention;
-                                    };
-                                };
-                                sleep 0.5;
-                            };
-                        };
+                        // Stop the car and dismount both officers so
+                        // they can actually chase on foot. Previously
+                        // the driver kept cruising past targets at
+                        // LIMITED speed and the partner never had a
+                        // chance to engage. doStop + forceSpeed 0 +
+                        // unassignVehicle + moveOut is the reliable
+                        // chain — engine-level disembark commands
+                        // ("GetOut") are best-effort while AI is
+                        // mounted in a moving vehicle.
+                        [_grp, _car, _p] spawn co_main_fnc_policeFootChase;
                     };
                 } forEach allPlayers;
 
@@ -142,21 +155,10 @@ CO_policeTownPosts = [
                         private _civ = selectRandom _civCandidates;
                         _civ setVariable ["CO_captureInProgress", true, true];
                         [_civ] call co_main_fnc_installNonLethalDamage;
-                        { _x doTarget _civ; _x doMove getPosATL _civ; _x setCombatMode "YELLOW"; } forEach units _grp;
                         diag_log format ["[CO] Police random stop: %1 by patrol near %2.", _civ, mapGridPosition (leader _grp)];
-                        [_civ, _grp] spawn {
-                            params ["_target","_grp"];
-                            private _deadline = time + 60;
-                            while { alive _target && !captive _target && time < _deadline } do {
-                                private _nearest = [units _grp select { alive _x }, [], { _x distance _target }, "ASCEND"] call BIS_fnc_sortBy;
-                                if (count _nearest > 0 && (_nearest select 0) distance _target < 2.5) then {
-                                    _target setCaptive true;
-                                    [_target, _grp] call co_main_fnc_transportToDetention;
-                                };
-                                sleep 0.5;
-                            };
-                            _target setVariable ["CO_captureInProgress", false, true];
-                        };
+                        // Use the shared foot-chase routine: stop car,
+                        // dismount both officers, melee-knockout-capture.
+                        [_grp, _car, _civ] spawn co_main_fnc_policeFootChase;
                     };
                 };
             };

@@ -114,6 +114,7 @@ class CfgFunctions {
             class enduranceBar     {};
             class frontMilitary    {};
             class policePatrols    {};
+            class policeFootChase  {};
             class spawnWeaponCaches{};
             class borderPatrolWaypoints {};
             class enforcerRetreatFromTown {};

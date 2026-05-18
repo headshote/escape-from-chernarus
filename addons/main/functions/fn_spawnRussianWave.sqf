@@ -1,6 +1,19 @@
 // fn_spawnRussianWave.sqf
 if (isNil "CO_rus_waveCount") then { CO_rus_waveCount = 0; };
 
+// Population cap — prevent unbounded RUS_ADV growth (round 9 fix:
+// Krasnostav FPS drop). If the live RUS_ADV count is already at or
+// above CO_rus_maxActive, skip this wave entirely instead of piling
+// on +30 more units.
+private _maxActive = missionNamespace getVariable ["CO_rus_maxActive", 80];
+private _activeCount = {
+    alive _x &&
+    ((group _x) getVariable ["CO_faction",""] == "RUS_ADV")
+} count allUnits;
+if (_activeCount >= _maxActive) exitWith {
+    diag_log format ["[CO] RUS_ADV wave skipped (%1/%2 active).", _activeCount, _maxActive];
+};
+
 private _spawnX     = missionNamespace getVariable ["CO_rus_spawnX", 13000];
 private _northX     = missionNamespace getVariable ["CO_rus_spawnXNorth", 12800];
 private _armorFreq  = missionNamespace getVariable ["CO_rus_armorFrequency", 3];

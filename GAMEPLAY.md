@@ -70,6 +70,12 @@ carries `CO_bus_hostilesPerBus` guards (default 5). Large towns get a minimum of
 Bus agro loop (`fn_busAgroLoop`) detects nearby players and male civilian NPCs, dismounts the
 escort group, and triggers `fn_checkpointAlert` using the bus guard group.
 
+If a TCK truck has been effectively stationary (speed below ~1.8 km/h) for 20 s in
+`traveling` or `approaching` state, the full escort dismounts and chases on foot — no
+escort cap. This prevents a stuck truck from sitting uselessly while civs/players are
+nearby. NPC captures are loaded into the truck for delivery; player captures are handed
+off to `spawnCaptureTransport`.
+
 Successful bus captures now knock the target out, load them into the vehicle, keep cruising for
 a short window, and then route the bus to the nearest detention center once it has enough
 detainees or the post-capture cruise timer expires.
@@ -142,10 +148,21 @@ Displayed via `hintSilent` text bar, updates every 6 frames.
 ## Police System
 
 Town police patrols in Chernogorsk, Elektrozavodsk, Berezino, Zelenogorsk, Stary Sobor.
-- 2 police Offroads per town, pistol-armed, gendarmerie uniform.
-- Every 5 s: check all players for `CO_wantedLevel ≥ 50` + positive recognition result.
-- If triggered: pursue → wrangle → transport to detention.
-- Traffic system also has random car stop checks at `CO_police_carStopChance` frequency.
+- 2 police Offroads per town, pistol-armed, gendarmerie uniform (helmet + harness vest +
+  P07). Police uniform is force-applied so they no longer end up in underwear if a uniform
+  swap silently fails.
+- Patrol cars cruise on `LIMITED` speed in `SAFE` behaviour. The driver and the partner both
+  have `AUTOTARGET`/`TARGET` disabled so the driver never accelerates away from the partner.
+- Every 5 s: check all players for `CO_wantedLevel ≥ 50` + positive recognition result, plus a
+  random `CO_police_carStopChance` roll on nearby civilians.
+- On a hit, `fn_policeFootChase` stops the car (`doStop` + `forceSpeed 0`), force-dismounts
+  both officers (`unassignVehicle` → `action ["GetOut"]` → `moveOut` fallback), and runs an
+  on-foot pursuit with non-lethal melee (`fn_applyMeleeHit`). On knockout: NPC civilians are
+  routed via `transportToDetention`; players via `spawnCaptureTransport` (the standard
+  dedicated-truck capture flow).
+- After capture or chase timeout, both officers reboard the patrol car and resume cruising.
+
+Traffic system also has random car stop checks at `CO_police_carStopChance` frequency.
 
 Disguise items: worker uniform (level 1), farmer/glasses (level 2). Higher level raises
 the recognition threshold needed for pursuit.
@@ -164,6 +181,17 @@ Each wave (`fn_spawnRussianWave`):
   `fn_updateFrontLine` redraws the `co_frontline` map marker.
 - If `CO_front_unitsRemaining ≤ 10`: `fn_frontCollapse`.
 - Deserters (soldiers moving >500 m from front): detected by `fn_desertionMonitor`.
+
+**Population cap.** `CO_rus_maxActive` (default 80) limits the live RUS_ADV unit count.
+Both `fn_spawnRussianWave` and `fn_spawnRussianReplacement` skip spawning when at or above
+the cap. This prevents unbounded growth that was producing severe FPS drops near Krasnostav
+(replacement spawns +1 per kill, wave spawns +30 every 100 s, combined with no cleanup).
+
+**Hostility tick throttle.** `fn_russianHostilityTick` (the per-player loop that forces
+RUS_ADV to engage cleared conscripts despite the engine `civilian setFriend [west,1]`
+relation) now sleeps 8 s (was 5 s) and only issues `reveal`/`doFire`/`fireAtTarget` against
+the 5 nearest foot units and 2 nearest vehicles. This bounds the command spam regardless of
+local AI density.
 
 ---
 
@@ -270,3 +298,25 @@ All defaults live in `missions/ChernOccupation.Chernarus/CO_adminDefaults.sqf`.
 - **Day/night cycle.** Server sets `setTimeMultiplier 6` so a Chernarus day is ~4 real hours.
   Clients start with `ItemMap`, `ItemCompass`, `ItemWatch` only — `ItemGPS`, `ItemRadio`,
   `B_UavTerminal` are stripped on init (per spec point 16).
+
+## Round 9 Changes
+
+- **Police polish.** Patrol cars now cruise on `LIMITED`/`SAFE`. On detain-trigger, the new
+  `fn_policeFootChase` stops the car and force-dismounts both officers (driver +
+  passenger) for an on-foot melee chase with the standard non-lethal capture handoff. The
+  driver no longer races past targets while the partner sits in the cargo seat.
+- **TCK truck idle fallback.** `fn_busAgroLoop` now uses speed-based idle detection
+  (`speed _veh < 1.8 km/h`) instead of position-delta (which reset on AI brake/restart
+  drift). Threshold raised to **20 s**. The 2-escort cap is removed — every mounted escort
+  dismounts and hunts on foot. Player captures route via `spawnCaptureTransport`, NPC
+  captures continue via the normal `transportToDetention` flow.
+- **Training crate + visible targets.** Boot camp rifle range repositioned: rack at the
+  firing-line sandbags, three quest targets at +55/60 m **east** of the field center,
+  directly downrange from the existing visible static target line, each facing west toward
+  the firing line. Per-target `mil_dot` markers added to the map labelled `TARGET 1/2/3`.
+  Rack now also stocks 1000 `B_AssaultPack_rgr` backpacks and 1000 `V_HarnessO_brn` vests
+  alongside the 900 AKMs and 100 000 magazines.
+- **Krasnostav FPS fix.** New global cap `CO_rus_maxActive` (default 80) on live RUS_ADV
+  units. Both wave spawner and replacement spawner short-circuit when the cap is reached.
+  `fn_russianHostilityTick` throttled from 5 s → 8 s and limited to 5 nearest infantry +
+  2 nearest vehicles per tick.

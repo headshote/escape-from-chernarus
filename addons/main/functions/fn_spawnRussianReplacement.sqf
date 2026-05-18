@@ -19,6 +19,22 @@ params ["_dead"];
 if (!isServer) exitWith {};
 if (isNil "CO_rus_waveCount") then { CO_rus_waveCount = 0 };
 
+// Population cap — prevent unbounded RUS_ADV growth that caused
+// severe FPS drops near Krasnostav (round 9). Each killed unit
+// adds 1 replacement; combined with the periodic wave spawner this
+// could climb to hundreds of active units in the north sector,
+// overwhelming AI simulation. If we're already at the cap, skip
+// the replacement entirely.
+private _maxActive = missionNamespace getVariable ["CO_rus_maxActive", 80];
+private _activeCount = {
+    alive _x &&
+    !(_x isKindOf "AllVehicles" && {_x isKindOf "Vehicle" && !(_x isKindOf "Man")}) &&
+    ((group _x) getVariable ["CO_faction",""] == "RUS_ADV")
+} count allUnits;
+if (_activeCount >= _maxActive) exitWith {
+    diag_log format ["[CO] RUS_ADV replacement skipped (%1/%2 active).", _activeCount, _maxActive];
+};
+
 private _lane = _dead getVariable ["CO_advanceLane", "north"];
 private _spawnX     = missionNamespace getVariable ["CO_rus_spawnX", 13000];
 private _northX     = missionNamespace getVariable ["CO_rus_spawnXNorth", 12800];

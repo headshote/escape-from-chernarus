@@ -46,11 +46,11 @@ if (isNull _veh || isNull _driverGrp) exitWith {};
 #define BUS_MELEE_RANGE          2.6
 #define BUS_WP_REACHED_DIST     35
 #define BUS_DOMOVE_INTERVAL      5
-#define BUS_DISMOUNT_DURATION   45
+#define BUS_DISMOUNT_DURATION   60
 #define BUS_REBOARD_TIMEOUT     15
 #define BUS_STUCK_SPEED          1.8
 #define BUS_STUCK_GRACE         10
-#define BUS_IDLE_DISMOUNT_GRACE 12
+#define BUS_IDLE_DISMOUNT_GRACE 20
 #define BUS_APPROACH_TIMEOUT    90
 
 private _aggroRadius = missionNamespace getVariable ["CO_bus_aggroRadius", BUS_SCAN_RADIUS];
@@ -350,28 +350,28 @@ while { alive _veh } do {
 
     // ====================================================================
     // GLOBAL IDLE-DISMOUNT TRIGGER
-    // Applies to "traveling" AND "approaching" — the bus AI can stall
-    // for many reasons (blocked road, bad pathing, target out of reach).
-    // If the bus has not moved >4 m in 20 s while supposedly cruising
-    // or chasing, force a foot dismount of up to 2 escorts so they can
-    // patrol the area on foot. The rest stay in the truck.
+    // Per user spec (round 9): truck stationary for 20s → EVERY escort
+    // dismounts and chases nearby civs/players on foot. Previous
+    // position-delta detection reset on tiny AI drift (brake/restart
+    // cycles) and the 2-escort cap left the truck doing nothing while
+    // half-full. Now uses speed-based detection (bus actually below
+    // walking pace) and dumps the whole escort squad.
     // ====================================================================
     if (_state in ["traveling", "approaching"]) then {
-        private _curPos = getPosATL _veh;
-        if (_curPos distance2D _lastIdlePos > 4) then {
-            _lastIdlePos = _curPos;
+        if ((speed _veh) >= BUS_STUCK_SPEED) then {
             _idleSince = time;
+            _lastIdlePos = getPosATL _veh;
         };
         if ((time - _idleSince) > BUS_IDLE_DISMOUNT_GRACE) then {
             diag_log format [
-                "[CO] Bus %1 idle %2s in state '%3' — forcing partial dismount.",
-                netId _veh, round (time - _idleSince), _state
+                "[CO] Bus %1 idle %2s in state '%3' (speed=%4) — FULL escort dismount.",
+                netId _veh, round (time - _idleSince), _state, round (speed _veh)
             ];
             _veh setVariable ["CO_busState", "dismounted", true];
             _state = "dismounted";
             _dismountUntil = time + BUS_DISMOUNT_DURATION;
             _approachStarted = -1;
-            doStop _driver;
+            if (!isNull _driver && alive _driver) then { doStop _driver };
             _veh forceSpeed 0;
             _escortGrp setBehaviour "AWARE";
             _escortGrp setCombatMode "YELLOW";
@@ -379,8 +379,8 @@ while { alive _veh } do {
 
             private _dismountCount = 0;
             {
-                // Cap to 2 escorts on idle-dismount — rest stay aboard.
-                if (alive _x && vehicle _x == _veh && _dismountCount < 2) then {
+                // Dismount EVERY mounted escort — no cap.
+                if (alive _x && vehicle _x == _veh) then {
                     _x allowGetIn false;
                     unassignVehicle _x;
                     _x action ["GetOut", _veh];
@@ -402,11 +402,11 @@ while { alive _veh } do {
                 };
             } forEach (units _escortGrp);
             diag_log format [
-                "[CO] Bus %1 idle-dispatched %2 escort hunters.",
+                "[CO] Bus %1 idle-dispatched %2 escort hunters (full dump).",
                 netId _veh, _dismountCount
             ];
             _idleSince = time;
-            _lastIdlePos = _curPos;
+            _lastIdlePos = getPosATL _veh;
         };
     };
 

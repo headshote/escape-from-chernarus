@@ -24,6 +24,7 @@ CO_rus_tankFrequency            = 4;      // every Nth wave gets an MBT
 CO_rus_firstWaveDelay           = 12;     // seconds after init before first visible wave
 CO_rus_spawnX                   = 13000;  // central/south lane spawn (closer to front; was 14100)
 CO_rus_spawnXNorth              = 12800;  // north (Krasnostav) lane spawn — closer still
+CO_rus_maxActive                = 80;     // hard cap on live RUS_ADV units (round 9: Krasnostav FPS fix)
 CO_awolRadius                   = 1200;   // distance from Krasnostav before AWOL triggers
 CO_awolGrace                    = 60;     // seconds outside Krasnostav before AWOL flag
 CO_front_initialStrength        = 60;
@@ -77,7 +78,7 @@ CO_adminUIDs                    = [76561198054336866];     // add Steam64 UIDs a
     "CO_checkpoint_includeSmall","CO_checkpoint_fortTemplate",
     "CO_bus_totalCruising","CO_bus_hostilesPerBus","CO_bus_townGuaranteed","CO_bus_vehiclePool",
     "CO_rus_waveCooldown","CO_rus_unitsPerWave","CO_rus_armorFrequency","CO_rus_firstWaveDelay","CO_rus_spawnX",
-    "CO_rus_spawnXNorth","CO_rus_tankFrequency","CO_awolRadius","CO_awolGrace",
+    "CO_rus_spawnXNorth","CO_rus_tankFrequency","CO_rus_maxActive","CO_awolRadius","CO_awolGrace",
     "CO_front_initialStrength","CO_front_lineSpacingY","CO_front_depthRows","CO_front_rowSpacing",
     "CO_border_postSpacing","CO_border_includeCoast","CO_border_includeLand","CO_border_patrolDensity",
     "CO_westBorderCampCount","CO_westBorderCampGuardsMin","CO_westBorderCampGuardsMax",

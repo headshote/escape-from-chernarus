@@ -37,13 +37,20 @@ if (isNil "CO_trainingFieldPos") then { CO_trainingFieldPos = [2160, 12800, 0] }
 // blocked, breaking both the shoot and the hit-detection check).
 private _obstacleA       = CO_airfieldCenter vectorAdd [-90,  -20, 0];
 private _obstacleB       = CO_airfieldCenter vectorAdd [ 90,   20, 0];
-private _weaponRackPos   = CO_trainingFieldPos vectorAdd [ 20, -22, 0];
-private _riflePos        = CO_trainingFieldPos vectorAdd [ 10, -25, 0];
+// Rack sits at the firing-line sandbags (fn_buildTrainingGround places
+// the visible sandbag line at x=+10). Targets go DOWNRANGE to the EAST
+// of the existing static-target row (which is at ~x=+25..+37) so the
+// quest targets are right behind / on the same axis as the visible
+// training range and unmissable from the firing line. Previous round-8
+// placement at x=-110 (west of CO_trainingFieldPos) was in obstructed
+// off-runway terrain and players couldn't see the targets at all.
+private _weaponRackPos   = CO_trainingFieldPos vectorAdd [ 10, -16, 0];
+private _riflePos        = CO_trainingFieldPos vectorAdd [ 10, -20, 0];
 private _rifleFireLine   = _riflePos;
 private _rifleTargetPositions = [
-    CO_trainingFieldPos vectorAdd [-110, -32, 0],
-    CO_trainingFieldPos vectorAdd [-115, -25, 0],
-    CO_trainingFieldPos vectorAdd [-110, -18, 0]
+    CO_trainingFieldPos vectorAdd [ 55, -24, 0],
+    CO_trainingFieldPos vectorAdd [ 60, -20, 0],
+    CO_trainingFieldPos vectorAdd [ 55, -16, 0]
 ];
 private _grenadePos       = CO_trainingFieldPos vectorAdd [-30,  60, 0];
 private _grenadeTargetPos = CO_trainingFieldPos vectorAdd [-30,  90, 0];
@@ -155,6 +162,11 @@ clearItemCargoGlobal _rack;
 // network-replicated path.
 _rack addWeaponCargoGlobal   ["arifle_AKM_F", 900];
 _rack addMagazineCargoGlobal ["30Rnd_762x39_Mag_F", 100000];
+// Per user spec: 1000 ammo carriers each so a wave of recruits can
+// kit up off the same rack without depleting. Box_NATO_WpsSpecial_F
+// supports backpack + item cargo for vests.
+_rack addBackpackCargoGlobal ["B_AssaultPack_rgr", 1000];
+_rack addItemCargoGlobal     ["V_HarnessO_brn",   1000];
 
 // addAction must be added on every client to be usable; remoteExec
 // with JIP=false (no persistent JIP entry — the rack is deleted at the
@@ -190,9 +202,14 @@ private _rackAction = [
 // visible feedback. Tracked via a setVariable flag so the waitUntil
 // check is deterministic.
 private _targets = [];
+private _targetMarkers = [];
+private _tIdx = 0;
 {
     private _t = createVehicle ["TargetP_Inf_F", _x, [], 0, "CAN_COLLIDE"];
     _t setPos _x;
+    // Face WEST toward the firing line so the front of the target
+    // (the silhouette) is visible from the shooter's position.
+    _t setDir 270;
     _t setVariable ["CO_targetHit", false, true];
     _t addEventHandler ["HitPart", {
         params ["_arr"];
@@ -206,6 +223,15 @@ private _targets = [];
         };
     }];
     _targets pushBack _t;
+
+    // Visible per-target marker so the player can find them on the map.
+    _tIdx = _tIdx + 1;
+    private _mkT = format ["co_bc_tgt_%1_%2", _suffix, _tIdx];
+    createMarker [_mkT, _x];
+    _mkT setMarkerType  "mil_dot";
+    _mkT setMarkerColor "ColorRED";
+    _mkT setMarkerText  (format ["TARGET %1", _tIdx]);
+    _targetMarkers pushBack _mkT;
 } forEach _rifleTargetPositions;
 
 private _stage2Deadline = time + 360;
@@ -220,6 +246,7 @@ waitUntil {
 { if (!isNull _x) then { deleteVehicle _x } } forEach _targets;
 if (!isNull _rack) then { deleteVehicle _rack };
 deleteMarker _mkR;
+{ deleteMarker _x } forEach _targetMarkers;
 
 if (!alive _player || !(_player getVariable ["CO_bootCampActive", false])) exitWith {
     [_player, _tStage2, "FAILED"] call BIS_fnc_taskSetState;
