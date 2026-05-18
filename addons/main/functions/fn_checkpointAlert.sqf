@@ -8,6 +8,17 @@ params ["_detectedUnits", "_hostileGrp"];
     // Female civilians are never targeted first
     if (_target getVariable ["CO_isFemale", false]) then { continue };
 
+    // Don't re-detain a player who is already a cleared conscript
+    // (military / front deployee). AWOL conscripts ARE fair game though.
+    if (_target getVariable ["CO_isCleared", false] &&
+        !(_target getVariable ["CO_isAWOL", false])) then { continue };
+
+    // Don't engage anyone inside the training-camp safe zone — the
+    // boot-camp script owns engagement decisions in that area.
+    if (!isNil "CO_airfieldCenter" &&
+        {_target distance2D CO_airfieldCenter < (CO_airfieldRadius + 20)} &&
+        !(_target getVariable ["CO_isAWOL", false])) then { continue };
+
     _target setVariable ["CO_captureInProgress", true, true];
 
     // Install non-lethal damage handler so any gunfire from this group on

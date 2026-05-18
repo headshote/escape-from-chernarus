@@ -17,11 +17,15 @@ CO_bus_townGuaranteed           = 3;      // min intra-town buses per large city
 CO_bus_vehiclePool              = ["C_Van_01_transport_F","C_Truck_02_transport_F"];
 
 // --- Eastern Front ---
-CO_rus_waveCooldown             = 150;    // seconds between Russian waves
-CO_rus_unitsPerWave             = 21;     // total infantry across the three lanes
-CO_rus_armorFrequency           = 3;      // every Nth wave gets an APC
+CO_rus_waveCooldown             = 100;    // seconds between Russian waves (was 150)
+CO_rus_unitsPerWave             = 30;     // total infantry across the three lanes (was 21)
+CO_rus_armorFrequency           = 2;      // every Nth wave gets an APC (was 3)
+CO_rus_tankFrequency            = 4;      // every Nth wave gets an MBT
 CO_rus_firstWaveDelay           = 12;     // seconds after init before first visible wave
-CO_rus_spawnX                   = 14100;  // close enough to eastern front for early contact
+CO_rus_spawnX                   = 13000;  // central/south lane spawn (closer to front; was 14100)
+CO_rus_spawnXNorth              = 12800;  // north (Krasnostav) lane spawn — closer still
+CO_awolRadius                   = 1200;   // distance from Krasnostav before AWOL triggers
+CO_awolGrace                    = 60;     // seconds outside Krasnostav before AWOL flag
 CO_front_initialStrength        = 60;
 CO_front_lineSpacingY           = 280;    // meters between front nodes N-S (was 200; lighter default)
 CO_front_depthRows              = 2;      // rows of fortification
@@ -73,6 +77,7 @@ CO_adminUIDs                    = [76561198054336866];     // add Steam64 UIDs a
     "CO_checkpoint_includeSmall","CO_checkpoint_fortTemplate",
     "CO_bus_totalCruising","CO_bus_hostilesPerBus","CO_bus_townGuaranteed","CO_bus_vehiclePool",
     "CO_rus_waveCooldown","CO_rus_unitsPerWave","CO_rus_armorFrequency","CO_rus_firstWaveDelay","CO_rus_spawnX",
+    "CO_rus_spawnXNorth","CO_rus_tankFrequency","CO_awolRadius","CO_awolGrace",
     "CO_front_initialStrength","CO_front_lineSpacingY","CO_front_depthRows","CO_front_rowSpacing",
     "CO_border_postSpacing","CO_border_includeCoast","CO_border_includeLand","CO_border_patrolDensity",
     "CO_westBorderCampCount","CO_westBorderCampGuardsMin","CO_westBorderCampGuardsMax",

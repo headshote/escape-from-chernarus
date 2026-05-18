@@ -41,6 +41,25 @@ showGPS false;
 // gunfire stuns instead of killing.
 [player] call co_main_fnc_installNonLethalDamage;
 
+// Track if the player has fired a weapon recently — police use this to
+// decide whether to escalate to lethal. Flag clears after 60 s of silence.
+player addEventHandler ["Fired", {
+    params ["_unit"];
+    _unit setVariable ["CO_hasFiredWeapon", true, true];
+    _unit setVariable ["CO_lastFireTime", time, true];
+}];
+[] spawn {
+    while { true } do {
+        sleep 5;
+        if (!alive player) then { continue };
+        private _last = player getVariable ["CO_lastFireTime", -999];
+        if ((player getVariable ["CO_hasFiredWeapon", false]) &&
+            time - _last > 60) then {
+            player setVariable ["CO_hasFiredWeapon", false, true];
+        };
+    };
+};
+
 // Re-install after every respawn
 addMissionEventHandler ["Respawn", {
     params ["_newUnit"];

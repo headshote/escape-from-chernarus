@@ -15,9 +15,9 @@ _conscript setCaptive true;
 // No need to re-spawn; just ensure the captive knows they're at training
 if (_isPlayer) then {
     [_conscript] remoteExecCall ["co_main_fnc_showTrainingHUD", _conscript];
-    // Training minigame: player must complete 3 movement drills to pass time
-    // (or just wait — the drills are optional RP flavor)
-    [_conscript] call co_main_fnc_trainingDrills;
+    // Launch the structured boot-camp quest (3 stages). On completion
+    // it sets CO_isCleared=true and calls deployToFront → Krasnostav.
+    [_conscript] spawn co_main_fnc_bootCampQuest;
 };
 
 // ---- Perimeter escape sentinel -----------------------------

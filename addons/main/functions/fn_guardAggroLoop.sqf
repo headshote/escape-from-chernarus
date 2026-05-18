@@ -43,6 +43,22 @@ if (isNil { _grp getVariable "CO_faction" }) then {
         private _radius = _grp getVariable ["CO_aggroRadius", 70];
         private _faction = _grp getVariable ["CO_faction", "CRN_ENF"];
 
+        // ----------------------------------------------------------------
+        // TRAINING SAFE ZONE: groups whose anchor sits inside the airfield
+        // are part of the boot-camp staff. They MUST NOT auto-detain the
+        // player when they enter the training ground — that produced the
+        // infinite "detain → bus → training → instructor detains again"
+        // loop. The perimeter sentinel in fn_trainingPhase still issues
+        // direct fireAtTarget commands to these guards if the recruit
+        // tries to escape, so escape mechanics are not broken.
+        // ----------------------------------------------------------------
+        if (!isNil "CO_airfieldCenter" && {_anchor distance2D CO_airfieldCenter < (CO_airfieldRadius + 50)}) then {
+            // Skip aggression scanning entirely for training-staff groups.
+            // They behave as ambient garrison; the trainingPhase script
+            // owns engagement decisions for the airfield.
+            continue
+        };
+
         // Skip if group is already engaged (one of them is targeting / shooting)
         private _busy = false;
         {
@@ -59,10 +75,20 @@ if (isNil { _grp getVariable "CO_faction" }) then {
         private _candidates = (_scanCenter nearEntities [["Man"], _radius]) select {
             private _u = _x;
             if (!alive _u) exitWith { false };
+            // AWOL conscripts are always engaged, ignoring captive/knocked-out
+            // bypass so they can't just kneel to get a free pass.
+            if (_u getVariable ["CO_isAWOL", false]) exitWith { true };
             if (captive _u) exitWith { false };
             if (_u getVariable ["CO_isFemale", false]) exitWith { false };
             if (_u getVariable ["CO_captureInProgress", false]) exitWith { false };
             if (_u getVariable ["CO_knockedOut", false]) exitWith { false };
+            // Cleared military conscripts are off-limits while they stay
+            // in the front zone — they belong to the war effort now.
+            if (_u getVariable ["CO_isCleared", false]) exitWith { false };
+
+            // Skip targets inside the airfield safe zone (training recruits
+            // walking around the boot-camp grounds).
+            if (!isNil "CO_airfieldCenter" && {_u distance2D CO_airfieldCenter < (CO_airfieldRadius + 20)}) exitWith { false };
 
             private _ufac = group _u getVariable ["CO_faction", ""];
             if (_ufac in ["CRN_ENF","POLICE","CRN_FRONT","RUS_ADV"]) exitWith { false };

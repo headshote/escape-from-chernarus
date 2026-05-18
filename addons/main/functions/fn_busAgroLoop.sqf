@@ -117,6 +117,27 @@ private _spawnEscortHunter = {
         params ["_u", "_bus", "_huntUntilTime"];
         if (isNull _u || !alive _u) exitWith {};
 
+        // Wait for the dismount to actually complete. If the previous
+        // code path's GetOut animation is still in flight when this
+        // sub-thread starts, vehicle _u != _u → the while loop below
+        // immediately exits and the escort "stands around uselessly".
+        // We block here up to 6 seconds, then bail if the unit really
+        // never got out.
+        private _dismountDeadline = time + 6;
+        while {
+            alive _u && (vehicle _u != _u) && time < _dismountDeadline
+        } do { sleep 0.3 };
+        if (alive _u && vehicle _u != _u) then {
+            // Stubborn — force them out.
+            moveOut _u;
+            _u action ["Eject", vehicle _u];
+            unassignVehicle _u;
+            sleep 0.5;
+        };
+        if (vehicle _u != _u) exitWith {
+            diag_log format ["[CO] busAgroLoop: escort %1 failed to dismount, abandoning hunt.", _u];
+        };
+
         // Switch escort to hunting posture
         _u setBehaviour "AWARE";
         _u setCombatMode "YELLOW";
@@ -183,58 +204,66 @@ private _spawnEscortHunter = {
                     // and the third hit triggers applyKnockout.
                     [_u, _myTarget] call co_main_fnc_applyMeleeHit;
 
-                    // If they got knocked out, mark them as a captive,
-                    // load them into the bus, and drop the target.
+                    // If they got knocked out, mark them as a captive.
+                    // For PLAYERS: dispatch a dedicated capture-transport
+                    // truck (same as border patrol / SW fort / TCK aggro)
+                    // — moveInCargo on a remote player's unit is fragile
+                    // and dropping them into the bus also conflicts with
+                    // the bus's continued patrol behaviour.
+                    // For NPC civilians: load them into the bus and keep
+                    // cruising until the bus is full → transport to detention.
                     if (_myTarget getVariable ["CO_knockedOut", false]) then {
                         _myTarget setCaptive true;
-                        private _caps = _bus getVariable ["CO_busCaptives", []];
-                        if !(_myTarget in _caps) then {
-                            _caps pushBack _myTarget;
-                            _bus setVariable ["CO_busCaptives", _caps, true];
-                        };
-                        // Carry: teleport into cargo. moveInCargo can
-                        // silently fail on a player whose unit is
-                        // local to a remote client — the server's
-                        // queued seat-assignment never lands. We:
-                        //   * wake the captive,
-                        //   * setPos onto the bus,
-                        //   * moveInCargo on server (works for AI),
-                        //   * remoteExec moveInCargo to the player's
-                        //     owner if captive is a player.
-                        if (alive _bus) then {
+                        _myTarget setVariable ["CO_captureInProgress", false, true];
+                        _myTarget setVariable ["CO_busLastCaptureTime", time, true];
+
+                        if (isPlayer _myTarget) then {
+                            // Wake them up — spawnCaptureTransport teleports
+                            // them into the truck cab so they need to be
+                            // conscious to ride.
                             _myTarget setUnconscious false;
                             _myTarget setVariable ["CO_knockedOut", false, true];
-                            _myTarget setPos (getPosATL _bus);
-                            _myTarget assignAsCargo _bus;
-                            _myTarget moveInCargo _bus;
-                            if (isPlayer _myTarget) then {
-                                [_myTarget, _bus] remoteExec ["moveInCargo", _myTarget];
+                            // Dispatch a dedicated capture truck with driver
+                            // + jailer. The bus continues cruising and can
+                            // capture more NPCs in the meantime.
+                            [_myTarget, group _u] spawn co_main_fnc_spawnCaptureTransport;
+                            diag_log format [
+                                "[CO] Bus %1: player %2 knocked out → dedicated capture-transport dispatched.",
+                                netId _bus, name _myTarget
+                            ];
+                            _myTarget = objNull;
+                        } else {
+                            // NPC: keep the bus-loading path
+                            private _caps = _bus getVariable ["CO_busCaptives", []];
+                            if !(_myTarget in _caps) then {
+                                _caps pushBack _myTarget;
+                                _bus setVariable ["CO_busCaptives", _caps, true];
                             };
-                            private _loadOk = false;
-                            for "_attempt" from 0 to 6 do {
-                                sleep 0.5;
-                                if (_myTarget in _bus) exitWith { _loadOk = true };
+                            if (alive _bus) then {
                                 _myTarget setUnconscious false;
                                 _myTarget setVariable ["CO_knockedOut", false, true];
                                 _myTarget setPos (getPosATL _bus);
                                 _myTarget assignAsCargo _bus;
                                 _myTarget moveInCargo _bus;
-                                if (isPlayer _myTarget) then {
-                                    [_myTarget, _bus] remoteExec ["moveInCargo", _myTarget];
+                                private _loadOk = false;
+                                for "_attempt" from 0 to 6 do {
+                                    sleep 0.5;
+                                    if (_myTarget in _bus) exitWith { _loadOk = true };
+                                    _myTarget setUnconscious false;
+                                    _myTarget setPos (getPosATL _bus);
+                                    _myTarget assignAsCargo _bus;
+                                    _myTarget moveInCargo _bus;
                                 };
+                                if (!_loadOk) then {
+                                    diag_log format [
+                                        "[CO] Bus %1: failed to load NPC captive %2 after retries.",
+                                        netId _bus, name _myTarget
+                                    ];
+                                };
+                                _bus lockCargo true;
                             };
-                            if (!_loadOk) then {
-                                diag_log format [
-                                    "[CO] Bus %1: failed to load captive %2 after retries.",
-                                    netId _bus, name _myTarget
-                                ];
-                                _myTarget setPos (getPosATL _bus);
-                            };
-                            _bus lockCargo true;
+                            _myTarget = objNull;
                         };
-                        _myTarget setVariable ["CO_captureInProgress", false, true];
-                        _myTarget setVariable ["CO_busLastCaptureTime", time, true];
-                        _myTarget = objNull;
                     };
                 };
             } else {

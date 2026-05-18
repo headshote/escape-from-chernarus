@@ -14,10 +14,13 @@ if (_lane isEqualTo "") then {
 
 private _advanceRoute = switch (_lane) do {
     case "north": {
+        // Closer-to-Krasnostav spawn arm. The first waypoint is set to
+        // start near the new northern spawn (CO_rus_spawnXNorth ~12800),
+        // then steps straight onto the Krasnostav combat axis.
         [
-            [14050, 12350, 0],
-            [12900, 12380, 0],
-            [11850, 12320, 0],
+            [12700, 12340, 0],
+            [12100, 12320, 0],
+            [11600, 12300, 0],
             [11200, 12300, 0],  // Krasnostav combat axis
             [10000, 11600, 0],
             [ 8500, 10200, 0],

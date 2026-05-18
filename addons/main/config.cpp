@@ -82,6 +82,9 @@ class CfgFunctions {
             class transportToTraining {};
             class trainingPhase    {};
             class trainingDrills   {};
+            class bootCampQuest    {};
+            class awolMonitor      {};
+            class spawnRussianReplacement {};
             class deployToFront    {};
             class transportToDetention {};
             class spawnDetentionGuards {};

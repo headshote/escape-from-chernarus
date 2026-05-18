@@ -1,11 +1,13 @@
 // fn_russianAdvance.sqf — master controller, runs on server
 
-CO_rus_advanceFront = 14000;   // current X coord of front line (starts at east edge ~15000)
+CO_rus_advanceFront = 13000;   // current X coord of front line (was 14000; closer to Krasnostav)
 publicVariable "CO_rus_advanceFront";
-if (isNil "CO_rus_waveCooldown") then { CO_rus_waveCooldown = 180; };
-if (isNil "CO_rus_unitsPerWave") then { CO_rus_unitsPerWave = 12; };
+if (isNil "CO_rus_waveCooldown") then { CO_rus_waveCooldown = 100; };
+if (isNil "CO_rus_unitsPerWave") then { CO_rus_unitsPerWave = 30; };
 if (isNil "CO_rus_firstWaveDelay") then { CO_rus_firstWaveDelay = 12; };
-if (isNil "CO_rus_spawnX") then { CO_rus_spawnX = 14100; };
+if (isNil "CO_rus_spawnX") then { CO_rus_spawnX = 13000; };
+if (isNil "CO_rus_spawnXNorth") then { CO_rus_spawnXNorth = 12800; };
+if (isNil "CO_rus_tankFrequency") then { CO_rus_tankFrequency = 4; };
 CO_rus_advanceSpeed = 0.5;     // front moves this many meters per second of game time (abstract)
 
 // Town capture checkpoints west to east
