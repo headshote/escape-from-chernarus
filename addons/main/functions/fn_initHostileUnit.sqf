@@ -41,7 +41,9 @@ if (vest _unit == "") then {
     _unit addVest "V_TacVest_blk";
 };
 
-private _rifle = selectRandom ["arifle_AKM_F","arifle_AK12_F","arifle_AKS_F"];
+// Consistency pass: all TCK/hostile infantry use 7.62 AKM + 7.62 mags.
+// Mixed AK classes were producing mismatched ammo complaints in runtime.
+private _rifle = "arifle_AKM_F";
 _unit addWeapon _rifle;
 _unit addMagazine "30Rnd_762x39_Mag_F";
 _unit addMagazine "30Rnd_762x39_Mag_F";
@@ -59,6 +61,18 @@ _unit setSkill ["aimingShake", 0.45];
 _unit setSkill ["spotDistance", 0.7];
 _unit setSkill ["spotTime", 0.6];
 _unit setSkill ["courage", 0.9];
+
+// Retaliation marker: when TCK/Police takes a hit from a civilian/player,
+// mark the attacker on the group so the global aggression loop can switch
+// into short-window gun retaliation instead of only melee chasing.
+_unit addEventHandler ["Hit", {
+    params ["_victim", "_source"];
+    if (isNull _source || !alive _source) exitWith {};
+    if (!(isPlayer _source || side _source == civilian)) exitWith {};
+    private _grp = group _victim;
+    _grp setVariable ["CO_retaliateTarget", _source, true];
+    _grp setVariable ["CO_retaliateUntil", time + 90, true];
+}];
 
 // On killed — decrement front counter if applicable, replenish russians 1:1
 _unit addEventHandler ["Killed", {

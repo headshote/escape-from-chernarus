@@ -86,6 +86,29 @@ diag_log "[CO] tckGlobalAggression: starting global failsafe loop (radius=60m, t
                 if (_u getVariable ["CO_knockedOut", false]) then { continue };
                 if (_u getVariable ["CO_vehicleChaseDriver", false]) then { continue };
 
+                // Short retaliation window after the group is attacked.
+                // This adds the missing "shoot back" response players
+                // expect when they gun down TCK/police at close-mid range.
+                private _retUntil = _grp getVariable ["CO_retaliateUntil", 0];
+                private _retTarget = _grp getVariable ["CO_retaliateTarget", objNull];
+                if (
+                    _retUntil > time &&
+                    !isNull _retTarget &&
+                    alive _retTarget &&
+                    !captive _retTarget &&
+                    (_u distance2D _retTarget) < 140
+                ) then {
+                    _u setBehaviour "COMBAT";
+                    _u setCombatMode "RED";
+                    _u enableAI "AUTOTARGET";
+                    _u enableAI "TARGET";
+                    _u reveal [_retTarget, 4];
+                    _u doTarget _retTarget;
+                    _u doFire _retTarget;
+                    _u fireAtTarget [_retTarget, currentWeapon _u];
+                    continue;
+                };
+
                 // TRAINING SAFE ZONE: units physically standing inside the
                 // NWAF airfield (= training staff: drill instructor, minders,
                 // gate guards, roving interior guards) MUST NOT auto-detain

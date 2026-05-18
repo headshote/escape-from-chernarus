@@ -100,6 +100,7 @@ setTimeMultiplier 6;
 ["civilianAI", { [] call co_main_fnc_civilianAI; }] call _launchStep;
 ["trafficSystem", { [] call co_main_fnc_trafficSystem; }] call _launchStep;
 ["policePatrols", { [] call co_main_fnc_policePatrols; }] call _launchStep;
+["urbanFootPatrols", { [] call co_main_fnc_spawnUrbanFootPatrols; }] call _launchStep;
 ["spawnWeaponCaches", { [] call co_main_fnc_spawnWeaponCaches; }] call _launchStep;
 // Western enforcement is the most player-visible border layer: run it first
 // in its own task so guards appear in seconds rather than after the slow

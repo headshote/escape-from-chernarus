@@ -86,6 +86,7 @@ CO_policeTownPosts = [
         // Behaviour loop: check all players for wanted status
         [_grp, _car, _center, _radius] spawn {
             params ["_grp", "_car", "_center", "_radius"];
+            private _nextFootStop = time + 50 + random 40;
             while { alive _car } do {
                 sleep 5;
                 if (!CO_police_active) then { continue };
@@ -160,6 +161,35 @@ CO_policeTownPosts = [
                         // dismount both officers, melee-knockout-capture.
                         [_grp, _car, _civ] spawn co_main_fnc_policeFootChase;
                     };
+                };
+
+                // ----- Periodic proactive foot stop -----
+                // Even without a hard trigger, cars periodically pull over,
+                // dismount, and attempt an on-foot intervention to keep town
+                // pressure/tension high and avoid purely drive-by policing.
+                if (
+                    time >= _nextFootStop &&
+                    !(_grp getVariable ["CO_policeFootChaseActive", false])
+                ) then {
+                    private _cand = ((leader _grp) nearEntities [["Man"], 140]) select {
+                        alive _x &&
+                        !captive _x &&
+                        !(_x getVariable ["CO_knockedOut", false]) &&
+                        !(_x getVariable ["CO_captureInProgress", false]) &&
+                        (isPlayer _x || side _x == civilian) &&
+                        !(_x getVariable ["CO_isFemale", false]) &&
+                        ((group _x) getVariable ["CO_faction", ""] == "")
+                    };
+
+                    if (count _cand > 0) then {
+                        _cand = [_cand, [], { _x distance2D (leader _grp) }, "ASCEND"] call BIS_fnc_sortBy;
+                        private _target = _cand select 0;
+                        [_target] call co_main_fnc_installNonLethalDamage;
+                        _target setVariable ["CO_captureInProgress", true, true];
+                        [_grp, _car, _target] spawn co_main_fnc_policeFootChase;
+                        diag_log format ["[CO] Police proactive foot stop near %1 targeting %2.", mapGridPosition (leader _grp), _target];
+                    };
+                    _nextFootStop = time + 65 + random 45;
                 };
             };
         };
