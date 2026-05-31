@@ -5,9 +5,7 @@ class CfgPatches {
         url = "";
         requiredVersion = 1.98;
         requiredAddons[] = {
-            "cba_main",
-            "cup_terrains_core",
-            "cup_terrains_cup_chernarus_a3"
+            "cba_main"
         };
         units[] = {};
         weapons[] = {};
@@ -44,19 +42,13 @@ class CO_AdminSettings {
         displayName = "Hostiles per Checkpoint";
         category = "Occupation";
     };
-    class CO_bus_totalCruising {
-        value = 30; min = 5; max = 80;
-        typeName = "SCALAR";
-        displayName = "Total Cruising Buses";
-        category = "Occupation";
-    };
     // ... all others follow this pattern
 };
 
 class CfgFunctions {
-    class CO {
+    class co_main {
         class Main {
-            file = "co_main\functions";
+            file = "\main\functions";
 
             class init             {};
             class initServer       {};
@@ -69,6 +61,8 @@ class CfgFunctions {
             class spawnFortGuards  {};
             class spawnRovingGuards{};
             class buildBorderForts {};
+            class buildWestBorderEnforcement {};
+            class buildSWBorderFort {};
             class buildEasternFront{};
             class buildAirfieldCamp{};
             class buildBusRoutes   {};
@@ -88,6 +82,11 @@ class CfgFunctions {
             class transportToTraining {};
             class trainingPhase    {};
             class trainingDrills   {};
+            class bootCampQuest    {};
+            class awolMonitor      {};
+            class russianHostilityTick {};
+            class buildKrasnostavGarrison {};
+            class spawnRussianReplacement {};
             class deployToFront    {};
             class transportToDetention {};
             class spawnDetentionGuards {};
@@ -99,13 +98,108 @@ class CfgFunctions {
             class borderPatrol     {};
             class borderAlert      {};
             class checkEscapeUnlock{};
+            class unlockResistanceRespawn {};
+            class spawnResistanceBike {};
+            class applyMeleeHit   {};
+            class applyKnockout   {};
+            class guardAggroLoop  {};
+            class installNonLethalDamage {};
+            class dispatchCaptureTransport {};
+            class spawnCaptureTransport {};
+            class tckGlobalAggression {};
+            class buildTrainingGround {};
             class showEscapeUnlockScreen {};
             class crowdResistance  {};
             class adminPanel       {};
             class enduranceBar     {};
             class frontMilitary    {};
+            class policePatrols    {};
+            class policeFootChase  {};
+            class spawnUrbanFootPatrols {};
+            class spawnWeaponCaches{};
+            class borderPatrolWaypoints {};
+            class enforcerRetreatFromTown {};
+            class alertEnforcers   {};
+            class alertNearbyGuards{};
+            class prisonEscape     {};
+            class initHC           {};
+            class registerHC       {};
+            class showDetentionHUD {};
+            class showTrainingHUD  {};
+            class showFrontDeployHUD {};
+            class updateFrontLine  {};
+            class buses            {};
+            class checkpoints      {};
         };
     };
+};
+
+// UI control bases for dialog classes included below.
+// Addon Builder/CfgConvert requires these base classes to exist at parse time.
+class RscText {
+    access = 0;
+    type = 0;
+    idc = -1;
+    style = 0;
+    linespacing = 1;
+    colorBackground[] = {0,0,0,0};
+    colorText[] = {1,1,1,1};
+    text = "";
+    shadow = 2;
+    font = "RobotoCondensed";
+    SizeEx = 0.03;
+    fixedWidth = 0;
+};
+
+class RscSlider {
+    access = 0;
+    type = 43;
+    style = 1024;
+    idc = -1;
+    color[] = {1,1,1,0.8};
+    colorActive[] = {1,1,1,1};
+};
+
+class RscCheckBox {
+    access = 0;
+    type = 77;
+    style = 0;
+    idc = -1;
+    checked = 0;
+    color[] = {1,1,1,0.7};
+    colorFocused[] = {1,1,1,1};
+    colorHover[] = {1,1,1,1};
+    colorPressed[] = {1,1,1,1};
+    colorDisabled[] = {1,1,1,0.2};
+    colorBackground[] = {0,0,0,0};
+};
+
+class RscButton {
+    access = 0;
+    type = 1;
+    style = 2;
+    idc = -1;
+    text = "";
+    font = "RobotoCondensed";
+    sizeEx = 0.03;
+    colorText[] = {1,1,1,1};
+    colorDisabled[] = {0.4,0.4,0.4,1};
+    colorBackground[] = {0.2,0.2,0.2,0.8};
+    colorBackgroundActive[] = {0.3,0.3,0.3,1};
+    colorBackgroundDisabled[] = {0,0,0,0.5};
+    colorFocused[] = {0.3,0.3,0.3,1};
+    colorShadow[] = {0,0,0,0};
+    colorBorder[] = {0,0,0,1};
+    borderSize = 0;
+    soundEnter[] = {"\A3\ui_f\data\sound\RscButton\soundEnter",0.09,1};
+    soundPush[] = {"\A3\ui_f\data\sound\RscButton\soundPush",0.09,1};
+    soundClick[] = {"\A3\ui_f\data\sound\RscButton\soundClick",0.09,1};
+    soundEscape[] = {"\A3\ui_f\data\sound\RscButton\soundEscape",0.09,1};
+    shadow = 2;
+    offsetX = 0;
+    offsetY = 0;
+    offsetPressedX = 0;
+    offsetPressedY = 0;
 };
 
 // Include UI dialog definitions

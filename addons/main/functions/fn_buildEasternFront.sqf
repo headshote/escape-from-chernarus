@@ -6,14 +6,15 @@
 
 params [
     ["_frontX",        13500],   // X coordinate of front line
-    ["_lineSpacingY",    200],   // meters between defense nodes N-S
-    ["_depthRows",         2],   // how many rows deep (1 = thin, 3 = fortified)
-    ["_rowSpacingX",      50]    // meters between rows west
+    ["_lineSpacingY",  missionNamespace getVariable ["CO_front_lineSpacingY", 200]],   // meters between defense nodes N-S
+    ["_depthRows",     missionNamespace getVariable ["CO_front_depthRows", 2]],         // how many rows deep (1 = thin, 3 = fortified)
+    ["_rowSpacingX",   missionNamespace getVariable ["CO_front_rowSpacing", 50]]        // meters between rows west
 ];
 
 private _yMin = 1500;
-private _yMax = 11500;
+private _yMax = 13000;
 private _nodes = floor ((_yMax - _yMin) / _lineSpacingY);
+private _spawned = 0;
 
 for "_row" from 0 to (_depthRows - 1) do {
     private _rowX = _frontX - (_row * _rowSpacingX);
@@ -30,5 +31,12 @@ for "_row" from 0 to (_depthRows - 1) do {
 
         // Spawn CRN_FRONT unit group at each node
         [_pos, _dir, "CRN_FRONT"] call co_main_fnc_spawnFortGuards;
+
+        _spawned = _spawned + 1;
+        // Yield every few nodes so the server can process other init work and
+        // avoid a multi-second hitch from spawning the entire front in one frame.
+        if (_spawned % 4 == 0) then { sleep 0.25; };
     };
 };
+
+diag_log format ["[CO] Eastern front built: %1 nodes across %2 rows.", _spawned, _depthRows];

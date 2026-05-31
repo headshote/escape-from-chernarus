@@ -17,19 +17,43 @@ CO_bus_townGuaranteed           = 3;      // min intra-town buses per large city
 CO_bus_vehiclePool              = ["C_Van_01_transport_F","C_Truck_02_transport_F"];
 
 // --- Eastern Front ---
-CO_rus_waveCooldown             = 180;    // seconds between Russian waves
-CO_rus_unitsPerWave             = 12;
-CO_rus_armorFrequency           = 3;      // every Nth wave gets an APC
+CO_rus_waveCooldown             = 100;    // seconds between Russian waves (was 150)
+CO_rus_unitsPerWave             = 30;     // total infantry across the three lanes (was 21)
+CO_rus_armorFrequency           = 2;      // every Nth wave gets an APC (was 3)
+CO_rus_tankFrequency            = 4;      // every Nth wave gets an MBT
+CO_rus_firstWaveDelay           = 12;     // seconds after init before first visible wave
+CO_rus_spawnX                   = 13000;  // central/south lane spawn (closer to front; was 14100)
+CO_rus_spawnXNorth              = 12800;  // north (Krasnostav) lane spawn — closer still
+CO_rus_maxActive                = 80;     // hard cap on live RUS_ADV units (round 9: Krasnostav FPS fix)
+CO_awolRadius                   = 1200;   // distance from Krasnostav before AWOL triggers
+CO_awolGrace                    = 60;     // seconds outside Krasnostav before AWOL flag
 CO_front_initialStrength        = 60;
-CO_front_lineSpacingY           = 200;    // meters between front nodes N-S
+CO_front_lineSpacingY           = 280;    // meters between front nodes N-S (was 200; lighter default)
 CO_front_depthRows              = 2;      // rows of fortification
-CO_front_rowSpacing             = 50;
+CO_front_rowSpacing             = 60;
 
 // --- Border Patrol ---
-CO_border_postSpacing           = 600;    // meters between border posts
+CO_border_postSpacing           = 1000;   // meters between border posts (default sparse to avoid AI overload)
 CO_border_includeCoast          = true;
 CO_border_includeLand           = true;
 CO_border_patrolDensity         = 1.0;    // multiplier on guard counts
+CO_westBorderCampCount          = 14;     // number of active forest camps on west edge
+CO_westBorderCampGuardsMin      = 2;
+CO_westBorderCampGuardsMax      = 4;
+CO_westBorderForestPatrols      = 5;      // foot patrols rovingthe forest strip
+CO_westBorderTownGuardCount     = 6;
+CO_westBorderChaseRadius        = 220;    // guards chase with melee inside this distance from their post
+CO_westBorderFireRadius         = 95;     // once target gets this far from their post, guards escalate to gunfire
+CO_westRoadCheckpointGuardCount = 6;
+CO_westRoadCheckpointLethal     = true;
+CO_westBorderFemaleOnlyTowns    = ["Komarovo", "Balota", "Pavlovo", "Myshkino", "Lopatino"];
+
+// --- Hostile Buses (TCK trucks) ---
+CO_bus_aggroRadius              = 260;    // detection range while cruising
+CO_bus_maxCaptives              = 3;      // force delivery once truck holds this many
+CO_busDetentionThreshold        = 2;      // immediate delivery threshold
+CO_busCruiseAfterCapture        = 60;     // seconds bus keeps hunting after first capture
+CO_bus_patrolStopInterval       = 75;     // seconds between proactive bus dismount-and-search stops
 
 // --- Airfield / Training Camp ---
 CO_airfield_guardCount          = 14;     // total roving guards inside
@@ -43,13 +67,27 @@ CO_conscript_trainTime          = 600;    // seconds in training before front de
 CO_police_carStopChance         = 0.05;
 CO_police_active                = true;
 
+// --- Admin ---
+CO_adminUIDs                    = [76561198054336866];     // add Steam64 UIDs allowed to open the admin panel
+
 // Broadcast all to clients
 {
     publicVariable _x;
 } forEach [
-    "CO_checkpoint_hostilesPerPost","CO_checkpoint_includeSmall",
-    "CO_bus_totalCruising","CO_bus_hostilesPerBus","CO_bus_townGuaranteed",
-    "CO_rus_waveCooldown","CO_rus_unitsPerWave","CO_front_initialStrength",
-    "CO_border_postSpacing","CO_airfield_guardCount","CO_conscript_detainTime",
-    "CO_conscript_trainTime","CO_police_carStopChance"
+    "CO_checkpoint_hostilesPerPost","CO_checkpoint_includeLarge","CO_checkpoint_includeMedium",
+    "CO_checkpoint_includeSmall","CO_checkpoint_fortTemplate",
+    "CO_bus_totalCruising","CO_bus_hostilesPerBus","CO_bus_townGuaranteed","CO_bus_vehiclePool",
+    "CO_rus_waveCooldown","CO_rus_unitsPerWave","CO_rus_armorFrequency","CO_rus_firstWaveDelay","CO_rus_spawnX",
+    "CO_rus_spawnXNorth","CO_rus_tankFrequency","CO_rus_maxActive","CO_awolRadius","CO_awolGrace",
+    "CO_front_initialStrength","CO_front_lineSpacingY","CO_front_depthRows","CO_front_rowSpacing",
+    "CO_border_postSpacing","CO_border_includeCoast","CO_border_includeLand","CO_border_patrolDensity",
+    "CO_westBorderCampCount","CO_westBorderCampGuardsMin","CO_westBorderCampGuardsMax",
+    "CO_westBorderTownGuardCount","CO_westBorderChaseRadius","CO_westBorderFireRadius",
+    "CO_westRoadCheckpointGuardCount","CO_westRoadCheckpointLethal","CO_westBorderFemaleOnlyTowns",
+    "CO_westBorderForestPatrols",
+    "CO_bus_aggroRadius","CO_bus_maxCaptives","CO_busDetentionThreshold","CO_busCruiseAfterCapture","CO_bus_patrolStopInterval",
+    "CO_airfield_guardCount","CO_airfield_gateGuards",
+    "CO_conscript_detainTime","CO_conscript_trainTime",
+    "CO_police_carStopChance","CO_police_active",
+    "CO_adminUIDs"
 ];

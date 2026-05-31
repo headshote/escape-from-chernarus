@@ -120,12 +120,9 @@ switch (_template) do {
         for "_s" from -4 to 4 do {
             ["Land_BagFence_Long_F", 0, _s * 8, 0] call _fnc_obj;
         };
-        // MG nests every 24m
-        [-6,  12, 0] call _fnc_obj; // placeholder, use nest below
-        private _nest1 = "Land_Fortified_nest_big_F" createVehicle (_pos getPos [6, _dir + 180]);
-        _nest1 setDir _dir; _objects pushBack _nest1;
-        private _nest2 = "Land_Fortified_nest_big_F" createVehicle (_pos getPos [6, _dir + 180] getPos [24, _dir + 90]);
-        _nest2 setDir _dir; _objects pushBack _nest2;
+        // MG nests every ~24m across the trench line.
+        ["Land_Fortified_nest_big_F", -4,  12, 180] call _fnc_obj;
+        ["Land_Fortified_nest_big_F", -4, -12, 180] call _fnc_obj;
     };
 };
 

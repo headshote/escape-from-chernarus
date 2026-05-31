@@ -1,0 +1,312 @@
+version=11;
+class Mission
+{
+	addOns[]=
+	{
+		"chernarus",
+		"A3_Characters_F"
+	};
+	addOnsAuto[]=
+	{
+		"chernarus",
+		"A3_Characters_F"
+	};
+	randomSeed=14867291;
+	class Intel
+	{
+		briefingName="Chernarus Occupation";
+		briefingDescription="Survive. Evade. Escape.";
+		startWeather=0.25;
+		forecastWeather=0.25;
+		year=2011;
+		month=6;
+		day=24;
+		hour=12;
+		minute=0;
+	};
+	class Vehicles
+	{
+		items=0;
+	};
+	class Markers
+	{
+		items=1;
+		class Item0
+		{
+			position[]={6400,0,2400};
+			name="respawn_civilian";
+			text="Civilian";
+			type="Empty";
+			colorName="ColorWhite";
+			a=1;
+			b=1;
+		};
+	};
+	class Sensors
+	{
+		items=0;
+	};
+	class Groups
+	{
+		items=1;
+		class Item0
+		{
+			side="CIV";
+			class Vehicles
+			{
+				items=16;
+				class Item0
+				{
+					position[]={6394,0,2394};
+					azimut=180;
+					id=0;
+					side="CIV";
+					vehicle="C_man_1";
+					player="PLAYER COMMANDER";
+					leader=1;
+					rank="SERGEANT";
+					skill=0.6;
+					text="Civilian 1";
+				};
+				class Item1
+				{
+					position[]={6398,0,2394};
+					azimut=180;
+					id=1;
+					side="CIV";
+					vehicle="C_man_1";
+					player="PLAY CDG";
+					rank="CORPORAL";
+					skill=0.45;
+					text="Civilian 2";
+				};
+				class Item2
+				{
+					position[]={6402,0,2394};
+					azimut=180;
+					id=2;
+					side="CIV";
+					vehicle="C_man_1";
+					player="PLAY CDG";
+					skill=0.45;
+					text="Civilian 3";
+				};
+				class Item3
+				{
+					position[]={6406,0,2394};
+					azimut=180;
+					id=3;
+					side="CIV";
+					vehicle="C_man_1";
+					player="PLAY CDG";
+					skill=0.45;
+					text="Civilian 4";
+				};
+				class Item4
+				{
+					position[]={6394,0,2398};
+					azimut=180;
+					id=4;
+					side="CIV";
+					vehicle="C_man_1";
+					player="PLAY CDG";
+					skill=0.45;
+					text="Civilian 5";
+				};
+				class Item5
+				{
+					position[]={6398,0,2398};
+					azimut=180;
+					id=5;
+					side="CIV";
+					vehicle="C_man_1";
+					player="PLAY CDG";
+					skill=0.45;
+					text="Civilian 6";
+				};
+				class Item6
+				{
+					position[]={6402,0,2398};
+					azimut=180;
+					id=6;
+					side="CIV";
+					vehicle="C_man_1";
+					player="PLAY CDG";
+					skill=0.45;
+					text="Civilian 7";
+				};
+				class Item7
+				{
+					position[]={6406,0,2398};
+					azimut=180;
+					id=7;
+					side="CIV";
+					vehicle="C_man_1";
+					player="PLAY CDG";
+					skill=0.45;
+					text="Civilian 8";
+				};
+				class Item8
+				{
+					position[]={6394,0,2402};
+					azimut=180;
+					id=8;
+					side="CIV";
+					vehicle="C_man_1";
+					player="PLAY CDG";
+					skill=0.45;
+					text="Civilian 9";
+				};
+				class Item9
+				{
+					position[]={6398,0,2402};
+					azimut=180;
+					id=9;
+					side="CIV";
+					vehicle="C_man_1";
+					player="PLAY CDG";
+					skill=0.45;
+					text="Civilian 10";
+				};
+				class Item10
+				{
+					position[]={6402,0,2402};
+					azimut=180;
+					id=10;
+					side="CIV";
+					vehicle="C_man_1";
+					player="PLAY CDG";
+					skill=0.45;
+					text="Civilian 11";
+				};
+				class Item11
+				{
+					position[]={6406,0,2402};
+					azimut=180;
+					id=11;
+					side="CIV";
+					vehicle="C_man_1";
+					player="PLAY CDG";
+					skill=0.45;
+					text="Civilian 12";
+				};
+				class Item12
+				{
+					position[]={6394,0,2406};
+					azimut=180;
+					id=12;
+					side="CIV";
+					vehicle="C_man_1";
+					player="PLAY CDG";
+					skill=0.45;
+					text="Civilian 13";
+				};
+				class Item13
+				{
+					position[]={6398,0,2406};
+					azimut=180;
+					id=13;
+					side="CIV";
+					vehicle="C_man_1";
+					player="PLAY CDG";
+					skill=0.45;
+					text="Civilian 14";
+				};
+				class Item14
+				{
+					position[]={6402,0,2406};
+					azimut=180;
+					id=14;
+					side="CIV";
+					vehicle="C_man_1";
+					player="PLAY CDG";
+					skill=0.45;
+					text="Civilian 15";
+				};
+				class Item15
+				{
+					position[]={6406,0,2406};
+					azimut=180;
+					id=15;
+					side="CIV";
+					vehicle="C_man_1";
+					player="PLAY CDG";
+					skill=0.45;
+					text="Civilian 16";
+				};
+			};
+		};
+	};
+};
+class Intro
+{
+	addOns[]=
+	{
+		"chernarus",
+		"A3_Characters_F"
+	};
+	addOnsAuto[]=
+	{
+		"chernarus",
+		"A3_Characters_F"
+	};
+	randomSeed=6212512;
+	class Intel
+	{
+		startWeather=0.25;
+		forecastWeather=0.25;
+		year=2011;
+		month=6;
+		day=24;
+		hour=12;
+		minute=0;
+	};
+};
+class OutroWin
+{
+	addOns[]=
+	{
+		"chernarus",
+		"A3_Characters_F"
+	};
+	addOnsAuto[]=
+	{
+		"chernarus",
+		"A3_Characters_F"
+	};
+	randomSeed=12784571;
+	class Intel
+	{
+		startWeather=0.25;
+		forecastWeather=0.25;
+		year=2011;
+		month=6;
+		day=24;
+		hour=12;
+		minute=0;
+	};
+};
+class OutroLoose
+{
+	addOns[]=
+	{
+		"chernarus",
+		"A3_Characters_F"
+	};
+	addOnsAuto[]=
+	{
+		"chernarus",
+		"A3_Characters_F"
+	};
+	randomSeed=8124550;
+	class Intel
+	{
+		startWeather=0.25;
+		forecastWeather=0.25;
+		year=2011;
+		month=6;
+		day=24;
+		hour=12;
+		minute=0;
+	};
+};

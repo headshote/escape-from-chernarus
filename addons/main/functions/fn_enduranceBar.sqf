@@ -1,30 +1,83 @@
-// fn_enduranceBar.sqf — runs on client each frame via CBA pfh
+// fn_enduranceBar.sqf — runs on client via CBA pfh
+//
+// Previous implementation called `hintSilent parseText` every 6 frames
+// (~10 Hz). hintSilent forces a full UI redraw and parseText allocates
+// a structured-text object on every call; running that at 10 Hz from
+// mission start created a steady stream of client-side UI work that
+// compounded over a long session into hard FPS drops (the bug the
+// player reported after completing boot camp). The redraw rate is now
+// throttled to the lowest possible cadence: hintSilent is only called
+// when the *displayed* state (bar count or exhausted flag) actually
+// changes. With endurance recovering at 0.12/tick the bar count rarely
+// changes more than ~1 time/sec, and is fully idle when the player
+// isn't moving.
+//
+// We also moved the per-frame work itself to a 4 Hz tick instead of
+// every-frame (`0.25` interval). Endurance is sampled in 0.25 s
+// quanta which is plenty for HUD purposes.
 #define BAR_MAX 100
 CO_playerEndurance = BAR_MAX;
 
-// CBA per-frame handler
+// Sprint animation state names (Arma 3 vanilla)
+private _sprintAnims = [
+    "AmovPercMsprSlowWrflDf",
+    "AmovPercMsprSlowWrflDfl",
+    "AmovPercMsprSlowWrflDfr",
+    "AmovPercMevaSdirDf",
+    "AmovPercMevaSdirDl",
+    "AmovPercMevaSdirDr"
+];
+
+CO_enduranceLastBars = -1;
+CO_enduranceLastExhausted = false;
+CO_enduranceAimCoefSet = -1;
+
+// 0.25 s tick instead of every-frame. The sprint penalty/recovery is
+// scaled by 5 (0.35*5 = 1.75 drop / 0.12*5 = 0.6 recover) to preserve
+// the original per-second drain/recovery rates.
 [{
     params ["_args", "_handle"];
-    private _player = ACE_player; // or just "player"
-
+    private _player = player;
     if (isNull _player || !alive _player) exitWith {};
 
-    private _isSprinting = (animationState _player) in ["AmovPercMsprSlowWrflDf","AmovPercMsprSlowWrflDfl","AmovPercMevaSdirDf"]; // detect sprint anims
+    private _anim = animationState _player;
+    private _isSprinting = _anim in _sprintAnims;
 
     if (_isSprinting) then {
-        CO_playerEndurance = ((CO_playerEndurance - 0.4) max 0);
-        if (CO_playerEndurance <= 0) then {
-            _player setVariable ["CO_exhausted", true, false];
-            [_player] remoteExec ["setUnconscious", _player]; // stagger effect
-        };
+        CO_playerEndurance = ((CO_playerEndurance - 1.75) max 0);
     } else {
-        CO_playerEndurance = ((CO_playerEndurance + 0.15) min BAR_MAX);
-        _player setVariable ["CO_exhausted", false, false];
+        CO_playerEndurance = ((CO_playerEndurance + 0.6) min BAR_MAX);
     };
 
-    // Draw HUD bar
+    // setCustomAimCoef only when threshold crosses (state change)
+    private _exhausted = CO_playerEndurance <= 0;
+    // Three tiers: full accuracy above 20%, a moderate sway penalty in the
+    // 1-20% band, and a heavy penalty when fully exhausted. The old code set
+    // the mid band to the *current* coef, which left the heavy exhausted
+    // penalty (4) stuck on until endurance climbed back above 20%.
+    private _wantCoef = if (_exhausted) then { 4 } else {
+        if (CO_playerEndurance > 20) then { 1 } else { 2 }
+    };
+    if (_wantCoef > 0 && _wantCoef != CO_enduranceAimCoefSet) then {
+        _player setCustomAimCoef _wantCoef;
+        CO_enduranceAimCoefSet = _wantCoef;
+        _player setVariable ["CO_exhausted", _exhausted, false];
+    };
+
+    // Compute displayed bar count and only refresh the UI on change.
     private _pct = CO_playerEndurance / BAR_MAX;
-    private _color = [1 - _pct, _pct, 0, 0.85];
-    drawIcon3D ["", _color, (_player modelToWorldVisual [0,-0.5,1.8]), 0,0,0,"",0]; // placeholder
-    // Better: use a proper dialog/RscTitles overlay
-}, 0, []] call CBA_fnc_addPerFrameHandler;
+    private _bars = floor (_pct * 20);
+    if (_bars != CO_enduranceLastBars || _exhausted != CO_enduranceLastExhausted) then {
+        CO_enduranceLastBars = _bars;
+        CO_enduranceLastExhausted = _exhausted;
+        private _barStr = "[" + ("|" * _bars) + (" " * (20 - _bars)) + "]";
+        private _color = if (_pct < 0.25) then {"#FF4444"} else {if (_pct < 0.6) then {"#FFAA00"} else {"#44FF44"}};
+        private _label = if (_exhausted) then {
+            "<t color='#FF2222'>EXHAUSTED</t>"
+        } else {
+            format ["<t color='%2'>Stamina %1</t>", _barStr, _color]
+        };
+        hintSilent parseText _label;
+    };
+
+}, 0.25, []] call CBA_fnc_addPerFrameHandler;

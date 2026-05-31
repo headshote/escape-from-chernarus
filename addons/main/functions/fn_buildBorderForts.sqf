@@ -5,9 +5,9 @@
 // ============================================================
 
 params [
-    ["_spacing",       600],   // meters between posts
-    ["_includeCoast",  true],
-    ["_includeLand",   true]
+    ["_spacing",       missionNamespace getVariable ["CO_border_postSpacing", 600]],   // meters between posts
+    ["_includeCoast",  missionNamespace getVariable ["CO_border_includeCoast", true]],
+    ["_includeLand",   missionNamespace getVariable ["CO_border_includeLand", true]]
 ];
 
 // Border segments: [start, end, facing direction]
@@ -15,7 +15,7 @@ CO_borderSegments = [
     [[200,   200,  0], [200,  14800, 0], 270,  "land"],   // West edge, face west
     [[200,  14800, 0], [14800,14800, 0], 0,    "land"],   // North edge, face north
     [[14800,14800, 0], [14800,  200, 0], 90,   "land"],   // East edge  (Russian side — skip)
-    [[200,   200,  0], [14800,  200, 0], 180,  "coast"],  // South coast, face south
+    [[200,   200,  0], [14800,  200, 0], 180,  "coast"]   // South coast, face south
 ];
 
 {
@@ -29,7 +29,7 @@ CO_borderSegments = [
     if (_type == "land"  && (_x select 2 == 90)) then { continue }; // skip east (Russian spawn)
 
     private _totalDist = _start distance _end;
-    private _steps     = floor (_totalDist / _spacing);
+    private _steps = (floor (_totalDist / (_spacing max 200))) max 1;
 
     for "_i" from 0 to _steps do {
         private _t   = _i / _steps;
@@ -42,6 +42,12 @@ CO_borderSegments = [
 
         // Spawn border guards
         [_pos, _facing, "CRN_ENF"] call co_main_fnc_spawnFortGuards;
+
+        // Yield between posts so we don't burn through the entire perimeter
+        // on one frame. Border posts can number ~70 with default spacing.
+        if (_i % 3 == 0) then { sleep 0.2; };
     };
 
 } forEach CO_borderSegments;
+
+diag_log "[CO] Border perimeter forts built.";

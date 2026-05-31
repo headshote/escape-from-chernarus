@@ -25,3 +25,8 @@ for "_w" from 0 to 5 do {
 };
 private _cycleWp = _grp addWaypoint [_center, 0];
 _cycleWp setWaypointType "CYCLE";
+
+// Active scan loop: roving guards hunt civilians within their compound.
+[_grp, _center, (_radius max 80), _faction] call co_main_fnc_guardAggroLoop;
+
+_grp

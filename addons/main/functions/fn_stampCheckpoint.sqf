@@ -73,9 +73,13 @@ for "_i" from 0 to (CO_checkpoint_hostilesPerPost - 1) do {
 // Patrol within 20m of checkpoint only
 {
     private _wp = _grp addWaypoint [_pos getPos [12, _dir + (_forEachIndex * 180)], 0];
-    _wp setWaypointType "CYCLE";
+    _wp setWaypointType (if (_forEachIndex == 0) then { "MOVE" } else { "CYCLE" });
     _wp setWaypointSpeed "LIMITED";
 } forEach [0,1];
+
+// Active scan loop — wider radius (90 m) so vehicles approaching the
+// checkpoint are flagged well before they roll past the barriers.
+[_grp, _pos, 90, "CRN_ENF"] call co_main_fnc_guardAggroLoop;
 
 // Return data struct
 [_pos, _dir, _objects, _grp]
