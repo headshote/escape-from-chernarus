@@ -33,7 +33,17 @@ if (_mode == "capture") exitWith {
             if ((_sorted select 0) distance _target < 2.5) then {
                 if (isPlayer _target) then {
                     [_target] remoteExecCall ["co_main_fnc_wrangleMinigame", _target];
-                    waitUntil { !isNil { _target getVariable "CO_wrangleResult" } };
+                    // Bound the wait: sleep so we don't busy-spin a server
+                    // thread every frame, and time out (defaulting to
+                    // "captured") so a disconnected/dead player can't hang
+                    // this spawned thread forever.
+                    private _wrangleDeadline = time + 20;
+                    waitUntil {
+                        sleep 0.3;
+                        !alive _target ||
+                        !isNil { _target getVariable "CO_wrangleResult" } ||
+                        time > _wrangleDeadline
+                    };
                     private _result = _target getVariable ["CO_wrangleResult", "captured"];
                     _target setVariable ["CO_wrangleResult", nil, true];
                     if (_result == "captured") then {

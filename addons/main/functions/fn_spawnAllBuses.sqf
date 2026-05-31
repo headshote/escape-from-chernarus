@@ -9,6 +9,12 @@ params [
     ["_hostilesPerBus", CO_bus_hostilesPerBus]
 ];
 
+// No routes → nothing to spawn. Guards against selectRandom [] later, which
+// would return nil and crash the weighted-allocation pass.
+if (isNil "CO_busRoutes" || { CO_busRoutes isEqualTo [] }) exitWith {
+    diag_log "[CO] spawnAllBuses: CO_busRoutes empty — no buses spawned.";
+};
+
 // Sort routes by priority descending
 private _sorted = [CO_busRoutes, [], { _x select 1 }, "DESCEND"] call BIS_fnc_sortBy;
 private _guaranteedPerLargeTown = missionNamespace getVariable ["CO_bus_townGuaranteed", 3];

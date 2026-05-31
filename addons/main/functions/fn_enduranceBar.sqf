@@ -51,8 +51,12 @@ CO_enduranceAimCoefSet = -1;
 
     // setCustomAimCoef only when threshold crosses (state change)
     private _exhausted = CO_playerEndurance <= 0;
+    // Three tiers: full accuracy above 20%, a moderate sway penalty in the
+    // 1-20% band, and a heavy penalty when fully exhausted. The old code set
+    // the mid band to the *current* coef, which left the heavy exhausted
+    // penalty (4) stuck on until endurance climbed back above 20%.
     private _wantCoef = if (_exhausted) then { 4 } else {
-        if (CO_playerEndurance > 20) then { 1 } else { CO_enduranceAimCoefSet }
+        if (CO_playerEndurance > 20) then { 1 } else { 2 }
     };
     if (_wantCoef > 0 && _wantCoef != CO_enduranceAimCoefSet) then {
         _player setCustomAimCoef _wantCoef;

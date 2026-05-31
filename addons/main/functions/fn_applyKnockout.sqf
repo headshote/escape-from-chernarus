@@ -16,10 +16,11 @@ if (!isServer) exitWith {
 if (isNull _target || !alive _target || !(_target isKindOf "CAManBase")) exitWith {};
 if (_target getVariable ["CO_knockedOut", false]) exitWith {};
 
-if (!isNull _attacker) then {
-    if (!alive _attacker) exitWith {};
-    if (_attacker distance _target > 3) exitWith {};
-};
+// NOTE: these guards must exit the FUNCTION, not a then{} block. exitWith
+// inside `then {}` only leaves the block, so the knockout would still run
+// for a dead or out-of-range attacker.
+if (!isNull _attacker && {!alive _attacker}) exitWith {};
+if (!isNull _attacker && {(_attacker distance _target) > 3}) exitWith {};
 
 _duration = (_duration max 5) min 120;
 
