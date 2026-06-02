@@ -38,9 +38,10 @@ private _perimeterAngles = [0, 45, 90, 135, 180, 225, 270, 315];
     _tower setDir _x;
     // Guard on each tower
     private _tGrp = createGroup west;
-    _tGrp setVariable ["CO_faction", "CRN_ENF"];
+    _tGrp setVariable ["CO_faction", "CRN_ENF", true];
     private _guard = _tGrp createUnit ["B_Soldier_F", _pos vectorAdd [0,0,6], [], 1, "FORM"];
     _guard setPos (_pos vectorAdd [0, 0, 6]); // top of tower approx
+    [_guard] call co_main_fnc_initHostileUnit;
 } forEach [0, 90, 180, 270];
 
 // --- Roving interior guards ---

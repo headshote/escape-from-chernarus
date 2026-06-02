@@ -9,6 +9,18 @@ CO_trafficVehiclePool = [
     "C_Hatchback_01_F", "C_SUV_01_F", "C_Offroad_01_F",
     "C_Van_01_transport_F", "C_Truck_02_transport_F"
 ];
+CO_trafficVehiclePool = CO_trafficVehiclePool select { isClass (configFile >> "CfgVehicles" >> _x) };
+if (CO_trafficVehiclePool isEqualTo []) then { CO_trafficVehiclePool = ["C_Offroad_01_F"] };
+
+private _trafficCivilianClasses = [
+    "C_man_polo_1_F",
+    "C_man_polo_2_F",
+    "C_man_1"
+] select { isClass (configFile >> "CfgVehicles" >> _x) };
+if (_trafficCivilianClasses isEqualTo []) then { _trafficCivilianClasses = ["C_man_1"] };
+private _trafficPassengerClasses = _trafficCivilianClasses + ([
+    "C_Woman_casual_F"
+] select { isClass (configFile >> "CfgVehicles" >> _x) });
 
 // Road-following waypoint pairs for civilian traffic arteries
 CO_trafficRoutes = [
@@ -63,14 +75,14 @@ private _spawnTrafficVehicle = {
     _veh setVectorUp (surfaceNormal _spawnPos);
 
     private _grp = createGroup civilian;
-    private _driver = _grp createUnit ["C_man_polo_1_F", _spawnPos, [], 0, "CARGO"];
+    private _driver = _grp createUnit [selectRandom _trafficCivilianClasses, _spawnPos, [], 0, "CARGO"];
     _driver moveInDriver _veh;
     _driver setVariable ["CO_trafficDriver", true];
 
     // Add random civilian passengers
     private _paxCount = 1 + floor (random 3);
     for "_p" from 1 to _paxCount do {
-        private _pax = _grp createUnit [selectRandom ["C_man_polo_1_F","C_man_polo_2_F","C_Woman_casual_F"], _spawnPos, [], 0, "CARGO"];
+        private _pax = _grp createUnit [selectRandom _trafficPassengerClasses, _spawnPos, [], 0, "CARGO"];
         _pax moveInCargo _veh;
     };
 

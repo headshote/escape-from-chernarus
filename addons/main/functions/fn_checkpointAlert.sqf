@@ -15,8 +15,9 @@ params ["_detectedUnits", "_hostileGrp"];
 
     // Don't engage anyone inside the training-camp safe zone — the
     // boot-camp script owns engagement decisions in that area.
+    private _airfieldRadius = missionNamespace getVariable ["CO_airfieldRadius", 350];
     if (!isNil "CO_airfieldCenter" &&
-        {_target distance2D CO_airfieldCenter < (CO_airfieldRadius + 20)} &&
+        {_target distance2D CO_airfieldCenter < (_airfieldRadius + 20)} &&
         !(_target getVariable ["CO_isAWOL", false])) then { continue };
 
     _target setVariable ["CO_captureInProgress", true, true];
@@ -25,8 +26,14 @@ params ["_detectedUnits", "_hostileGrp"];
     // civilians/players is converted into stun + transport.
     [_target] call co_main_fnc_installNonLethalDamage;
 
-    // Check crowd resistance first
-    [getPosATL _target, _hostileGrp, _target] call co_main_fnc_crowdResistance;
+    // Check crowd resistance first. When the crowd successfully blocks the
+    // attempt, release the target immediately instead of letting the capture
+    // loop continue anyway.
+    private _crowdBlocked = [getPosATL _target, _hostileGrp, _target] call co_main_fnc_crowdResistance;
+    if (_crowdBlocked) then {
+        _target setVariable ["CO_captureInProgress", false, true];
+        continue;
+    };
 
     // Order whole group to move on target. Guards close to melee range
     // first; if the target is still > 25 m after a beat, they're cleared
@@ -81,7 +88,13 @@ params ["_detectedUnits", "_hostileGrp"];
                 // Trigger wrangle minigame on the player's machine
                 if (isPlayer _target) then {
                     [_target] remoteExecCall ["co_main_fnc_wrangleMinigame", _target];
-                    waitUntil { sleep 0.3; !isNil { _target getVariable "CO_wrangleResult" } };
+                    private _wrangleDeadline = time + 20;
+                    waitUntil {
+                        sleep 0.3;
+                        !alive _target ||
+                        !isNil { _target getVariable "CO_wrangleResult" } ||
+                        time > _wrangleDeadline
+                    };
                     private _result = _target getVariable ["CO_wrangleResult", "captured"];
                     _target setVariable ["CO_wrangleResult", nil, true];
 

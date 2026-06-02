@@ -106,7 +106,9 @@ missionNamespace setVariable ["CO_fnc_setupAdminPanelAction", {
         player setVariable ["CO_adminPanelActionId", -1];
     };
 
-    private _adminUIDs = missionNamespace getVariable ["CO_adminUIDs", []];
+    private _adminUIDs = (missionNamespace getVariable ["CO_adminUIDs", []]) apply {
+        if (typeName _x == "STRING") then { _x } else { str _x }
+    };
     if !((getPlayerUID player) in _adminUIDs) exitWith {};
 
     private _actionId = player addAction [

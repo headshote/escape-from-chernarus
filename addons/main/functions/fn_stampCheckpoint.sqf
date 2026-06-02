@@ -52,7 +52,7 @@ _objects pushBack _light;
 
 // --- NPC Group ---
 private _grp = createGroup west;  // BLUFOR Enforcers
-_grp setVariable ["CO_faction", "CRN_ENF"];
+_grp setVariable ["CO_faction", "CRN_ENF", true];
 
 for "_i" from 0 to (CO_checkpoint_hostilesPerPost - 1) do {
     private _spawnOffset = [

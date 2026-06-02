@@ -82,7 +82,7 @@ private _fnc_makeTask = {
     ] call BIS_fnc_taskCreate;
 };
 
-[["BOOT CAMP\nCheck your map (M) for objectives.\nReport to the obstacle course."]] remoteExec ["hint", _player];
+["BOOT CAMP\nCheck your map (M) for objectives.\nReport to the obstacle course."] remoteExec ["hint", _player];
 sleep 2;
 
 // =========================================================
@@ -114,7 +114,7 @@ waitUntil {
 
 if (alive _player && (_player getVariable ["CO_bootCampActive", false]) && time <= _stage1Deadline) then {
     [[_player], _tStage1, _obstacleB] call BIS_fnc_taskSetDestination;
-    [["Halfway there — reach the FINISH flag."]] remoteExec ["hint", _player];
+    ["Halfway there — reach the FINISH flag."] remoteExec ["hint", _player];
     waitUntil {
         sleep 1;
         !alive _player ||
@@ -308,7 +308,7 @@ if (_grenadesThrown < 2) then {
 // =========================================================
 // GRADUATION
 // =========================================================
-[["BOOT CAMP COMPLETE\nMoving you to the front at Krasnostav."]] remoteExec ["hint", _player];
+["BOOT CAMP COMPLETE\nMoving you to the front at Krasnostav."] remoteExec ["hint", _player];
 sleep 4;
 _player setVariable ["CO_isCleared", true, true];
 _player setVariable ["CO_bootCampGraduated", true, true];

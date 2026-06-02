@@ -1,8 +1,8 @@
 // ============================================================
 // fn_spawnResistanceBike.sqf
-// Server-side support vehicle spawn for resistance-side or civilian-start
-// players. Prefers a CUP Apache-style attack helicopter when available,
-// otherwise falls back to a vanilla armed attack helicopter.
+// Server-side attack helicopter spawn for resistance-side or civilian-start
+// players near the Cherno start. Keep the function name for compatibility
+// with existing mission calls.
 // ============================================================
 params ["_player", ["_anchorPos", []]];
 
@@ -17,17 +17,17 @@ if (!isNull _existingVehicle && { alive _existingVehicle }) then {
     deleteVehicle _existingVehicle;
 };
 
-private _vehicleClass = "B_Heli_Attack_01_dynamicLoadout_F";
+private _vehicleClass = "B_Heli_Light_01_armed_F";
 {
     if (isClass (configFile >> "CfgVehicles" >> _x)) exitWith {
         _vehicleClass = _x;
     };
 } forEach [
-    "CUP_B_AH64D_DL_USA",
-    "CUP_B_AH64D_USA",
-    "CUP_B_AH1Z_Dynamic_USMC",
+    "B_Heli_Light_01_armed_F",
     "B_Heli_Attack_01_dynamicLoadout_F",
-    "B_Heli_Attack_01_F"
+    "O_Heli_Light_02_dynamicLoadout_F",
+    "O_Heli_Attack_02_dynamicLoadout_F",
+    "B_Heli_Light_01_F"
 ];
 
 private _spawnOrigin = if (_anchorPos isEqualTo []) then { getPosATL _player } else { +_anchorPos };
@@ -47,7 +47,7 @@ private _preferredOffsets = [
 
 {
     private _candidatePos = _spawnOrigin vectorAdd _x;
-    private _emptyPos = _candidatePos findEmptyPosition [0, 35, _vehicleClass];
+    private _emptyPos = _candidatePos findEmptyPosition [0, 60, _vehicleClass];
     if !(_emptyPos isEqualTo []) exitWith {
         _spawnPos = _emptyPos;
     };

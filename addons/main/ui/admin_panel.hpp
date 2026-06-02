@@ -45,8 +45,9 @@ class CO_AdminPanel {
         class Sld_CPCount: RscSlider {
             idc = 301;
             x = MID; y = ROW(1); w = 0.25; h = LBL_H;
+            sliderRange[] = {1, 12};
             sliderPosition = 4; sliderSpeed = 1;
-            onSliderPosChanged = "CO_checkpoint_hostilesPerPost = round sliderPosition (_this select 0); publicVariable 'CO_checkpoint_hostilesPerPost';";
+            onSliderPosChanged = "CO_checkpoint_hostilesPerPost = round sliderPosition (_this select 0); publicVariable 'CO_checkpoint_hostilesPerPost'; ((ctrlParent (_this select 0)) displayCtrl 3011) ctrlSetText str CO_checkpoint_hostilesPerPost;";
         };
         class Val_CPCount: RscText {
             idc = 3011;
@@ -79,8 +80,9 @@ class CO_AdminPanel {
         class Sld_BusTotal: RscSlider {
             idc = 310;
             x = MID; y = ROW(4); w = 0.25; h = LBL_H;
+            sliderRange[] = {0, 80};
             sliderPosition = 30; sliderSpeed = 1;
-            onSliderPosChanged = "CO_bus_totalCruising = round sliderPosition (_this select 0); publicVariable 'CO_bus_totalCruising';";
+            onSliderPosChanged = "CO_bus_totalCruising = round sliderPosition (_this select 0); publicVariable 'CO_bus_totalCruising'; ((ctrlParent (_this select 0)) displayCtrl 3101) ctrlSetText str CO_bus_totalCruising;";
         };
         class Val_BusTotal: RscText {
             idc = 3101; text = "30";
@@ -95,8 +97,9 @@ class CO_AdminPanel {
         class Sld_BusHostiles: RscSlider {
             idc = 311;
             x = MID; y = ROW(5); w = 0.25; h = LBL_H;
+            sliderRange[] = {0, 12};
             sliderPosition = 5; sliderSpeed = 1;
-            onSliderPosChanged = "CO_bus_hostilesPerBus = round sliderPosition (_this select 0); publicVariable 'CO_bus_hostilesPerBus';";
+            onSliderPosChanged = "CO_bus_hostilesPerBus = round sliderPosition (_this select 0); publicVariable 'CO_bus_hostilesPerBus'; ((ctrlParent (_this select 0)) displayCtrl 3111) ctrlSetText str CO_bus_hostilesPerBus;";
         };
         class Val_BusHostiles: RscText {
             idc = 3111; text = "5";
@@ -111,8 +114,9 @@ class CO_AdminPanel {
         class Sld_BusTown: RscSlider {
             idc = 312;
             x = MID; y = ROW(6); w = 0.25; h = LBL_H;
+            sliderRange[] = {0, 6};
             sliderPosition = 3; sliderSpeed = 1;
-            onSliderPosChanged = "CO_bus_townGuaranteed = round sliderPosition (_this select 0); publicVariable 'CO_bus_townGuaranteed';";
+            onSliderPosChanged = "CO_bus_townGuaranteed = round sliderPosition (_this select 0); publicVariable 'CO_bus_townGuaranteed'; ((ctrlParent (_this select 0)) displayCtrl 3121) ctrlSetText str CO_bus_townGuaranteed;";
         };
         class Val_BusTown: RscText {
             idc = 3121; text = "3";
@@ -134,8 +138,9 @@ class CO_AdminPanel {
         class Sld_BorSpace: RscSlider {
             idc = 320;
             x = MID; y = ROW(8); w = 0.25; h = LBL_H;
+            sliderRange[] = {200, 1500};
             sliderPosition = 600; sliderSpeed = 50;
-            onSliderPosChanged = "CO_border_postSpacing = round sliderPosition (_this select 0); publicVariable 'CO_border_postSpacing';";
+            onSliderPosChanged = "CO_border_postSpacing = round sliderPosition (_this select 0); publicVariable 'CO_border_postSpacing'; ((ctrlParent (_this select 0)) displayCtrl 3201) ctrlSetText str CO_border_postSpacing;";
         };
         class Val_BorSpace: RscText {
             idc = 3201; text = "600";
@@ -157,8 +162,9 @@ class CO_AdminPanel {
         class Sld_PolStop: RscSlider {
             idc = 330;
             x = MID; y = ROW(10); w = 0.25; h = LBL_H;
+            sliderRange[] = {0, 1};
             sliderPosition = 0.05; sliderSpeed = 0.01;
-            onSliderPosChanged = "CO_police_carStopChance = sliderPosition (_this select 0); publicVariable 'CO_police_carStopChance';";
+            onSliderPosChanged = "CO_police_carStopChance = sliderPosition (_this select 0); publicVariable 'CO_police_carStopChance'; ((ctrlParent (_this select 0)) displayCtrl 3301) ctrlSetText str CO_police_carStopChance;";
         };
         class Val_PolStop: RscText {
             idc = 3301; text = "0.05";
@@ -191,8 +197,9 @@ class CO_AdminPanel {
         class Sld_RusWave: RscSlider {
             idc = 340;
             x = MID; y = ROW(13); w = 0.25; h = LBL_H;
+            sliderRange[] = {30, 600};
             sliderPosition = 180; sliderSpeed = 10;
-            onSliderPosChanged = "CO_rus_waveCooldown = round sliderPosition (_this select 0); publicVariable 'CO_rus_waveCooldown';";
+            onSliderPosChanged = "CO_rus_waveCooldown = round sliderPosition (_this select 0); publicVariable 'CO_rus_waveCooldown'; ((ctrlParent (_this select 0)) displayCtrl 3401) ctrlSetText str CO_rus_waveCooldown;";
         };
         class Val_RusWave: RscText {
             idc = 3401; text = "180";

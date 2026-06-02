@@ -6,7 +6,7 @@
 params ["_center", "_radius", "_count", "_faction"];
 
 private _grp = createGroup west;
-_grp setVariable ["CO_faction", _faction];
+_grp setVariable ["CO_faction", _faction, true];
 
 for "_i" from 0 to (_count - 1) do {
     private _angle = random 360;

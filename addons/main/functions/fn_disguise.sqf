@@ -47,26 +47,32 @@ private _ensureCacheActions = {
         "<t color='#FFCC00'>Take Disguise (Worker)</t>",
         {
             params ["_target", "_caller"];
-            ["co_main_disguise", [_caller, "U_C_Workman_01"]] call CBA_fnc_localEvent;
+            private _items = _target getVariable ["CO_disguiseItems", []];
+            private _clothing = if ("U_C_Workman_01" in _items) then { "U_C_Workman_01" } else { "U_C_Poor_1" };
+            if !(_clothing in _items) exitWith { hint "No worker disguise in this cache."; };
+            ["co_main_disguise", [_caller, _clothing]] call CBA_fnc_localEvent;
             // Mark this cache as having had its disguise taken so the action
             // greys out for subsequent uses.
             _target setVariable ["CO_disguiseTaken", true, true];
         },
         nil, 1.5, true, true,
         "",
-        "alive _target && _this distance _target < 3 && !(_target getVariable ['CO_disguiseTaken', false])"
+        "alive _target && _this distance _target < 3 && !(_target getVariable ['CO_disguiseTaken', false]) && { ((_target getVariable ['CO_disguiseItems', []]) findIf { _x in ['U_C_Workman_01','U_C_Poor_1'] }) >= 0 }"
     ];
 
     _box addAction [
         "<t color='#FFCC00'>Take Disguise (Farmer)</t>",
         {
             params ["_target", "_caller"];
-            ["co_main_disguise", [_caller, "U_C_Farmer"]] call CBA_fnc_localEvent;
+            private _items = _target getVariable ["CO_disguiseItems", []];
+            private _clothing = if ("U_C_Farmer" in _items) then { "U_C_Farmer" } else { "U_C_Driver_1" };
+            if !(_clothing in _items) exitWith { hint "No farmer disguise in this cache."; };
+            ["co_main_disguise", [_caller, _clothing]] call CBA_fnc_localEvent;
             _target setVariable ["CO_disguiseTaken", true, true];
         },
         nil, 1.4, true, true,
         "",
-        "alive _target && _this distance _target < 3 && !(_target getVariable ['CO_disguiseTaken', false])"
+        "alive _target && _this distance _target < 3 && !(_target getVariable ['CO_disguiseTaken', false]) && { ((_target getVariable ['CO_disguiseItems', []]) findIf { _x in ['U_C_Farmer','U_C_Driver_1'] }) >= 0 }"
     ];
 };
 

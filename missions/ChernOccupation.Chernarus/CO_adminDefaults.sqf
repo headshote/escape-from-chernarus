@@ -68,7 +68,7 @@ CO_police_carStopChance         = 0.05;
 CO_police_active                = true;
 
 // --- Admin ---
-CO_adminUIDs                    = [76561198054336866];     // add Steam64 UIDs allowed to open the admin panel
+CO_adminUIDs                    = ["76561198054336866"];   // add Steam64 UID strings allowed to open the admin panel
 
 // Broadcast all to clients
 {

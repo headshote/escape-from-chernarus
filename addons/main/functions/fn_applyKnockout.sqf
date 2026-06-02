@@ -6,11 +6,12 @@ params [
     ["_attacker", objNull],
     ["_target", objNull],
     ["_duration", 60],
-    ["_keepCaptive", false]
+    ["_keepCaptive", false],
+    ["_requireCloseAttacker", true]
 ];
 
 if (!isServer) exitWith {
-    [_attacker, _target, _duration, _keepCaptive] remoteExecCall ["co_main_fnc_applyKnockout", 2];
+    [_attacker, _target, _duration, _keepCaptive, _requireCloseAttacker] remoteExecCall ["co_main_fnc_applyKnockout", 2];
 };
 
 if (isNull _target || !alive _target || !(_target isKindOf "CAManBase")) exitWith {};
@@ -20,7 +21,7 @@ if (_target getVariable ["CO_knockedOut", false]) exitWith {};
 // inside `then {}` only leaves the block, so the knockout would still run
 // for a dead or out-of-range attacker.
 if (!isNull _attacker && {!alive _attacker}) exitWith {};
-if (!isNull _attacker && {(_attacker distance _target) > 3}) exitWith {};
+if (_requireCloseAttacker && {!isNull _attacker && {(_attacker distance _target) > 3}}) exitWith {};
 
 _duration = (_duration max 5) min 120;
 

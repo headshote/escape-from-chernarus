@@ -32,7 +32,7 @@ private _keyHandlerId = _dlg displayAddEventHandler ["KeyDown", {
 }];
 
 // Mini-game loop
-while { time - _startTime < _timeLimit } do {
+while { !isNull _dlg && { time - _startTime < _timeLimit } } do {
     private _pressCount = missionNamespace getVariable ["CO_wranglePressCount", 0];
 
     if (_pressCount > 0) then {
@@ -43,8 +43,10 @@ while { time - _startTime < _timeLimit } do {
     };
 
     // Resize bar
-    _resistBar ctrlSetPosition [0.2, 0.45, _totalW * _progress, 0.06];
-    _resistBar ctrlCommit 0;
+    if (!isNull _resistBar) then {
+        _resistBar ctrlSetPosition [0.2, 0.45, _totalW * _progress, 0.06];
+        _resistBar ctrlCommit 0;
+    };
 
     if (_progress >= 1) then {
         _result = "escaped";
@@ -58,7 +60,9 @@ while { time - _startTime < _timeLimit } do {
     sleep 0.05;
 };
 
-_dlg displayRemoveEventHandler ["KeyDown", _keyHandlerId];
+if (!isNull _dlg) then {
+    _dlg displayRemoveEventHandler ["KeyDown", _keyHandlerId];
+};
 missionNamespace setVariable ["CO_wrangleActionKeys", nil];
 missionNamespace setVariable ["CO_wranglePressCount", nil];
 closeDialog 0;

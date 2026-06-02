@@ -28,7 +28,7 @@ publicVariable "CO_frontCollapsed";
         if (random 1 < 0.3) then {
             if (isNull _resistanceGrp) then {
                 _resistanceGrp = createGroup resistance;
-                _resistanceGrp setVariable ["CO_faction", "RESIST"];
+                _resistanceGrp setVariable ["CO_faction", "RESIST", true];
             };
             [_x] joinSilent _resistanceGrp;
         };

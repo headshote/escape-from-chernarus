@@ -115,7 +115,7 @@ _captive setCaptive true;
 
     // ---- 4. Pick a driver + a jailer from the capturing group --
     private _alive = (units _capturingGrp) select { alive _x && vehicle _x == _x };
-    if (count _alive == 0) exitWith {
+    if (count _alive == 0) then {
         diag_log "[CO] Capture transport: no live guards left to drive — using fallback NPC driver.";
         // Fallback driver so the captive still arrives at training
         private _fallbackGrp = createGroup west;

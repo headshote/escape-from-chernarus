@@ -19,10 +19,11 @@ private _unitsPerNode = (ceil (_totalStrength / ((count CO_frontDefensePositions
 {
     private _pos = _x;
     private _grp = createGroup west;
-    _grp setVariable ["CO_faction", "CRN_FRONT"];
+    _grp setVariable ["CO_faction", "CRN_FRONT", true];
 
     for "_i" from 1 to _unitsPerNode do {
         private _u = _grp createUnit ["B_Soldier_F", _pos, [], 15, "FORM"];
+        _u setVariable ["CO_faction", "CRN_FRONT", true];
         CO_front_unitsRemaining = CO_front_unitsRemaining + 1;
         // Track death to update counter
         _u addEventHandler ["Killed", {

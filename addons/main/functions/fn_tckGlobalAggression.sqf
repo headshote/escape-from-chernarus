@@ -114,8 +114,9 @@ diag_log "[CO] tckGlobalAggression: starting global failsafe loop (radius=60m, t
                 // gate guards, roving interior guards) MUST NOT auto-detain
                 // anyone. The boot-camp script + perimeter sentinel own
                 // engagement decisions in that area.
+                private _airfieldRadius = missionNamespace getVariable ["CO_airfieldRadius", 350];
                 if (!isNil "CO_airfieldCenter" &&
-                    {(getPosATL _u) distance2D CO_airfieldCenter < (CO_airfieldRadius + 50)}) then {
+                    {(getPosATL _u) distance2D CO_airfieldCenter < (_airfieldRadius + 50)}) then {
                     continue
                 };
 
@@ -138,7 +139,7 @@ diag_log "[CO] tckGlobalAggression: starting global failsafe loop (radius=60m, t
                     // Targets inside the airfield safe zone are off-limits
                     // (training recruits).
                     if (_ok && !isNil "CO_airfieldCenter" &&
-                        {(getPosATL _t) distance2D CO_airfieldCenter < (CO_airfieldRadius + 20)} &&
+                        {(getPosATL _t) distance2D CO_airfieldCenter < (_airfieldRadius + 20)} &&
                         !(_t getVariable ["CO_isAWOL", false])) then { _ok = false };
                     if (_ok) then {
                         private _f = group _t getVariable ["CO_faction", ""];

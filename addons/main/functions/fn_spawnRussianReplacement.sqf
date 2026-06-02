@@ -68,6 +68,7 @@ private _u = _grp createUnit [
     selectRandom ["O_Soldier_F","O_Soldier_AR_F","O_Medic_F","O_Soldier_GL_F","O_Soldier_LAT_F"],
     _spawnPos, [], 8, "FORM"
 ];
+_u setVariable ["CO_faction", "RUS_ADV", true];
 _u setVariable ["CO_advanceLane", _lane, true];
 _u setUnitPos "UP";
 _u setBehaviour "COMBAT";

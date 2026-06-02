@@ -7,6 +7,7 @@ private _crowdSize = count _nearCivs;
 private _hostileCount = count units _hostileGrp;
 
 private _resistChance = ((_crowdSize - _hostileCount * 2) / 10) max 0 min 1;
+private _blockedCapture = false;
 
 if (random 1 < _resistChance) then {
     // Some civs attack
@@ -20,7 +21,7 @@ if (random 1 < _resistChance) then {
             _x doMove (getPosATL (leader _hostileGrp) vectorAdd [random 60 - 30, random 60 - 30, 0]);
             _x setBehaviour "STEALTH";
         } forEach units _hostileGrp;
-        // Victim not captured
+        _blockedCapture = true;
     } else {
         // Open fire — some civs die, survivor become wanted
         { _x setCombatMode "RED"; } forEach units _hostileGrp;
@@ -46,3 +47,5 @@ if (random 1 < _resistChance) then {
         } forEach _attackers;
     };
 };
+
+_blockedCapture

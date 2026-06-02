@@ -17,7 +17,7 @@ publicVariable "CO_trainingFieldPos";
 
 // --- Drill instructor group ---
 private _drillGrp = createGroup west;
-_drillGrp setVariable ["CO_faction", "CRN_ENF"];
+_drillGrp setVariable ["CO_faction", "CRN_ENF", true];
 _drillGrp setVariable ["CO_isDrillInstructor", true, true];
 
 private _instructor = _drillGrp createUnit ["B_Soldier_TL_F", CO_trainingFieldPos, [], 0, "FORM"];
@@ -42,7 +42,7 @@ _instructor setVariable ["CO_drillInstructor", true, true];
 // --- Recruit formation NPCs (visual flavour) ---
 // Spawn three rows of "recruit" props that drill in place.
 private _recruitGrp = createGroup west;
-_recruitGrp setVariable ["CO_faction", "CRN_ENF"];
+_recruitGrp setVariable ["CO_faction", "CRN_ENF", true];
 
 for "_row" from 0 to 2 do {
     for "_col" from 0 to 4 do {
@@ -52,6 +52,7 @@ for "_row" from 0 to 2 do {
             0
         ];
         private _r = _recruitGrp createUnit ["B_Soldier_F", _rPos, [], 0, "FORM"];
+        _r setVariable ["CO_faction", "CRN_ENF", true];
         removeAllWeapons _r;
         removeAllAssignedItems _r;
         _r setDir 90;
@@ -96,7 +97,7 @@ for "_i" from 0 to 3 do {
     private _angle = _i * 90;
     private _minderPos = CO_trainingFieldPos getPos [_minderRadius, _angle];
     private _grp = createGroup west;
-    _grp setVariable ["CO_faction", "CRN_ENF"];
+    _grp setVariable ["CO_faction", "CRN_ENF", true];
     private _u = _grp createUnit ["B_Soldier_TL_F", _minderPos, [], 0, "FORM"];
     [_u] call co_main_fnc_initHostileUnit;
     // Wider scan radius so they intercept escaping conscripts

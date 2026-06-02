@@ -61,7 +61,7 @@ private _assignedGroup = if (count _frontGroups > 0) then {
     _frontGroups select 0
 } else {
     private _newGrp = createGroup west;
-    _newGrp setVariable ["CO_faction", "CRN_FRONT"];
+    _newGrp setVariable ["CO_faction", "CRN_FRONT", true];
     _newGrp
 };
 
@@ -73,7 +73,7 @@ if (side _conscript == side _assignedGroup) then {
 
 if (isPlayer _conscript) then {
     [_conscript] remoteExecCall ["co_main_fnc_showFrontDeployHUD", _conscript];
-    [["KRASNOSTAV FRONT\nHold the line. Deserters will be hunted by every faction."]] remoteExec ["hint", _conscript];
+    ["KRASNOSTAV FRONT\nHold the line. Deserters will be hunted by every faction."] remoteExec ["hint", _conscript];
     // AWOL monitor: if the cleared conscript wanders > 1.2 km from
     // Krasnostav for more than 60 s, flag them AWOL and every
     // faction (TCK, border, police, RUS_ADV) becomes lethal.

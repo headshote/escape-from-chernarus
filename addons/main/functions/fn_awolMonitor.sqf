@@ -36,12 +36,12 @@ while {
         if (_outsideAt < 0) then { _outsideAt = time };
         if (!_warned && (time - _outsideAt) > 15) then {
             _warned = true;
-            [["AWOL WARNING\nReturn to Krasnostav front in 60 seconds or you will be hunted."]]
+            ["AWOL WARNING\nReturn to Krasnostav front in 60 seconds or you will be hunted."]
                 remoteExec ["hint", _player];
         };
         if ((time - _outsideAt) > _grace) then {
             _player setVariable ["CO_isAWOL", true, true];
-            [["YOU ARE AWOL\nAll factions will engage on sight."]]
+            ["YOU ARE AWOL\nAll factions will engage on sight."]
                 remoteExec ["hint", _player];
             diag_log format [
                 "[CO] AWOL: %1 left Krasnostav (%2 m) for %3 s — flagged hostile.",
@@ -53,7 +53,7 @@ while {
         _outsideAt = -1;
         if (_warned) then {
             _warned = false;
-            [["Welcome back to the front. AWOL warning cleared."]]
+            ["Welcome back to the front. AWOL warning cleared."]
                 remoteExec ["hint", _player];
         };
     };

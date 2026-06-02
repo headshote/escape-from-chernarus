@@ -25,11 +25,31 @@ params ["_grp", "_car", "_target"];
 
 if (!isServer) exitWith {};
 if (isNull _grp || isNull _car || isNull _target) exitWith {};
-if (_grp getVariable ["CO_policeFootChaseActive", false]) exitWith {};
+if (_grp getVariable ["CO_policeFootChaseActive", false]) then {
+    private _activeTarget = _grp getVariable ["CO_policeFootChaseTarget", objNull];
+    private _startedAt = _grp getVariable ["CO_policeFootChaseStartedAt", 0];
+    if (
+        !isNull _activeTarget &&
+        alive _activeTarget &&
+        !captive _activeTarget &&
+        time < (_startedAt + 95)
+    ) exitWith {};
+
+    _grp setVariable ["CO_policeFootChaseActive", false, false];
+    if (!isNull _activeTarget && alive _activeTarget) then {
+        _activeTarget setVariable ["CO_captureInProgress", false, true];
+    };
+};
+if (_target getVariable ["CO_captureInProgress", false]) exitWith {};
 _grp setVariable ["CO_policeFootChaseActive", true, false];
+_grp setVariable ["CO_policeFootChaseTarget", _target, false];
+_grp setVariable ["CO_policeFootChaseStartedAt", time, false];
+_target setVariable ["CO_captureInProgress", true, true];
+_grp setVariable ["CO_transportVehicle", _car, true];
 
 private _allUnits = (units _grp) select { alive _x };
 if (count _allUnits == 0) exitWith {
+    _target setVariable ["CO_captureInProgress", false, true];
     _grp setVariable ["CO_policeFootChaseActive", false, false];
 };
 
@@ -50,6 +70,8 @@ if (!isNull _drv) then {
     _u setCombatMode "YELLOW";
     _u enableAI "MOVE";
     _u enableAI "PATH";
+    _u enableAI "TARGET";
+    _u enableAI "AUTOTARGET";
     _u setUnitPos "UP";
     if (vehicle _u != _u) then {
         unassignVehicle _u;
@@ -75,7 +97,6 @@ sleep 1.4;
 
 // --- Foot chase ---
 private _deadline   = time + 75;
-private _melee      = "co_main_fnc_applyMeleeHit";
 private _isPlayer   = isPlayer _target;
 private _captured   = false;
 
@@ -91,6 +112,9 @@ while {
     private _sorted = [_live, [], { _x distance2D _target }, "ASCEND"] call BIS_fnc_sortBy;
 
     {
+        _x reveal [_target, 4];
+        _x doWatch _target;
+        _x doTarget _target;
         _x doMove (getPosATL _target);
         if ((_x distance _target) < 3.0) then {
             [_x, _target] call co_main_fnc_applyMeleeHit;
@@ -136,6 +160,7 @@ if (alive _car) then {
     [_grp, _car] spawn {
         params ["_g", "_v"];
         sleep 12;
+        if (_g getVariable ["CO_policeFootChaseActive", false]) exitWith {};
         // Stragglers — force-board
         {
             if (alive _x && vehicle _x == _x) then {
@@ -157,3 +182,4 @@ if (alive _target && !(_target getVariable ["CO_knockedOut", false])) then {
     _target setVariable ["CO_captureInProgress", false, true];
 };
 _grp setVariable ["CO_policeFootChaseActive", false, false];
+_grp setVariable ["CO_policeFootChaseTarget", objNull, false];

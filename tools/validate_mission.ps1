@@ -14,11 +14,11 @@ function Fail {
 }
 
 if ([string]::IsNullOrWhiteSpace($MissionSource)) {
-    Fail 'MissionSource parameter is required.'
+    $MissionSource = Join-Path (Join-Path $PSScriptRoot '..') 'missions\ChernOccupation.Chernarus'
 }
 
 if ([string]::IsNullOrWhiteSpace($MissionTarget)) {
-    Fail 'MissionTarget parameter is required.'
+    $MissionTarget = $MissionSource
 }
 
 $requiredSourceFiles = @(

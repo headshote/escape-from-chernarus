@@ -25,7 +25,14 @@ if (captive _target && !isNull (objectParent _target)) exitWith {};
 _target setVariable ["CO_captureInProgress", true, true];
 
 // Knock the victim down — keep them captive while they ride/transport
-[_shooter, _target, 90, true] call co_main_fnc_applyKnockout;
+[_shooter, _target, 90, true, false] call co_main_fnc_applyKnockout;
+if (!(_target getVariable ["CO_knockedOut", false])) exitWith {
+    _target setVariable ["CO_captureInProgress", false, true];
+    diag_log format [
+        "[CO] dispatchCaptureTransport: knockout failed for %1 from shooter %2; released capture reservation.",
+        _target, _shooter
+    ];
+};
 
 // Bump wanted level for players hit by police/ENF gunfire
 if (isPlayer _target) then {

@@ -8,6 +8,22 @@ private _totalCivs = missionNamespace getVariable ["CO_civilian_totalPopulation"
 private _femaleOnlyTowns = missionNamespace getVariable ["CO_westBorderFemaleOnlyTowns", []];
 private _settlementPlan = [];
 private _weightedSettlements = [];
+private _fnc_existingVehicleClasses = {
+    params ["_classes"];
+    _classes select { isClass (configFile >> "CfgVehicles" >> _x) }
+};
+private _maleCivilianClasses = [
+    "C_man_polo_1_F",
+    "C_man_polo_2_F",
+    "C_man_casual_4_F",
+    "C_Man_casual_6_F",
+    "C_man_hunter_1_F",
+    "C_man_1"
+] call _fnc_existingVehicleClasses;
+if (_maleCivilianClasses isEqualTo []) then { _maleCivilianClasses = ["C_man_1"] };
+private _femaleCivilianClasses = [
+    "C_Woman_casual_F"
+] call _fnc_existingVehicleClasses;
 
 {
     private _townName = _x select 0;
@@ -71,22 +87,15 @@ if (count _settlementPlan > _totalCivs) then {
     private _emptyPos = _anchorPos findEmptyPosition [0, 20, "C_man_1"];
     private _pos = if (_emptyPos isEqualTo []) then { _anchorPos } else { _emptyPos };
     private _grp = createGroup civilian;
-    private _genderPool = if (_townName in _femaleOnlyTowns) then {
-        ["C_Woman_casual_F"]
+    private _genderPool = if ((_townName in _femaleOnlyTowns) && { !(_femaleCivilianClasses isEqualTo []) }) then {
+        _femaleCivilianClasses
     } else {
-        [
-            "C_man_polo_1_F",
-            "C_man_polo_2_F",
-            "C_man_casual_4_F",
-            "C_Man_casual_6_F",
-            "C_man_hunter_1_F",
-            "C_Woman_casual_F"
-        ]
+        _maleCivilianClasses + _femaleCivilianClasses
     };
     private _gender = selectRandom _genderPool;
     private _civ = _grp createUnit [_gender, _pos, [], 5, "NONE"];
 
-    _civ setVariable ["CO_isFemale", (_gender == "C_Woman_casual_F")];
+    _civ setVariable ["CO_isFemale", _gender in _femaleCivilianClasses, true];
     _civ setVariable ["CO_civState", "walking"]; // walking | fleeing | compliant | fighting
     _civ setVariable ["CO_civAlertUntil", 0, false];
     _civ setVariable ["CO_homePos", _anchorPos, false];

@@ -70,7 +70,11 @@ CO_enduranceAimCoefSet = -1;
     if (_bars != CO_enduranceLastBars || _exhausted != CO_enduranceLastExhausted) then {
         CO_enduranceLastBars = _bars;
         CO_enduranceLastExhausted = _exhausted;
-        private _barStr = "[" + ("|" * _bars) + (" " * (20 - _bars)) + "]";
+        private _filled = "";
+        for "_i" from 1 to _bars do { _filled = _filled + "|" };
+        private _empty = "";
+        for "_i" from 1 to (20 - _bars) do { _empty = _empty + " " };
+        private _barStr = "[" + _filled + _empty + "]";
         private _color = if (_pct < 0.25) then {"#FF4444"} else {if (_pct < 0.6) then {"#FFAA00"} else {"#44FF44"}};
         private _label = if (_exhausted) then {
             "<t color='#FF2222'>EXHAUSTED</t>"

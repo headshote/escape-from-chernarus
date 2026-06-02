@@ -27,6 +27,7 @@ private _mkPoliceFoot = {
 
     for "_i" from 1 to 2 do {
         private _u = _grp createUnit ["B_Soldier_F", _pos, [], 0, "FORM"];
+        _u setVariable ["CO_faction", "POLICE", true];
         removeAllWeapons _u;
         removeAllItems _u;
         removeUniform _u;

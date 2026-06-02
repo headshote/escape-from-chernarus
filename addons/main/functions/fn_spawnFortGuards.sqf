@@ -19,7 +19,7 @@ private _count = if (_countOverride > -1) then {
 };
 
 private _grp = createGroup _side;
-_grp setVariable ["CO_faction", _faction];
+_grp setVariable ["CO_faction", _faction, true];
 
 for "_i" from 0 to (_count - 1) do {
     private _offset = [

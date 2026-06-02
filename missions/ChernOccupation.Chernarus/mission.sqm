@@ -4,12 +4,16 @@ class Mission
 	addOns[]=
 	{
 		"chernarus",
-		"A3_Characters_F"
+		"A3_Characters_F",
+		"cba_main",
+		"co_main"
 	};
 	addOnsAuto[]=
 	{
 		"chernarus",
-		"A3_Characters_F"
+		"A3_Characters_F",
+		"cba_main",
+		"co_main"
 	};
 	randomSeed=14867291;
 	class Intel
@@ -243,12 +247,16 @@ class Intro
 	addOns[]=
 	{
 		"chernarus",
-		"A3_Characters_F"
+		"A3_Characters_F",
+		"cba_main",
+		"co_main"
 	};
 	addOnsAuto[]=
 	{
 		"chernarus",
-		"A3_Characters_F"
+		"A3_Characters_F",
+		"cba_main",
+		"co_main"
 	};
 	randomSeed=6212512;
 	class Intel
@@ -267,12 +275,16 @@ class OutroWin
 	addOns[]=
 	{
 		"chernarus",
-		"A3_Characters_F"
+		"A3_Characters_F",
+		"cba_main",
+		"co_main"
 	};
 	addOnsAuto[]=
 	{
 		"chernarus",
-		"A3_Characters_F"
+		"A3_Characters_F",
+		"cba_main",
+		"co_main"
 	};
 	randomSeed=12784571;
 	class Intel
@@ -291,12 +303,16 @@ class OutroLoose
 	addOns[]=
 	{
 		"chernarus",
-		"A3_Characters_F"
+		"A3_Characters_F",
+		"cba_main",
+		"co_main"
 	};
 	addOnsAuto[]=
 	{
 		"chernarus",
-		"A3_Characters_F"
+		"A3_Characters_F",
+		"cba_main",
+		"co_main"
 	};
 	randomSeed=8124550;
 	class Intel

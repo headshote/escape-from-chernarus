@@ -28,7 +28,7 @@ _grp setVariable ["CO_aggroLoopActive", true, false];
 _grp setVariable ["CO_aggroAnchor", _anchorPos, false];
 _grp setVariable ["CO_aggroRadius", _radius, false];
 if (isNil { _grp getVariable "CO_faction" }) then {
-    _grp setVariable ["CO_faction", _faction, false];
+    _grp setVariable ["CO_faction", _faction, true];
 };
 
 [_grp] spawn {
@@ -52,7 +52,8 @@ if (isNil { _grp getVariable "CO_faction" }) then {
         // direct fireAtTarget commands to these guards if the recruit
         // tries to escape, so escape mechanics are not broken.
         // ----------------------------------------------------------------
-        if (!isNil "CO_airfieldCenter" && {_anchor distance2D CO_airfieldCenter < (CO_airfieldRadius + 50)}) then {
+        private _airfieldRadius = missionNamespace getVariable ["CO_airfieldRadius", 350];
+        if (!isNil "CO_airfieldCenter" && {_anchor distance2D CO_airfieldCenter < (_airfieldRadius + 50)}) then {
             // Skip aggression scanning entirely for training-staff groups.
             // They behave as ambient garrison; the trainingPhase script
             // owns engagement decisions for the airfield.
@@ -88,7 +89,7 @@ if (isNil { _grp getVariable "CO_faction" }) then {
 
             // Skip targets inside the airfield safe zone (training recruits
             // walking around the boot-camp grounds).
-            if (!isNil "CO_airfieldCenter" && {_u distance2D CO_airfieldCenter < (CO_airfieldRadius + 20)}) exitWith { false };
+            if (!isNil "CO_airfieldCenter" && {_u distance2D CO_airfieldCenter < (_airfieldRadius + 20)}) exitWith { false };
 
             private _ufac = group _u getVariable ["CO_faction", ""];
             if (_ufac in ["CRN_ENF","POLICE","CRN_FRONT","RUS_ADV"]) exitWith { false };

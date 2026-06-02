@@ -54,7 +54,7 @@ if (isNull _veh || isNull _driverGrp) exitWith {};
 #define BUS_APPROACH_TIMEOUT    90
 
 private _aggroRadius = missionNamespace getVariable ["CO_bus_aggroRadius", BUS_SCAN_RADIUS];
-private _maxCaptives = missionNamespace getVariable ["CO_bus_maxCaptives", 3];
+private _maxCaptives = (missionNamespace getVariable ["CO_bus_maxCaptives", 3]) max 1;
 
 private _routeWps = _veh getVariable ["CO_busRouteWps", []];
 if (count _routeWps == 0) then { _routeWps = [getPosATL _veh] };
@@ -346,7 +346,13 @@ while { alive _veh } do {
         !isNull _x && alive _x && captive _x
     };
     _veh setVariable ["CO_busCaptives", _aboard, true];
-    if (count _aboard >= _maxCaptives) then { continue };
+    if ((count _aboard) > 0 && { count _aboard >= _maxCaptives }) then {
+        if (!(_veh getVariable ["CO_busDeliveryScheduled", false]) &&
+            { (_veh getVariable ["CO_busState", "traveling"]) != "delivering" }) then {
+            [_aboard select 0, _escortGrp] call co_main_fnc_transportToDetention;
+        };
+        continue;
+    };
 
     // ====================================================================
     // GLOBAL IDLE-DISMOUNT TRIGGER
@@ -453,13 +459,12 @@ while { alive _veh } do {
                 // silently swallowed delivery whenever the dismount
                 // captured the player but the bus driver had been
                 // swapped or the escort leader was still walking back.
-                private _threshold = missionNamespace getVariable ["CO_busDetentionThreshold", 1];
                 private _liveCaps = (_veh getVariable ["CO_busCaptives", []]) select {
                     !isNull _x && alive _x && captive _x && (_x in _veh)
                 };
                 _veh setVariable ["CO_busCaptives", _liveCaps, true];
 
-                if (count _liveCaps >= _threshold) then {
+                if (count _liveCaps > 0) then {
                     // Make sure a driver is in the seat before handoff.
                     private _driverNow = driver _veh;
                     if (isNull _driverNow || !alive _driverNow) then {
@@ -471,10 +476,12 @@ while { alive _veh } do {
                     };
                     _veh setVariable ["CO_transportVehicle", _veh, true];
                     _escortGrp setVariable ["CO_transportVehicle", _veh, true];
-                    [_liveCaps select 0, _escortGrp] spawn co_main_fnc_transportToDetention;
+                    [_liveCaps select 0, _escortGrp] call co_main_fnc_transportToDetention;
                 };
 
-                _veh setVariable ["CO_busState", "traveling", true];
+                if ((_veh getVariable ["CO_busState", "traveling"]) != "delivering") then {
+                    _veh setVariable ["CO_busState", "traveling", true];
+                };
                 _huntTarget = objNull;
                 _lastDoMove = 0;
                 _idleSince = time;

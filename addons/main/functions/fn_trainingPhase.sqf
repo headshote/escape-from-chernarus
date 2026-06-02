@@ -2,6 +2,9 @@
 params ["_conscript"];
 private _isPlayer = isPlayer _conscript;
 private _trainTime = missionNamespace getVariable ["CO_conscript_trainTime", 600];
+if (isNil "CO_trainingFieldPos") then { CO_trainingFieldPos = [2160, 12800, 0] };
+if (isNil "CO_airfieldCenter") then { CO_airfieldCenter = [2100, 12800, 0] };
+if (isNil "CO_airfieldRadius") then { CO_airfieldRadius = 350 };
 
 _conscript setPos (CO_trainingFieldPos vectorAdd [random 60 - 30, random 60 - 30, 0]);
 _conscript setVariable ["CO_detainPhase", "training", true];

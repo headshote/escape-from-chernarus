@@ -28,7 +28,7 @@ private _staticPlan = [
 ];
 
 private _staticGrp = createGroup west;
-_staticGrp setVariable ["CO_faction", "CRN_FRONT"];
+_staticGrp setVariable ["CO_faction", "CRN_FRONT", true];
 
 {
     _x params ["_off", "_dir", "_cls"];
@@ -42,6 +42,7 @@ _staticGrp setVariable ["CO_faction", "CRN_FRONT"];
     _sb setDir _dir;
 
     private _gunner = _staticGrp createUnit ["B_Soldier_F", _p, [], 0, "NONE"];
+    _gunner setVariable ["CO_faction", "CRN_FRONT", true];
     _gunner moveInGunner _veh;
     _gunner setBehaviour "AWARE";
     _gunner setCombatMode "YELLOW";
@@ -58,9 +59,10 @@ private _squadAnchors = [
 {
     private _anchor = _x;
     private _grp = createGroup west;
-    _grp setVariable ["CO_faction", "CRN_FRONT"];
+    _grp setVariable ["CO_faction", "CRN_FRONT", true];
     for "_i" from 1 to 6 do {
         private _u = _grp createUnit ["B_Soldier_F", _anchor, [], 4, "FORM"];
+        _u setVariable ["CO_faction", "CRN_FRONT", true];
         _u setSkill 0.55;
         _u setBehaviour "AWARE";
         _u setCombatMode "YELLOW";

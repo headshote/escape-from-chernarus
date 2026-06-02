@@ -4,10 +4,16 @@
 // ============================================================
 params ["_unit"];
 
-// Tag faction so scripts can distinguish ENF from FRONT/RUS
-if (isNil { _unit getVariable "CO_faction" }) then {
-    _unit setVariable ["CO_faction", "CRN_ENF"];
+// Tag faction so scripts can distinguish ENF from FRONT/RUS. The value must
+// be public because player HandleDamage EHs run on the player client, not on
+// the server that spawned the AI.
+private _grp = group _unit;
+private _faction = _unit getVariable ["CO_faction", ""];
+if (_faction isEqualTo "") then {
+    _faction = _grp getVariable ["CO_faction", "CRN_ENF"];
 };
+_grp setVariable ["CO_faction", _faction, true];
+_unit setVariable ["CO_faction", _faction, true];
 
 // Strip default loadout and equip occupation-style gear
 removeAllWeapons _unit;
@@ -77,7 +83,7 @@ _unit addEventHandler ["Hit", {
 // On killed — decrement front counter if applicable, replenish russians 1:1
 _unit addEventHandler ["Killed", {
     params ["_killed"];
-    private _fac = _killed getVariable ["CO_faction",""];
+    private _fac = _killed getVariable ["CO_faction", (group _killed) getVariable ["CO_faction",""]];
     if (_fac == "CRN_FRONT") then {
         CO_front_unitsRemaining = (CO_front_unitsRemaining - 1) max 0;
         publicVariable "CO_front_unitsRemaining";

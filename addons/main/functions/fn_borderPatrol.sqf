@@ -34,7 +34,7 @@ CO_fnc_isNearBorder = {
 
         if (_type == "land") then {
             private _grp = createGroup west;
-            _grp setVariable ["CO_faction", "CRN_ENF"];
+            _grp setVariable ["CO_faction", "CRN_ENF", true];
             private _atv = "B_Quadbike_01_F" createVehicle _pos;
             private _driver = _grp createUnit ["B_Soldier_F", _pos, [], 0, "CARGO"];
             _driver moveInDriver _atv;
@@ -47,7 +47,7 @@ CO_fnc_isNearBorder = {
 
         if (_type == "boat") then {
             private _grp = createGroup west;
-            _grp setVariable ["CO_faction", "CRN_ENF"];
+            _grp setVariable ["CO_faction", "CRN_ENF", true];
             private _boat = "B_Boat_Armed_01_minigun_F" createVehicle _pos;
             private _driver = _grp createUnit ["B_Soldier_F", _pos, [], 0, "CARGO"];
             _driver moveInDriver _boat;

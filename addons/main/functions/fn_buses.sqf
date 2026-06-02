@@ -1,1 +1,12 @@
-// fn_buses.sqf\n// DEPRECATED \u2014 bus spawning is now handled by fn_buildBusRoutes + fn_spawnAllBuses.\n// This file is kept as a stub.\ndiag_log "[CO] fn_buses stub \u2014 bus spawn handled by fn_spawnAllBuses.";
+// fn_buses.sqf
+// Deprecated compatibility shim. Bus spawning is now handled by
+// fn_buildBusRoutes + fn_spawnAllBuses.
+
+diag_log "[CO] fn_buses called; redirecting to fn_spawnAllBuses.";
+
+if (isServer) then {
+    if (isNil "CO_busRoutes" || { CO_busRoutes isEqualTo [] }) then {
+        [] call co_main_fnc_buildBusRoutes;
+    };
+    [] call co_main_fnc_spawnAllBuses;
+};

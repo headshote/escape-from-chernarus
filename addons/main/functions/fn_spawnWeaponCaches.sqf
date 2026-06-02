@@ -75,12 +75,16 @@ private _lootTables = [
     // Not a guaranteed roll; rural caches are more likely to hold a worker
     // disguise, town caches a farmer/journalist disguise.
     private _disguisePool = ["U_C_Workman_01", "U_C_Poor_1", "U_C_Farmer", "U_C_Driver_1"];
+    private _disguiseItems = [];
     if (random 1 < 0.6) then {
-        _box addItemCargoGlobal [selectRandom _disguisePool, 1];
+        private _disguiseItem = selectRandom _disguisePool;
+        _box addItemCargoGlobal [_disguiseItem, 1];
+        _disguiseItems pushBack _disguiseItem;
     };
 
     // Mark as cache for interaction system
     _box setVariable ["CO_isWeaponCache", true, true];
-    _box setVariable ["CO_disguiseTaken", false, true];
+    _box setVariable ["CO_disguiseItems", _disguiseItems, true];
+    _box setVariable ["CO_disguiseTaken", _disguiseItems isEqualTo [], true];
     CO_weaponCaches pushBack _box;
 } forEach _cacheDefs;

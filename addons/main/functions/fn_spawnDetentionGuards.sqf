@@ -18,7 +18,7 @@ for "_i" from 0 to 5 do {
     private _angle = _i * 60;
     private _gPos  = _pos getPos [20, _angle];
     private _grp   = createGroup west;
-    _grp setVariable ["CO_faction", "CRN_ENF"];
+    _grp setVariable ["CO_faction", "CRN_ENF", true];
     private _u = _grp createUnit ["B_Soldier_F", _gPos, [], 2, "FORM"];
     [_u] call co_main_fnc_initHostileUnit;
     // Short patrol loop around their post

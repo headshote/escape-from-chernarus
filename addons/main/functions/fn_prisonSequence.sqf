@@ -13,10 +13,10 @@ if (_isPlayer) then {
 
 [{ // wait 5 minutes or until escaped
     params ["_c", "_detainTime"];
-    !(captive _c) || time > (_c getVariable ["CO_detainStartTime", 0]) + _detainTime
+    !alive _c || !(captive _c) || time > (_c getVariable ["CO_detainStartTime", 0]) + _detainTime
 }, {
     params ["_c"];
-    if (captive _c) then {
+    if (alive _c && captive _c) then {
         // Not escaped — transfer to training
         [_c] call co_main_fnc_transportToTraining;
     };

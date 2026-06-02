@@ -25,7 +25,7 @@ CO_policeTownPosts = [
         private _spawnPos = _center getPos [30 + random 60, random 360];
         private _car  = "C_Offroad_01_F" createVehicle _spawnPos;
         private _grp  = createGroup west;
-        _grp setVariable ["CO_faction", "POLICE"];
+        _grp setVariable ["CO_faction", "POLICE", true];
 
         private _driver = _grp createUnit ["B_Soldier_F", _spawnPos, [], 0, "CARGO"];
         _driver moveInDriver _car;
@@ -62,6 +62,9 @@ CO_policeTownPosts = [
         // passenger as the on-foot chaser.
         _driver setVariable ["CO_isPoliceDriver", true, true];
         _partner setVariable ["CO_isPoliceDriver", false, true];
+        {
+            _x setVariable ["CO_faction", "POLICE", true];
+        } forEach [_driver, _partner];
 
         // Cruise patrol loop around town. Slow LIMITED speed + SAFE
         // behaviour so they actually look around at civilians rather
@@ -82,6 +85,7 @@ CO_policeTownPosts = [
         // Mark the patrol car so dismount logic can reach it.
         _car setVariable ["CO_policePatrolCar", _grp, true];
         _grp setVariable ["CO_policePatrolCar", _car, true];
+        _grp setVariable ["CO_transportVehicle", _car, true];
 
         // Behaviour loop: check all players for wanted status
         [_grp, _car, _center, _radius] spawn {
@@ -124,6 +128,7 @@ CO_policeTownPosts = [
                                        _hasFired ||
                                        (_p getVariable ["CO_isAWOL", false]);
                     if (!_trigger) then { continue };
+                    if (_grp getVariable ["CO_policeFootChaseActive", false]) then { continue };
 
                     if ([leader _grp, _p] call co_main_fnc_policeRecognise) then {
                         // Stop the car and dismount both officers so
@@ -150,11 +155,11 @@ CO_policeTownPosts = [
                         !captive _x &&
                         !(_x getVariable ["CO_isFemale", false]) &&
                         !(_x getVariable ["CO_captureInProgress", false]) &&
-                        (group _x getVariable ["CO_faction", ""] == "")
+                        !(_grp getVariable ["CO_policeFootChaseActive", false]) &&
+                        ((group _x) getVariable ["CO_faction", ""] == "")
                     };
                     if (count _civCandidates > 0) then {
                         private _civ = selectRandom _civCandidates;
-                        _civ setVariable ["CO_captureInProgress", true, true];
                         [_civ] call co_main_fnc_installNonLethalDamage;
                         diag_log format ["[CO] Police random stop: %1 by patrol near %2.", _civ, mapGridPosition (leader _grp)];
                         // Use the shared foot-chase routine: stop car,
@@ -185,7 +190,6 @@ CO_policeTownPosts = [
                         _cand = [_cand, [], { _x distance2D (leader _grp) }, "ASCEND"] call BIS_fnc_sortBy;
                         private _target = _cand select 0;
                         [_target] call co_main_fnc_installNonLethalDamage;
-                        _target setVariable ["CO_captureInProgress", true, true];
                         [_grp, _car, _target] spawn co_main_fnc_policeFootChase;
                         diag_log format ["[CO] Police proactive foot stop near %1 targeting %2.", mapGridPosition (leader _grp), _target];
                     };

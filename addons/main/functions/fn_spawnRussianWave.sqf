@@ -3,21 +3,22 @@ if (isNil "CO_rus_waveCount") then { CO_rus_waveCount = 0; };
 
 // Population cap — prevent unbounded RUS_ADV growth (round 9 fix:
 // Krasnostav FPS drop). If the live RUS_ADV count is already at or
-// above CO_rus_maxActive, skip this wave entirely instead of piling
-// on +30 more units.
+// above CO_rus_maxActive, skip this wave entirely. Also clamp partial
+// waves to the remaining slots so one wave cannot overshoot the cap.
 private _maxActive = missionNamespace getVariable ["CO_rus_maxActive", 80];
 private _activeCount = {
     alive _x &&
     ((group _x) getVariable ["CO_faction",""] == "RUS_ADV")
 } count allUnits;
-if (_activeCount >= _maxActive) exitWith {
+private _remainingSlots = (_maxActive - _activeCount) max 0;
+if (_remainingSlots <= 0) exitWith {
     diag_log format ["[CO] RUS_ADV wave skipped (%1/%2 active).", _activeCount, _maxActive];
 };
 
 private _spawnX     = missionNamespace getVariable ["CO_rus_spawnX", 13000];
 private _northX     = missionNamespace getVariable ["CO_rus_spawnXNorth", 12800];
-private _armorFreq  = missionNamespace getVariable ["CO_rus_armorFrequency", 3];
-private _tankFreq   = missionNamespace getVariable ["CO_rus_tankFrequency", 4];
+private _armorFreq  = (missionNamespace getVariable ["CO_rus_armorFrequency", 3]) max 1;
+private _tankFreq   = (missionNamespace getVariable ["CO_rus_tankFrequency", 4]) max 1;
 
 // Lane allocation — the north (Krasnostav) lane gets the heaviest weight
 // because that's the player's spawn target. South/central are lighter.
@@ -27,15 +28,16 @@ private _lanes = [
     ["south",   [_spawnX - random 120,  3300 + random 260 - 130, 0], 0.22]
 ];
 
-private _waveSize = (missionNamespace getVariable ["CO_rus_unitsPerWave", 24]) max 3;
+private _requestedWaveSize = (missionNamespace getVariable ["CO_rus_unitsPerWave", 24]) max 1;
+private _waveSize = _requestedWaveSize min _remainingSlots;
 
 private _spawnGroup = {
     params ["_lane", "_count"];
     private _laneName = _lane select 0;
     private _spawnPos = _lane select 1;
     private _grp = createGroup east;
-    _grp setVariable ["CO_faction", "RUS_ADV"];
-    _grp setVariable ["CO_advanceLane", _laneName];
+    _grp setVariable ["CO_faction", "RUS_ADV", true];
+    _grp setVariable ["CO_advanceLane", _laneName, true];
     _grp setVariable ["CO_advanceSpawnPos", _spawnPos, true];
 
     for "_i" from 1 to _count do {
@@ -43,6 +45,7 @@ private _spawnGroup = {
             selectRandom ["O_Soldier_F","O_Soldier_AR_F","O_Medic_F","O_Soldier_GL_F","O_Soldier_LAT_F"],
             _spawnPos, [], 8, "FORM"
         ];
+        _u setVariable ["CO_faction", "RUS_ADV", true];
         _u setVariable ["CO_advanceLane", _laneName, true];
         _u setUnitPos "UP";
         _u setBehaviour "COMBAT";
@@ -64,31 +67,50 @@ private _spawnGroup = {
     _grp
 };
 
-// Allocate per-lane infantry counts by weight
+// Allocate per-lane infantry counts by weight, bounded by the remaining cap.
 private _waveGroups = [];
+private _infantrySpawned = 0;
+private _remainingInfantry = _waveSize;
 {
-    private _laneCount = round (_waveSize * (_x select 2));
-    if (_laneCount < 2) then { _laneCount = 2 };
-    private _grp = [_x, _laneCount] call _spawnGroup;
-    _waveGroups pushBack _grp;
+    private _laneCount = if (_forEachIndex == ((count _lanes) - 1)) then {
+        _remainingInfantry
+    } else {
+        (round (_waveSize * (_x select 2))) min _remainingInfantry
+    };
+    if (_laneCount > 0) then {
+        private _grp = [_x, _laneCount] call _spawnGroup;
+        _waveGroups pushBack _grp;
+        _infantrySpawned = _infantrySpawned + _laneCount;
+        _remainingInfantry = (_remainingInfantry - _laneCount) max 0;
+    };
 } forEach _lanes;
 
 CO_rus_waveCount = CO_rus_waveCount + 1;
+private _activeAfterInfantry = _activeCount + _infantrySpawned;
+private _apcSpawned = false;
+private _tankSpawned = false;
 
 // ---- APC support every Nth wave (north lane prioritized) ----
-if (CO_rus_waveCount % _armorFreq == 0) then {
+if ((CO_rus_waveCount % _armorFreq == 0) && { _activeAfterInfantry + 3 <= _maxActive }) then {
     private _apcLane = _lanes select 0; // north — Krasnostav axis
     private _apcPos = (_apcLane select 1) vectorAdd [-40, 0, 0];
     private _apcGrp = createGroup east;
-    _apcGrp setVariable ["CO_faction", "RUS_ADV"];
-    _apcGrp setVariable ["CO_advanceLane", _apcLane select 0];
+    _apcGrp setVariable ["CO_faction", "RUS_ADV", true];
+    _apcGrp setVariable ["CO_advanceLane", _apcLane select 0, true];
+    _apcGrp setVariable ["CO_advanceSpawnPos", _apcPos, true];
     private _apcCls = selectRandom ["O_APC_Wheeled_02_rcws_F","O_APC_Tracked_02_cannon_F"];
     private _apc = _apcCls createVehicle _apcPos;
     private _driver = _apcGrp createUnit ["O_Soldier_F", _apcPos, [], 0, "CARGO"];
+    _driver setVariable ["CO_faction", "RUS_ADV", true];
+    _driver setVariable ["CO_advanceLane", _apcLane select 0, true];
     _driver moveInDriver _apc;
     private _gunner = _apcGrp createUnit ["O_Soldier_F", _apcPos, [], 0, "CARGO"];
+    _gunner setVariable ["CO_faction", "RUS_ADV", true];
+    _gunner setVariable ["CO_advanceLane", _apcLane select 0, true];
     _gunner moveInGunner _apc;
     private _cmd    = _apcGrp createUnit ["O_Soldier_F", _apcPos, [], 0, "CARGO"];
+    _cmd setVariable ["CO_faction", "RUS_ADV", true];
+    _cmd setVariable ["CO_advanceLane", _apcLane select 0, true];
     _cmd moveInCommander _apc;
     _apc addEventHandler ["Killed", {
         params ["_killed"];
@@ -97,28 +119,38 @@ if (CO_rus_waveCount % _armorFreq == 0) then {
         };
     }];
     [_apcGrp] call co_main_fnc_russianAdvanceWaypoints;
+    _activeAfterInfantry = _activeAfterInfantry + 3;
+    _apcSpawned = true;
 };
 
 // ---- Main battle tank every Nth wave (Krasnostav axis) ----
-if (CO_rus_waveCount % _tankFreq == 0) then {
+if ((CO_rus_waveCount % _tankFreq == 0) && { _activeAfterInfantry + 3 <= _maxActive }) then {
     private _tankLane = _lanes select 0; // north — Krasnostav
     private _tankPos = (_tankLane select 1) vectorAdd [-80, 30, 0];
     private _tankGrp = createGroup east;
-    _tankGrp setVariable ["CO_faction", "RUS_ADV"];
-    _tankGrp setVariable ["CO_advanceLane", _tankLane select 0];
+    _tankGrp setVariable ["CO_faction", "RUS_ADV", true];
+    _tankGrp setVariable ["CO_advanceLane", _tankLane select 0, true];
+    _tankGrp setVariable ["CO_advanceSpawnPos", _tankPos, true];
     private _tank = "O_MBT_02_cannon_F" createVehicle _tankPos;
     private _td = _tankGrp createUnit ["O_Soldier_F", _tankPos, [], 0, "CARGO"];
+    _td setVariable ["CO_faction", "RUS_ADV", true];
+    _td setVariable ["CO_advanceLane", _tankLane select 0, true];
     _td moveInDriver _tank;
     private _tg = _tankGrp createUnit ["O_Soldier_F", _tankPos, [], 0, "CARGO"];
+    _tg setVariable ["CO_faction", "RUS_ADV", true];
+    _tg setVariable ["CO_advanceLane", _tankLane select 0, true];
     _tg moveInGunner _tank;
     private _tc = _tankGrp createUnit ["O_Soldier_F", _tankPos, [], 0, "CARGO"];
+    _tc setVariable ["CO_faction", "RUS_ADV", true];
+    _tc setVariable ["CO_advanceLane", _tankLane select 0, true];
     _tc moveInCommander _tank;
     [_tankGrp] call co_main_fnc_russianAdvanceWaypoints;
+    _tankSpawned = true;
 };
 
 diag_log format [
-    "[CO] Russian wave %1: north spawnX=%2 weave size=%3, APC=%4, Tank=%5.",
-    CO_rus_waveCount, _northX, _waveSize,
-    (CO_rus_waveCount % _armorFreq == 0),
-    (CO_rus_waveCount % _tankFreq == 0)
+    "[CO] Russian wave %1: active=%2/%3 infantry=%4/%5, APC=%6, Tank=%7.",
+    CO_rus_waveCount, _activeCount, _maxActive, _infantrySpawned, _requestedWaveSize,
+    _apcSpawned,
+    _tankSpawned
 ];

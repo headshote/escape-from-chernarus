@@ -35,7 +35,7 @@ _unit addEventHandler ["HandleDamage", {
     if (isNull _shooter) exitWith { _damage };
     if (_shooter == _target) exitWith { _damage };
 
-    private _shooterFac = group _shooter getVariable ["CO_faction", ""];
+    private _shooterFac = _shooter getVariable ["CO_faction", (group _shooter) getVariable ["CO_faction", ""]];
     private _isTCK = _shooterFac in ["CRN_ENF","POLICE"];
 
     // Russians (RUS_ADV) and CRN_FRONT keep lethal behavior so the
@@ -106,7 +106,7 @@ _unit addEventHandler ["Hit", {
     if (isNull _target || !alive _target) exitWith {};
     private _src = if (!isNull _instigator) then { _instigator } else { _source };
     if (isNull _src || _src == _target) exitWith {};
-    private _fac = group _src getVariable ["CO_faction", ""];
+    private _fac = _src getVariable ["CO_faction", (group _src) getVariable ["CO_faction", ""]];
     if !(_fac in ["CRN_ENF","POLICE"]) exitWith {};
     // Lethal border guards bypass the Hit-EH clamp too.
     if ((group _src) getVariable ["CO_lethalShooter", false]) exitWith {};

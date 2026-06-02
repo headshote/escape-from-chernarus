@@ -39,14 +39,34 @@ if (isNull _bus || _bus isKindOf "Man") exitWith {
 };
 
 private _busDriver = driver _bus;
-if (isNull _busDriver) exitWith {
-    diag_log "[CO] transportToDetention aborted: no bus driver available.";
+if (isNull _busDriver) then {
+    private _driverGrp = if (!isNull _capturingGrp) then { _capturingGrp } else { createGroup west };
+    private _spawnPos = (getPosATL _bus) vectorAdd [3, 0, 0];
+    _busDriver = _driverGrp createUnit ["B_Soldier_F", _spawnPos, [], 0, "FORM"];
+    [_busDriver] call co_main_fnc_initHostileUnit;
+    _busDriver assignAsDriver _bus;
+    _busDriver moveInDriver _bus;
+    diag_log "[CO] transportToDetention: spawned fallback driver for transport vehicle.";
 };
 
 _captive setCaptive true;
 
 if (_bus getVariable ["CO_isBusPatrol", false]) exitWith {
+    _captive assignAsCargo _bus;
     _captive moveInCargo _bus;
+    if (isPlayer _captive) then {
+        [_captive, _bus] remoteExec ["moveInCargo", _captive];
+    };
+    for "_attempt" from 0 to 6 do {
+        sleep 0.5;
+        if (_captive in _bus) exitWith {};
+        _captive setPos (getPosATL _bus);
+        _captive assignAsCargo _bus;
+        _captive moveInCargo _bus;
+        if (isPlayer _captive) then {
+            [_captive, _bus] remoteExec ["moveInCargo", _captive];
+        };
+    };
     [leader _capturingGrp, _captive, 60, true] call co_main_fnc_applyKnockout;
 
     private _busCaptives = (_bus getVariable ["CO_busCaptives", []]) select {
@@ -243,8 +263,27 @@ if (_bus getVariable ["CO_isBusPatrol", false]) exitWith {
     };
 };
 
-// Load captive into bus
+// Load captive into bus. For player units the server may not own the unit, so
+// retry on the player's client as well and verify before the transport starts.
+_captive assignAsCargo _bus;
 _captive moveInCargo _bus;
+if (isPlayer _captive) then {
+    [_captive, _bus] remoteExec ["moveInCargo", _captive];
+};
+private _loaded = false;
+for "_attempt" from 0 to 6 do {
+    sleep 0.5;
+    if (_captive in _bus) exitWith { _loaded = true };
+    _captive setPos (getPosATL _bus);
+    _captive assignAsCargo _bus;
+    _captive moveInCargo _bus;
+    if (isPlayer _captive) then {
+        [_captive, _bus] remoteExec ["moveInCargo", _captive];
+    };
+};
+if (!_loaded) then {
+    diag_log format ["[CO] transportToDetention: failed to load %1 into transport after retries.", _captive];
+};
 
 // Optionally cruise for other players (30s) then drive to detention
 [_bus, _captive] spawn {
