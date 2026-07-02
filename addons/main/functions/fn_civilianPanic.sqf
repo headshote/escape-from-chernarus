@@ -26,6 +26,8 @@ private _civs = (_center nearEntities [["Man"], _radius]) select {
     _x doMove ((getPosATL _x) getPos [80 + random 60, _dir]);
 } forEach _civs;
 
-if (!isNull _source) then {
-    playSound3D ["A3\Sounds_F\sfx\alarm.wss", _source, false, getPosASL _source, 1.1, 0.9, 180];
+// Sound cue only if the siren path resolved (R2-c); a missing file
+// fails silently, so don't pretend there's audio when there isn't.
+if (!isNull _source && (missionNamespace getVariable ["CO_sirenSoundPath", ""]) != "") then {
+    playSound3D [CO_sirenSoundPath, _source, false, getPosASL _source, 1.1, 0.9, 180];
 };

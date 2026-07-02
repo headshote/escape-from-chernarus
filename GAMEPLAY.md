@@ -299,6 +299,21 @@ All defaults live in `missions/ChernOccupation.Chernarus/CO_adminDefaults.sqf`.
   Clients start with `ItemMap`, `ItemCompass`, `ItemWatch` only — `ItemGPS`, `ItemRadio`,
   `B_UavTerminal` are stripped on init (per spec point 16).
 
+## Round R2 Changes — you can read the threat
+
+- **Always-on threat HUD** (top right): your stamina bar, your **WANTED stars**
+  (persistent legal standing — crimes and captures), and a colored **posture chip**
+  showing what the security forces are doing about you *right now*: CALM, COOLING
+  (residual attention draining), WATCHED, ID CHECK, PURSUIT, HUNTED — HIDE,
+  WEAPONS FREE, SHOOT TO KILL. It never fades out — the old flashing tooltip is gone.
+- **Toasts on every threat transition** ("PURSUIT — run or hide!", "You've broken
+  contact — stay out of sight.", "The heat has died down.") plus the music stinger.
+- **Heat now actually cools down** on dedicated servers (decay runs server-side), so
+  the chip honestly returns to CALM after you lie low.
+- **Sirens are audible everywhere**: the siren sound is verified at load and falls
+  back to horn blasts if the audio asset is missing, so a responding police car is
+  never silent.
+
 ## Round R1 Changes — the city reacts
 
 - **Violence has consequences.** Killing or wounding TCK/police *in view of a witness*

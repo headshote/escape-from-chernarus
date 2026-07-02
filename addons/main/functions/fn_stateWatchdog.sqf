@@ -55,6 +55,31 @@ CO_stateWatchdogRunning = true;
     while { true } do {
         sleep 30;
 
+        // ---- 0. Escalation expiry + heat decay (server-authoritative,
+        // repair R2-a / audit R2-17). The old client-side decay in
+        // fn_getEscalationState only ran inside the local player's HUD
+        // loop, so states never expired on a dedicated server.
+        {
+            private _p = _x;
+            if (!alive _p) then { continue };
+
+            private _state = _p getVariable ["CO_escalationState", "UNAWARE"];
+            private _until = _p getVariable ["CO_escalationUntil", 0];
+            if (!(_state in ["UNAWARE", "CLEAR"]) && time > _until) then {
+                [_p, "CLEAR", "expired", 0, grpNull] call co_main_fnc_setEscalationState;
+                _state = "CLEAR";
+            };
+
+            if (_state in ["UNAWARE", "CLEAR"]) then {
+                private _heat = _p getVariable ["CO_heatLevel", 0];
+                if (_heat > 0) then {
+                    // 30 s tick → half of the per-minute decay rate.
+                    private _decay = (missionNamespace getVariable ["CO_heat_decayPerMinute", 5]) * 0.5;
+                    _p setVariable ["CO_heatLevel", (_heat - _decay) max 0, true];
+                };
+            };
+        } forEach allPlayers;
+
         // ---- 1. Ghost targets: stuck CO_captureInProgress ------------
         // A unit flagged in-progress but free (not captive, not KO'd,
         // not mid-wrangle, not inside a transport) is invisible to every

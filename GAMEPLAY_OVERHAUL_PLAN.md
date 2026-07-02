@@ -581,16 +581,27 @@ again, R4 finishes the remaining original phases against that harness.
 
 ### Phase R2 — Make it legible (fixes symptom 4)
 
-- **R2-a. One threat model, one display.** Wanted = the persistent legal standing
+> **Status 2026-07-02: R2 code complete**, PBO rebuilt and validated. Marked
+> `[CODE]` pending a live session. New: `ui/threat_hud.hpp` (RscTitles layer,
+> idd 9400) + `RscStructuredText` base in `config.cpp`; `fn_heatHud` rewritten
+> onto a persistent cutRsc layer (wanted stars + posture chip + stamina, always
+> visible, no hintSilent); escalation expiry + heat decay moved into the server
+> maintenance loop in `fn_stateWatchdog` (`fn_getEscalationState` is now
+> read-only); `fn_chaseStinger` shows auto-fading transition toasts on a
+> dedicated layer alongside the throttled music; siren path is runtime-verified
+> with `fileExists` and falls back to config-derived horn blasts
+> (`fn_policeResponseFX`, `fn_civilianPanic`).
+
+- `[CODE]` **R2-a. One threat model, one display.** Wanted = the persistent legal standing
   (crimes, captures); heat/escalation = the *current* posture toward you. HUD: stars
   = wanted; a colored state chip (CALM/WATCHED/ID CHECK/PURSUIT/SEARCH/WEAPONS) =
   escalation; both always visible. Replace `hintSilent` with a persistent `cutRsc`
   layer (dedicated RscTitle HUD in `ui/`), stamina bar included. Server-side heat
   decay loop (fixes R2-17).
-- **R2-b. Event toasts:** short systemChat/toast lines on every transition the player
+- `[CODE]` **R2-b. Event toasts:** short systemChat/toast lines on every transition the player
   caused ("Witnessed: murder of an enforcer — wanted increased", "ID check passed",
   "They lost you"). The tension loop must be readable without the docs.
-- **R2-c. Sound sanity pass:** verify `A3\Sounds_F\sfx\alarm.wss` actually resolves
+- `[CODE]` **R2-c. Sound sanity pass:** verify `A3\Sounds_F\sfx\alarm.wss` actually resolves
   on dedicated (RPT check); fall back to horn-pulse siren if not.
 
 ### Phase R3 — Verification harness (why Round 1 "passed" while broken)

@@ -199,6 +199,28 @@ class RscCheckBox {
     colorBackground[] = {0,0,0,0};
 };
 
+class RscStructuredText {
+    access = 0;
+    type = 13;
+    idc = -1;
+    style = 0;
+    x = 0;
+    y = 0;
+    w = 0.3;
+    h = 0.1;
+    size = 0.035;
+    text = "";
+    colorText[] = {1,1,1,1};
+    colorBackground[] = {0,0,0,0};
+    shadow = 1;
+    class Attributes {
+        font = "RobotoCondensed";
+        color = "#ffffff";
+        align = "left";
+        shadow = 1;
+    };
+};
+
 class RscButton {
     access = 0;
     type = 1;
@@ -231,3 +253,4 @@ class RscButton {
 #include "ui\lockpick_dialog.hpp"
 #include "ui\wrangle_dialog.hpp"
 #include "ui\admin_panel.hpp"
+#include "ui\threat_hud.hpp"

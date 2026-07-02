@@ -1,25 +1,27 @@
 // ============================================================
-// fn_getEscalationState.sqf
-// Returns a suspect's current doctrine state, expiring stale states.
+// fn_getEscalationState.sqf — READ-ONLY doctrine-state accessor
+//
+// Returns a suspect's current escalation state, treating an
+// expired state as CLEAR *without writing anything*.
+//
+// Repair R2-a / audit R2-17: the old version decayed heat and
+// broadcast state changes from whoever happened to call it —
+// which in practice was only the local player's HUD loop, so NPC
+// states never expired and heat never decayed on a dedicated
+// server unless a client was staring at its own HUD. Expiry and
+// heat decay are now owned by the server maintenance loop in
+// fn_stateWatchdog; this accessor is safe to call from anywhere.
+//
 // params: [_target]
+// returns: STRING state
 // ============================================================
 params [["_target", objNull]];
 if (isNull _target) exitWith { "UNAWARE" };
 
 private _state = _target getVariable ["CO_escalationState", "UNAWARE"];
 private _until = _target getVariable ["CO_escalationUntil", 0];
-if (_state != "UNAWARE" && _state != "CLEAR" && time > _until) then {
+if (!(_state in ["UNAWARE", "CLEAR"]) && time > _until) then {
     _state = "CLEAR";
-    _target setVariable ["CO_escalationState", _state, true];
 };
 
-if (_state in ["UNAWARE", "CLEAR"]) then {
-    private _lastDecayAt = _target getVariable ["CO_heatLastDecayAt", time];
-    if ((time - _lastDecayAt) > 5) then {
-        private _heat = _target getVariable ["CO_heatLevel", 0];
-        private _decay = (missionNamespace getVariable ["CO_heat_decayPerMinute", 5]) * ((time - _lastDecayAt) / 60);
-        _target setVariable ["CO_heatLevel", (_heat - _decay) max 0, true];
-        _target setVariable ["CO_heatLastDecayAt", time, false];
-    };
-};
 _state

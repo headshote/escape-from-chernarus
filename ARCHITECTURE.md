@@ -200,6 +200,13 @@ every 10 s. If >500 m from `CO_rus_advanceFront` X-coord, marks as deserter.
 | CO_WrangleDialog | 9201 | `ui/wrangle_dialog.hpp` |
 | CO_LockpickDialog | 9202 | `ui/lockpick_dialog.hpp` |
 | CO_AdminPanel | 9300 | `ui/admin_panel.hpp` |
+| CO_ThreatHUD (RscTitles) | 9400 | `ui/threat_hud.hpp` |
+
+`CO_ThreatHUD` is not a dialog: it is a persistent `RscTitles` layer shown via
+`cutRsc` on the `CO_ThreatHUDLayer` BIS layer by `fn_heatHud`. Its single
+structured-text control (idc 9401) is positioned at runtime with safezone
+coordinates and re-cut automatically if the display is lost (respawn/load).
+Transition toasts use a second layer, `CO_ToastLayer` (`fn_chaseStinger`).
 
 Dialog references use `uiNamespace getVariable` to retrieve the display object
 set in `onLoad`. Example: `uiNamespace getVariable "CO_AdminPanelDlg"`.
@@ -278,6 +285,30 @@ VS Code will show false-positive CBA namespace errors. These do not affect build
 4. Rebuild `co_main.pbo`.
 
 ---
+
+## Round R2 — Make it legible (repair plan Phase R2)
+
+- **Persistent threat HUD.** `ui/threat_hud.hpp` (RscTitles `CO_ThreatHUD`, idd 9400)
+  + new `RscStructuredText` base class in `config.cpp`. `fn_heatHud` rewritten: renders
+  stamina + WANTED stars (wanted only) + a colored posture chip (CALM / COOLING /
+  WATCHED / ID CHECK / PURSUIT / HUNTED / WEAPONS FREE / SHOOT TO KILL) on a dedicated
+  always-visible cutRsc layer. No more `hintSilent` (which faded out and fought the
+  hint channel). `fn_enduranceBar` keeps writing `CO_enduranceHudText`; only the HUD
+  renders it.
+- **Server-authoritative escalation lifecycle (audit R2-17).** Expiry of escalation
+  states and heat decay moved into the `fn_stateWatchdog` maintenance loop (30 s tick,
+  half of `CO_heat_decayPerMinute` per tick). `fn_getEscalationState` is now a pure
+  read (treats expired as CLEAR without writing) — previously decay only ran inside
+  the local player's HUD loop, so nothing expired on a dedicated server.
+- **Transition toasts.** `fn_chaseStinger` (invoked by `fn_setEscalationState` only on
+  real transitions) shows a 4-second auto-fading toast on `CO_ToastLayer`
+  (serial-guarded so rapid transitions don't clip newer toasts) plus the throttled
+  music stinger.
+- **Siren sound sanity (R2-c).** `fn_policeResponseFX` resolves the siren path once at
+  runtime via `fileExists` over a candidate list (cached in `CO_sirenSoundPath`,
+  logged); if none resolves it falls back to periodic horn blasts using the vehicle's
+  config-defined horn weapon. `fn_civilianPanic` only plays audio when the path
+  resolved.
 
 ## Round R1 — Make the city react (repair plan Phase R1)
 
