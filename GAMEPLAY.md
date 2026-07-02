@@ -299,6 +299,31 @@ All defaults live in `missions/ChernOccupation.Chernarus/CO_adminDefaults.sqf`.
   Clients start with `ItemMap`, `ItemCompass`, `ItemWatch` only — `ItemGPS`, `ItemRadio`,
   `B_UavTerminal` are stripped on init (per spec point 16).
 
+## Round R1 Changes — the city reacts
+
+- **Violence has consequences.** Killing or wounding TCK/police *in view of a witness*
+  (any security unit or NPC civilian with line-of-sight within 140 m) raises wanted
+  (+60 kill / +40 wound), triggers an armed response from every security group within
+  200 m — including full weapons-free dismounts from nearby TCK trucks — and raises the
+  town's alert level for ~10 minutes (faster suspicion, more ID checks). Unwitnessed
+  takedowns remain clean: stealth is a real playstyle.
+- **Gunfire is heard.** Shots near any TCK/police unit report the shooter (small wanted
+  bump, SUSPICIOUS state, alert-net entry) even without line-of-sight.
+- **TCK trucks fight back.** Shooting at a truck's squad dumps the entire escort,
+  weapons-free, hunting the shooter (stun rounds — the capture pipeline, not a kill).
+  Full trucks now drive to detention instead of freezing in place.
+- **Police act like police.** Foot gendarmerie pairs now run the same brain as patrol
+  cars: suspicion, hails, pursuit, and — new — **random document checks** of players
+  (a compliant check is a 15-second tension beat; fleeing one is +20 wanted and a
+  chase). Cars always resume their patrol route after an engagement, and a server-side
+  watchdog un-sticks any patrol/vehicle/flag a failed script leaves behind.
+- **Checkpoint guards keep their post.** Chases leash at 250 m; beyond that the
+  runner's position is radioed to mobile units instead of the checkpoint emptying
+  itself. Guards return to their posts after every engagement.
+- **Fair grabs.** Only one squad can wrangle you at a time (no more instant captures
+  from overlapping grabs), and patrols now prefer players/armed/hot suspects over the
+  nearest random NPC civilian.
+
 ## Round 9 Changes
 
 - **Police polish.** Patrol cars now cruise on `LIMITED`/`SAFE`. On detain-trigger, the new

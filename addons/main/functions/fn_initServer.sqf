@@ -26,6 +26,8 @@
     "CO_chase_speedCoef","CO_chase_aiStaminaDrain","CO_chase_tackleRange","CO_chase_tackleTime",
     "CO_tracker_speedCoef","CO_checkpoint_maxCount","CO_border_innerJitter","CO_heat_decayPerMinute",
     "CO_kpiLogInterval","CO_maxSimultaneousChases",
+    "CO_crime_killWanted","CO_crime_woundWanted","CO_crime_gunfireWanted",
+    "CO_checkpoint_chaseLeash","CO_police_chaseDeadline",
     "CO_adminUIDs"
 ];
 sleep 0.5;
@@ -102,6 +104,9 @@ sleep 0.5;
 // civilian density, and patrol behaviour. 6x runs a 24h Chernarus day in 4h.
 setTimeMultiplier 6;
 
+// Watchdog first: it recovers stuck flags/vehicles from every other
+// subsystem, so it must survive even if a later step fails.
+["stateWatchdog", { [] call co_main_fnc_stateWatchdog; }] call _launchStep;
 ["spawnAllBuses", { [] call co_main_fnc_spawnAllBuses; }] call _launchStep;
 ["tckGlobalAggression", { [] call co_main_fnc_tckGlobalAggression; }] call _launchStep;
 ["civilianAI", { [] call co_main_fnc_civilianAI; }] call _launchStep;

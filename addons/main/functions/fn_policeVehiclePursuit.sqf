@@ -70,6 +70,21 @@ while {
         _done = true;
     };
 
+    // Replace a dead/missing driver mid-pursuit (audit R2-16).
+    _driver = driver _car;
+    if (isNull _driver || !alive _driver) then {
+        private _foot = _claimed select { alive _x };
+        if !(_foot isEqualTo []) then {
+            private _newDriver = _foot select 0;
+            if (vehicle _newDriver != _newDriver && vehicle _newDriver != _car) then {
+                moveOut _newDriver;
+            };
+            _newDriver moveInDriver _car;
+            _driver = driver _car;
+        };
+    };
+    if (isNull _driver) exitWith { _done = false };
+
     [_target, "PURSUIT", _source, _priority, _grp] call co_main_fnc_setEscalationState;
 
     private _tVeh = vehicle _target;
@@ -115,12 +130,22 @@ while {
 };
 
 _car setVariable ["CO_responseActive", false, true];
-{
-    [_x, _token] call co_main_fnc_releaseUnit;
-} forEach _claimed;
 
 if (!_done && alive _target) then {
     [_target, "SEARCH", _source, 50, _grp] call co_main_fnc_setEscalationState;
+    [_target, getPosATL (vehicle _target), _source, 60] call co_main_fnc_alertPublish;
 };
+
+// A pursuit that did NOT hand off to a foot chase must put the patrol
+// back on its route — this was the "police car parked dead in the
+// middle of the road" bug (audit R2-2). Foot-chase handoffs resume
+// patrol at the end of fn_policeFootChase instead.
+if (!_done) then {
+    [_grp, _car] call co_main_fnc_policeResumePatrol;
+};
+
+{
+    [_x, _token] call co_main_fnc_releaseUnit;
+} forEach _claimed;
 
 _grp setVariable ["CO_vehiclePursuitActive", false, false];

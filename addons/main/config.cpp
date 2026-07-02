@@ -126,6 +126,12 @@ class CfgFunctions {
             class checkpointControl {};
             class borderZone       {};
             class civilianPanic    {};
+            class reportCrime      {};
+            class installCrimeWitness {};
+            class runWrangle       {};
+            class stateWatchdog    {};
+            class policeBrain      {};
+            class policeResumePatrol {};
             class buildTrainingGround {};
             class showEscapeUnlockScreen {};
             class crowdResistance  {};

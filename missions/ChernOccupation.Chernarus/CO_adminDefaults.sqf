@@ -80,6 +80,13 @@ CO_heat_decayPerMinute          = 5;
 CO_kpiLogInterval               = 120;
 CO_maxSimultaneousChases        = 6;
 
+// --- Crime & witness system (repair R1-a) ---
+CO_crime_killWanted             = 60;     // wanted added for a WITNESSED kill of TCK/police
+CO_crime_woundWanted            = 40;     // ... for a witnessed wounding
+CO_crime_gunfireWanted          = 10;     // ... per reported gunshot (throttled)
+CO_checkpoint_chaseLeash        = 250;    // max chase distance from a checkpoint before radio handoff
+CO_police_chaseDeadline         = 180;    // seconds before a police foot chase converts to search
+
 // --- Admin ---
 CO_adminUIDs                    = [76561198054336866];     // add Steam64 UIDs allowed to open the admin panel
 
@@ -106,5 +113,7 @@ CO_adminUIDs                    = [76561198054336866];     // add Steam64 UIDs a
     "CO_chase_speedCoef","CO_chase_aiStaminaDrain","CO_chase_tackleRange","CO_chase_tackleTime",
     "CO_tracker_speedCoef","CO_checkpoint_maxCount","CO_border_innerJitter","CO_heat_decayPerMinute",
     "CO_kpiLogInterval","CO_maxSimultaneousChases",
+    "CO_crime_killWanted","CO_crime_woundWanted","CO_crime_gunfireWanted",
+    "CO_checkpoint_chaseLeash","CO_police_chaseDeadline",
     "CO_adminUIDs"
 ];

@@ -256,18 +256,27 @@ multiplier — everything after it reuses the same primitives.
 
 ### Implementation Dashboard
 
-Status key: `[DONE]` complete, `[PART]` partially complete, `[TODO]` not started.
+Status key: `[DONE]` complete **and verified in game**, `[CODE]` code exists but
+failed or is unverified in live play, `[PART]` partially complete, `[TODO]` not started.
 
-Overall: `[##########] 100%`
+> **2026-07-02 playtest verdict (Chernogorsk): the city loop does not work.**
+> Police drive by or park dead in the road, TCK ignore being massacred at
+> point-blank range, pedestrian police are inert, and the HUD shows
+> contradictory heat/wanted. Root causes are catalogued in
+> **Part 4 — Round 2 Audit** below. The previous "100%" claims were
+> code-written claims, not play-verified claims. Do not trust a phase as done
+> until its Part 3 acceptance test passes in a live session.
 
-| Phase | Status | Progress | Code state |
+Overall (play-verified): `[##--------] ~20%`
+
+| Phase | Status | Verified in game | Notes |
 |---|---:|---:|---|
-| Phase 0 — Foundation | `[DONE]` | `[##########]` | Claims, chase movement, AI stamina, proximity tackle, alert net, search behavior, and escalation doctrine implemented. |
-| Phase 1 — Police | `[DONE]` | `[##########]` | Suspicion, hail/ID checks, vehicle pursuit, backup dispatch, sirens/lights, roadblocks, and search handoff implemented. |
-| Phase 2 — TCK Trucks | `[DONE]` | `[##########]` | LKP-seeded hunts, adaptive quiet, fireteam split, intercept pressure, roadblocks, no-teleport recovery, and panic flavor implemented. |
-| Phase 3 — Checkpoints | `[DONE]` | `[##########]` | Choke scoring, legal passage, bypass pursuit, barrier consequences, spikes, pursuit cars, and night flare dressing implemented. |
-| Phase 4 — Border & Forest | `[DONE]` | `[##########]` | Live detection, layered border zone, patrol belts, sensor gaps, tripflares, trackers, heli manhunt, and ambience implemented. |
-| Phase 5 — Feedback & Tuning | `[DONE]` | `[##########]` | Heat HUD, chase stingers, difficulty presets, public tuning values, chase caps, and KPI logging implemented. |
+| Phase 0 — Foundation | `[CODE]` | No | Helpers exist and are called, but chase-cap logic is broken (R2-13), stuck-flag leaks lobotomize controllers (R2-3/4), no watchdog. |
+| Phase 1 — Police | `[CODE]` | **Failed** | Suspicion thresholds unreachable in normal play; vehicle pursuit never resumes patrol; urban foot police have no controller at all. |
+| Phase 2 — TCK Trucks | `[CODE]` | **Failed** | No under-fire reaction (mounted TCK are skipped by every aggression path); captive-cap deadlocks the state machine; nearest-target rule means players are never picked in crowds. |
+| Phase 3 — Checkpoints | `[CODE]` | No | Control loop + pursuit car exist; per-tick COMBAT/RED spam will ruin chases; no leash; unverified. |
+| Phase 4 — Border & Forest | `[CODE]` | No | Unverified; same thread-death and flag-leak risks apply. |
+| Phase 5 — Feedback & Tuning | `[PART]` | **Failed** | HUD renders via fading hintSilent (flashes, then vanishes); heat vs wanted contradiction confuses rather than informs; wanted economy has no crime inputs. |
 
 Step log:
 - `[DONE]` 2026-07-02: Phase 0 helper registration and first chase retrofits.
@@ -359,5 +368,262 @@ not hopeless).
 2. ~~`setAnimSpeedCoef 1.12` on any unit in an active chase; reset after.~~ Done through `fn_chaseMove`/`fn_releaseUnit` for retrofitted chase controllers.
 3. ~~Police chase deadline 75 s → 180 s.~~ Done in `fn_policeFootChase`, with search conversion on lost sight.
 4. ~~Border response loops: scan from live leader position instead of camp center.~~ Done in `fn_buildWestBorderEnforcement`.
-5. ~~Police excluded from `fn_tckGlobalAggression` (biggest single "distraction" source).~~ Done.
+5. ~~Police excluded from `fn_tckGlobalAggression` (biggest single "distraction" source).~~ Done — **but see R2-5: this orphaned the urban police foot patrols.**
 6. ~~Siren + blue light on responding police cars.~~ Done through `fn_policeResponseFX`.
+
+---
+
+# Part 4 — Round 2 Audit (post-playtest) & Repair Plan
+
+Playtest report (Chernogorsk, 2026-07-02): cops drive by or park dead mid-road and do
+nothing; pedestrian cops only hassle NPC civilians; a full magdump into a TCK truck
+cabin (2 dead, 1 wounded, 2 witness trucks nearby) produced **zero** response; HUD
+showed `Heat [***--]` alongside `Wanted 0`.
+
+Every one of those observations is reproduced by the code below. This part is in three
+sections: **4.1** the exact defects behind each symptom, **4.2** latent bugs found on
+the way, **4.3** the repair plan (phases R1–R4) with acceptance tests that must pass
+in a live session before anything is marked done again.
+
+## 4.1 Why the city felt dead — defect-by-symptom
+
+### Symptom 1 — "Cops drive by, never get out; sometimes stop dead and do nothing"
+
+**R2-1. A clean player can never trip the suspicion meter — and there is no other
+police interaction left.** `fn_policePatrols.sqf:104-128`: suspicion needs ~5–10
+*consecutive* 5-second ticks of unbroken line-of-sight from the (moving) patrol car to
+reach the 60 threshold; a single obscured tick decays −15, being 190 m away decays
+−10. A cruising car holds LOS on a walking player for maybe 2–3 ticks. Meanwhile the
+old random traffic-stop mechanic (`CO_police_carStopChance` on players) was removed in
+the rewrite — the remaining random stop (`fn_policePatrols.sqf:164`) fires ~once per
+2 min per car **and only targets NPC civilians**. Net: at wanted 0 the police have
+*no* code path that ever engages a player. "Safe at wanted 0" was the design, but
+with no ID-check pressure at all, the city reads as "police are decorative."
+
+**R2-2. After a vehicle pursuit ends, the patrol car is abandoned wherever it stopped.**
+`fn_policeVehiclePursuit.sqf:115-126`: on timeout/failure it releases claims and sets
+a SEARCH state — but never issues the resume-patrol epilogue that `fn_policeFootChase`
+has (reboard, `setCurrentWaypoint`, `forceSpeed -1`, SAFE/LIMITED). The car keeps its
+last `doMove` destination and parks there forever. That is the "stopped dead in the
+middle of the road, doing nothing" car.
+
+**R2-3. One SQF error permanently lobotomizes a patrol — and there is no watchdog.**
+The chase threads set sticky state *before* doing risky work:
+`CO_policeFootChaseActive` / `CO_vehiclePursuitActive` (checked at
+`fn_policePatrols.sqf:78-79` — while true, the patrol brain skips **everything**),
+`_car forceSpeed 0`, `CO_responseActive`, and broadcast `CO_captureInProgress` on the
+target. If the thread dies (any runtime error in `chaseMove` / `searchBehavior` /
+`kpi` / remote wrangle), none of that is ever cleared: the group never scans again,
+the car never moves again, and — worst — the *player* keeps
+`CO_captureInProgress = true`, which makes **every aggression system on the map skip
+them forever** (bus scan `fn_busAgroLoop.sqf:575`, tck global
+`fn_tckGlobalAggression.sqf:133`, checkpoint alert `fn_checkpointAlert.sqf:8`,
+police random stop). One early broken chase = the player becomes a ghost for the rest
+of the session. This is the most likely master-cause of "nobody ever tried me."
+(Note: the try/catch wrappers in `fn_initServer` only catch `throw` — SQF runtime
+errors abort the thread without being caught.)
+
+**R2-4. `CO_responseActive` leak keeps the siren/light loop alive forever** on the
+same failure paths (set at `fn_policeFootChase.sqf:44`, cleared only on clean exit).
+
+### Symptom 2 — "Pedestrian cops busy chasing civilians, never tried me"
+
+**R2-5. Urban POLICE foot patrols have no brain.** `fn_spawnUrbanFootPatrols.sqf:5-7`
+says they "rely on existing aggression systems (tckGlobalAggression +
+checkpointAlert)" — but this same commit **removed POLICE from tckGlobalAggression**
+(`fn_tckGlobalAggression.sqf:64-66`) and nothing replaced it. Gendarmerie foot pairs
+now walk waypoints and can never engage anyone. The "cops" you saw chasing civilians
+were the CRN_ENF (TCK) foot groups.
+
+**R2-6. Nearest-target rule means players never get picked in a crowd.**
+`fn_tckGlobalAggression.sqf:155-156` and the bus hunters sort candidates purely by
+distance. In a populated Chernogorsk there is almost always an NPC civilian man
+closer to the patrol than you are, so TCK foot groups spend the whole session
+knocking out civilians and statistically never select a player. There is no weighting
+for `isPlayer`, wanted, heat, or being armed.
+
+### Symptom 3 — "Magdumped a TCK cabin, killed 2 — nothing happened"
+
+**R2-7. Mounted TCK are unreachable by every reaction path.** The only
+return-fire/retaliation logic lives in `fn_tckGlobalAggression`, which (a) skips the
+entire bus group while its truck is alive (`:78-81`), and (b) skips any mounted unit
+(`:86`). `fn_busAgroLoop` itself has **no under-fire handling at all** — its own
+header comment (lines 31–35) describes Hit/Killed handlers flipping escorts to
+AWARE/RED, but that code does not exist anywhere in the file. The `Hit` EH from
+`fn_initHostileUnit` dutifully records `CO_retaliateTarget` on the group — and nothing
+ever consumes it for bus groups. Result: you can execute a mounted squad point-blank
+and the survivors sit in their seats.
+
+**R2-8. Violence has no consequences in the wanted economy.** Grep of all
+`CO_wantedLevel` writers: capture events, checkpoint interactions, fleeing an ID
+check, desertion. **Killing or wounding TCK/police raises nothing** — no wanted, no
+heat, no `alertPublish`, no witness reaction from the two trucks sitting next to the
+massacre. `CO_hasFiredWeapon` is set client-side on firing, but only the police
+suspicion sweep reads it (and only within 190 m of a patrol car). The single most
+extreme act of defiance in the game is invisible to the game.
+
+**R2-9. Bus captive-cap deadlock.** `fn_busAgroLoop.sqf:396-401`: once the truck
+holds `CO_bus_maxCaptives` (3) NPC captives, the main loop `continue`s **before** the
+state machine — but delivery to detention is only triggered from the reboard path
+*inside* the state machine. If the cap is reached while dismounted (trivial in a
+dense town during a 60 s hunt window), the truck freezes in `dismounted` state
+forever: engine idling, escorts' hunt threads expiring, everyone standing around the
+truck. This is the "TCK just standing around their truck / sitting in an idling
+truck" picture.
+
+### Symptom 4 — "Heat [***--] but Wanted 0 — is this broken?"
+
+**R2-10. Heat and wanted are two disconnected currencies and the HUD max()es them.**
+`fn_heatHud.sqf:21`: stars = `max(wanted, heat) / 20`. Heat is written by
+`fn_setEscalationState` (hail = 25, checkpoint inspection = 35, fled-inspection = 65,
+failed papers = 75) with **max-merge, never reduced by events**, decaying only 5/min
+once the state expires to CLEAR. Driving anywhere near a checkpoint once → 3 stars
+for ~13 minutes, while wanted stays 0 because wanted only moves on captures. The two
+numbers answer different questions and the HUD never says which. (Your `***--` +
+`Wanted 0` = you brushed a checkpoint inspection trigger, probably without noticing
+the systemChat line.)
+
+**R2-11. The HUD is a fading hint, not a HUD.** `hintSilent` fades out after a few
+seconds and `fn_heatHud` only re-renders **when the text changes**
+(`fn_heatHud.sqf:46-49`) — so the display appears for one hint-lifetime per change
+and then vanishes: the "tooltip that flashes occasionally." It also shares the single
+hint channel with anything else that hints.
+
+## 4.2 Latent bugs found during the audit (will bite even after 4.1 is fixed)
+
+- **R2-12. checkpointAlert reintroduces command-stomping on itself:**
+  `fn_checkpointAlert.sqf:120-125` re-issues `doTarget` + `setCombatMode RED` +
+  `setBehaviour COMBAT` on every claimed unit **every 0.7 s** — the exact per-tick
+  spam RC1 was about, and COMBAT behaviour makes chasers bound/crawl tactically, so
+  checkpoint chases will look broken the moment they're actually exercised. Also no
+  leash: static checkpoint guards will sprint cross-country for 180 s.
+- **R2-13. `fn_claimUnit` chase-cap is dead code:** the inner
+  `if (...) exitWith { false }` (`fn_claimUnit.sqf:60-62`) exits only the
+  `then {}` block, not the function — execution falls through and grants the claim.
+  The `CO_maxSimultaneousChases` cap never rejects anything.
+- **R2-14. Wrangle minigame has no mutex:** bus hunters run one thread per escort
+  aimed at the same target; several can tackle-trigger in the same second, each
+  remoteExec'ing `wrangleMinigame`. The second `createDialog` fails →
+  `CO_wrangleResult` defaults to "captured". Player gets captured by a dialog bug.
+- **R2-15. Checkpoint guards firing at occupied vehicles**
+  (`fn_checkpointAlert.sqf:150-157`) can destroy the vehicle — occupants die from the
+  explosion, bypassing the non-lethal doctrine entirely.
+- **R2-16. `fn_policeVehiclePursuit` driver handling:** `_driver` resolved once; if
+  the driver dies mid-pursuit nobody replaces him (loop keeps doMove'ing a corpse's
+  car).
+- **R2-17. Escalation states only expire via `fn_getEscalationState`, which runs
+  exclusively in the player's own HUD loop** — NPC states never expire server-side,
+  and if the HUD isn't running (dedicated server objects) heat never decays.
+
+## 4.3 Repair plan
+
+Ordering rule: R1 makes the city *react* (the playtest failures), R2 makes the game
+*legible*, R3 builds the verification harness so "done" can't drift from reality
+again, R4 finishes the remaining original phases against that harness.
+
+### Phase R1 — Make the city react (fixes symptoms 1–3)
+
+> **Status 2026-07-02: R1 code complete** (all items a–h below), PBO rebuilt,
+> `validate_build.ps1` + `validate_mission.ps1` passed. Marked `[CODE]` — each
+> item's acceptance test still needs a live Chernogorsk session before it can be
+> crossed off as `[DONE]`. New functions: `fn_reportCrime`,
+> `fn_installCrimeWitness`, `fn_runWrangle`, `fn_stateWatchdog`,
+> `fn_policeBrain`, `fn_policeResumePatrol`.
+
+- `[CODE]` **R1-a. Crime & witness system (new `fn_reportCrime`).** Server-side `Killed`/`Hit`
+  EH on every TCK/POLICE unit (extend `fn_initHostileUnit`) and a `FiredNear`-based
+  gunshot witness check: if any TCK/POLICE/civilian has LOS within ~120 m of the
+  crime, the shooter gets wanted +40 (wound) / +60 (kill, cumulative to 100), heat to
+  match, an `alertPublish` with high heat, and the town alert level rises. Unwitnessed
+  crimes stay unwitnessed — sneaky kills remain viable. This single system makes the
+  magdump scenario produce: both witness trucks dump escorts, police converge, WEAPONS
+  posture. *Acceptance: kill a TCK in view of another truck → visible armed response
+  within 15 s, wanted ≥ 60, HUD shows it.*
+- `[CODE]` **R1-b. TCK under-fire doctrine in `fn_busAgroLoop`.** Group-level `Hit`/`Killed`
+  reaction (consume the existing `CO_retaliateTarget` group var): immediate emergency
+  dismount (reuse the existing full-dismount block regardless of state), escorts claim
+  at priority 90, WEAPONS escalation via the chase kit against the attacker.
+  Remove the mounted-unit blanket skip for retaliation cases in
+  `fn_tckGlobalAggression`. *Acceptance: shoot at any TCK truck → full dismount +
+  return pressure within 10 s.*
+- `[CODE]` **R1-c. Fix the bus captive-cap deadlock:** when the cap is reached, force the
+  delivery path (reboard + `transportToDetention`) instead of `continue`
+  (`fn_busAgroLoop.sqf:401`). *Acceptance: a truck that reaches 3 captives drives to
+  detention within 60 s.*
+- `[CODE]` **R1-d. Stuck-state watchdog (server loop, 30 s tick).** Every sticky flag gets a
+  timestamp when set (`CO_policeFootChaseActive`, `CO_vehiclePursuitActive`,
+  `CO_responseActive`, `CO_captureInProgress`, `CO_grpEngaging`, `forceSpeed 0` cars,
+  broken `CO_busState`). The watchdog clears any flag older than its owner's maximum
+  legitimate lifetime, restores `forceSpeed -1`, and logs `[CO][WATCHDOG]` so thread
+  deaths become visible instead of permanent. *Acceptance: kill a chase thread
+  artificially → patrol resumes within 60 s; player never stays permanently invisible.*
+- `[CODE]` **R1-e. Vehicle pursuit epilogue:** shared `fn_policeResumePatrol` (reboard +
+  waypoint restore + SAFE/LIMITED + forceSpeed −1) called from every exit path of
+  both pursuit functions. *Acceptance: after any failed pursuit the car is cruising
+  again within 60 s.*
+- `[CODE]` **R1-f. Urban police controller:** run the same suspicion/hail/ID-check brain for
+  foot police groups (extract the patrol-loop body from `fn_policePatrols` into a
+  shared `fn_policeBrain` taking [group, car-or-null]); foot police respond to
+  alertNet entries within 400 m. Restore player random ID checks using
+  `CO_police_carStopChance` (a compliant check should be a 15-second tension beat,
+  not a capture). *Acceptance: standing near a foot patrol at wanted 0 eventually
+  produces a papers check; at wanted 60+ it produces a chase.*
+- `[CODE]` **R1-g. Target selection weighting:** replace nearest-only sorting in
+  `fn_tckGlobalAggression` and bus hunters with score = distance − (isPlayer ? 40 : 0)
+  − heat×0.5 − (armed ? 25 : 0). Players stop being statistically invisible in
+  crowds. *Acceptance: player and NPC civ equidistant from a TCK patrol → player is
+  picked when heat > 0.*
+- `[CODE]` **R1-h. Wrangle mutex + grab ownership:** `CO_wrangleActive` (timestamped) on the
+  target; only one grab owner may open the dialog; other chasers hold cordon during
+  the wrangle. Fix the `fn_claimUnit` cap fall-through (restructure without nested
+  `exitWith`). Fix checkpointAlert per-tick RED/COMBAT spam (posture once, AWARE, let
+  `chaseMove` own movement) and add a 250 m leash + return-to-post.
+
+### Phase R2 — Make it legible (fixes symptom 4)
+
+- **R2-a. One threat model, one display.** Wanted = the persistent legal standing
+  (crimes, captures); heat/escalation = the *current* posture toward you. HUD: stars
+  = wanted; a colored state chip (CALM/WATCHED/ID CHECK/PURSUIT/SEARCH/WEAPONS) =
+  escalation; both always visible. Replace `hintSilent` with a persistent `cutRsc`
+  layer (dedicated RscTitle HUD in `ui/`), stamina bar included. Server-side heat
+  decay loop (fixes R2-17).
+- **R2-b. Event toasts:** short systemChat/toast lines on every transition the player
+  caused ("Witnessed: murder of an enforcer — wanted increased", "ID check passed",
+  "They lost you"). The tension loop must be readable without the docs.
+- **R2-c. Sound sanity pass:** verify `A3\Sounds_F\sfx\alarm.wss` actually resolves
+  on dedicated (RPT check); fall back to horn-pulse siren if not.
+
+### Phase R3 — Verification harness (why Round 1 "passed" while broken)
+
+- **R3-a. Scenario self-tests.** `fn_qaScenarios` (admin-triggered or
+  `-serverMod` param): spawns a dummy target with configurable wanted/heat near a
+  chosen system (police car, TCK truck, checkpoint, border camp), drives it on a
+  scripted path, and logs `[CO][QA] PASS/FAIL <scenario> <reason>` by asserting
+  observable outcomes (dismount happened, chase started, capture or search occurred,
+  car resumed patrol, flags cleared). Run after every build; a failing scenario blocks
+  "done".
+- **R3-b. RPT triage as a gate.** Any script error in a session is a P0 (per R2-3, one
+  error = one lobotomized controller). `tools/check_rpt.ps1` greps the newest RPT for
+  `Error in expression` / `[CO][WATCHDOG]` / missing-sound lines and prints a summary.
+- **R3-c. KPI assertions.** Extend `fn_kpi` logging with derived rates; a healthy
+  session must show chases started > 0, catch-rate 40–70 %, zero watchdog recoveries.
+
+### Phase R4 — Finish the original vision (re-scoped, against the harness)
+
+- Checkpoints: verify legal-passage flow end-to-end with the pursuit car; leash;
+  spike-strip consequence chain (C2–C4 acceptance from Part 3).
+- Town lockdown (P3) after violent crimes: temporary suspicion multiplier + extra
+  foot patrols for 10 min in the affected town — pairs with R1-a.
+- Border: run the Part 3 Phase-4 acceptance walk (patrol contact per km, tripflare +
+  manhunt at night, scouted-gap crossing) and fix what fails; audit `fn_borderZone`,
+  `fn_borderAlert` rewrites with the same claim/flag-leak lens as 4.1.
+- Feel: chase stingers only on state *transitions the player can see*; difficulty
+  presets exposed in the admin panel; final KPI-driven tuning pass.
+
+### Suggested implementation order
+
+1. R1-d watchdog + R1-h claim/wrangle/spam fixes (they de-risk everything else),
+2. R1-a crime system + R1-b TCK under-fire + R1-c deadlock (the playtest's core rage),
+3. R1-e/f/g police lifecycle + urban brain + targeting,
+4. R2 HUD/legibility,
+5. R3 harness, then re-run the Chernogorsk playtest script before touching R4.

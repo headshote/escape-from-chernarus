@@ -279,6 +279,47 @@ VS Code will show false-positive CBA namespace errors. These do not affect build
 
 ---
 
+## Round R1 — Make the city react (repair plan Phase R1)
+
+- **Crime & witness system.** `fn_installCrimeWitness` (applied by
+  `fn_initHostileUnit` + both police spawners) adds Hit/Killed/FiredNear EHs feeding
+  `fn_reportCrime`: witnessed kills/wounds of TCK/police raise wanted (+60/+40),
+  set WEAPONS/PURSUIT escalation, bump a per-town alert level (`CO_townAlertLevels`,
+  10 min expiry), and arm every CRN_ENF/POLICE group within 200 m — bus groups get a
+  `CO_busEmergency*` order. Unwitnessed kills stay free (stealth is viable).
+- **Bus under-fire doctrine.** `fn_busAgroLoop` main loop consumes the bus emergency:
+  full escort dismount (no held-back guard), hunters seeded with the attacker at
+  claim priority 90, weapons-free (`fireAtTarget` stun volleys through the
+  non-lethal filter) when blood was drawn.
+- **Bus captive-cap deadlock fixed.** Cap reached → forced detention delivery (or
+  forced reboard when dismounted) instead of `continue`-ing past the state machine.
+- **State watchdog.** `fn_stateWatchdog` (30 s tick, launched first in
+  `fn_initServer`) recovers stuck `CO_captureInProgress`, stale wrangle locks, dead
+  police chase flags, ghost sirens, parked patrol cars, and frozen bus states; every
+  recovery logs `[CO][WATCHDOG]` — a healthy RPT has none.
+- **Police lifecycle.** Shared `fn_policeBrain` (suspicion sweep, hails, random ID
+  checks via `CO_police_carStopChance`, alert-net response, AWOL handling, town-alert
+  scaling) drives BOTH car patrols (`fn_policePatrols`) and urban foot police
+  (`fn_spawnUrbanFootPatrols` — previously brainless). `fn_policeResumePatrol` is the
+  mandatory epilogue for `fn_policeFootChase` (now car-optional) and
+  `fn_policeVehiclePursuit` (which also replaces dead drivers mid-pursuit).
+- **Serialized wrangle.** `fn_runWrangle` mutexes the minigame (`CO_wrangleActive`);
+  police/checkpoint/bus grabs all route through it — concurrent grabs no longer
+  auto-capture via a failed createDialog.
+- **Arbiter cap fixed.** `fn_claimUnit` chase cap actually rejects now (the old
+  `exitWith`-in-`then{}` fall-through granted claims anyway); player-priority (>= 70)
+  chases are exempt from the cap. Bus hunters share one token per dismount event.
+- **Checkpoint chases.** `fn_checkpointAlert` posture set once (AWARE, not per-tick
+  COMBAT/RED spam), 250 m leash (`CO_checkpoint_chaseLeash`) with alert-net handoff,
+  return-to-post epilogue, and vehicle fire aimed at the driver instead of the hull.
+- **Target weighting.** `fn_tckGlobalAggression` and bus hunters score targets
+  (players −40, heat −0.5/pt, armed −25) instead of picking the nearest civ; TCK
+  retaliation now runs before the mounted-unit skip (mounted units dismount to fight).
+- New functions registered in `CfgFunctions`: `reportCrime`, `installCrimeWitness`,
+  `runWrangle`, `stateWatchdog`, `policeBrain`, `policeResumePatrol`. New tunables in
+  `CO_adminDefaults.sqf`: `CO_crime_killWanted/woundWanted/gunfireWanted`,
+  `CO_checkpoint_chaseLeash`, `CO_police_chaseDeadline`.
+
 ## Round 9 � Population caps + dismount fixes
 
 - **RUS_ADV population cap.** `CO_rus_maxActive` (default 80, broadcast via `fn_initServer` + `CO_adminDefaults.sqf`). `fn_spawnRussianWave` and `fn_spawnRussianReplacement` both short-circuit when the live RUS_ADV count is at or above the cap. This bounds the AI simulation cost in the north sector (Krasnostav) where the wave + 1:1 replacement spawners previously produced unbounded growth.

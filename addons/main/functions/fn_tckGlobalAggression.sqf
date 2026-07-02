@@ -83,13 +83,14 @@ diag_log "[CO] tckGlobalAggression: starting global failsafe loop (radius=60m, t
             {
                 private _u = _x;
                 if (isNull _u || !alive _u) then { continue };
-                if (vehicle _u != _u) then { continue };  // skip mounted
                 if (_u getVariable ["CO_knockedOut", false]) then { continue };
                 if (_u getVariable ["CO_vehicleChaseDriver", false]) then { continue };
 
-                // Short retaliation window after the group is attacked.
-                // This adds the missing "shoot back" response players
-                // expect when they gun down TCK/police at close-mid range.
+                // Retaliation FIRST, before the mounted skip (audit R2-7):
+                // units shot at while sitting in a vehicle dismount and
+                // return fire instead of staring through the windshield.
+                // (Bus escort groups are skipped above — fn_busAgroLoop's
+                // emergency dismount owns their under-fire response.)
                 private _retUntil = _grp getVariable ["CO_retaliateUntil", 0];
                 private _retTarget = _grp getVariable ["CO_retaliateTarget", objNull];
                 if (
@@ -99,6 +100,14 @@ diag_log "[CO] tckGlobalAggression: starting global failsafe loop (radius=60m, t
                     !captive _retTarget &&
                     (_u distance2D _retTarget) < 140
                 ) then {
+                    [_retTarget] call co_main_fnc_installNonLethalDamage;
+                    if (vehicle _u != _u) then {
+                        private _v = vehicle _u;
+                        unassignVehicle _u;
+                        _u action ["GetOut", _v];
+                        doGetOut _u;
+                        moveOut _u;
+                    };
                     _u setBehaviour "COMBAT";
                     _u setCombatMode "RED";
                     _u enableAI "AUTOTARGET";
@@ -109,6 +118,8 @@ diag_log "[CO] tckGlobalAggression: starting global failsafe loop (radius=60m, t
                     _u fireAtTarget [_retTarget, currentWeapon _u];
                     continue;
                 };
+
+                if (vehicle _u != _u) then { continue };  // skip mounted
 
                 // TRAINING SAFE ZONE: units physically standing inside the
                 // NWAF airfield (= training staff: drill instructor, minders,
@@ -152,7 +163,16 @@ diag_log "[CO] tckGlobalAggression: starting global failsafe loop (radius=60m, t
                 };
                 if (count _cands == 0) then { continue };
 
-                private _sorted = [_cands, [], { _x distance2D _u }, "ASCEND"] call BIS_fnc_sortBy;
+                // Weighted pick (R1-g): players, hot suspects, and armed men
+                // out-rank the nearest random NPC civilian, so patrols stop
+                // being statistically blind to players in crowded towns.
+                private _sorted = [_cands, [], {
+                    private _score = _x distance2D _u;
+                    if (isPlayer _x) then { _score = _score - 40 };
+                    _score = _score - (((_x getVariable ["CO_heatLevel", 0]) * 0.5) min 40);
+                    if (primaryWeapon _x != "" || handgunWeapon _x != "") then { _score = _score - 25 };
+                    _score
+                }, "ASCEND"] call BIS_fnc_sortBy;
                 private _target = _sorted select 0;
                 private _token = format ["tck_global_%1_%2", netId _u, floor (time * 10)];
                 private _priority = 40;

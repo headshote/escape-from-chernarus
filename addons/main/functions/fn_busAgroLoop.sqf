@@ -115,9 +115,15 @@ diag_log format [
 // escort so they hunt in parallel without blocking the main loop.
 // ---------------------------------------------------------------
 private _spawnEscortHunter = {
-    params ["_u", "_bus", "_huntUntilTime", ["_seedTarget", objNull]];
-    [_u, _bus, _huntUntilTime, _seedTarget] spawn {
-        params ["_u", "_bus", "_huntUntilTime", "_seedTarget"];
+    params [
+        "_u", "_bus", "_huntUntilTime",
+        ["_seedTarget", objNull],
+        ["_token", ""],
+        ["_prio", 50],
+        ["_weaponsFree", false]
+    ];
+    [_u, _bus, _huntUntilTime, _seedTarget, _token, _prio, _weaponsFree] spawn {
+        params ["_u", "_bus", "_huntUntilTime", "_seedTarget", "_token", "_prio", "_weaponsFree"];
         if (isNull _u || !alive _u) exitWith {};
 
         // Wait for the dismount to actually complete. If the previous
@@ -141,8 +147,12 @@ private _spawnEscortHunter = {
             diag_log format ["[CO] busAgroLoop: escort %1 failed to dismount, abandoning hunt.", _u];
         };
 
-        private _token = format ["bus_hunter_%1_%2", netId _u, floor (time * 10)];
-        private _claimPriority = 50;
+        // One token per dismount EVENT (shared by all hunters of this
+        // bus) so the map-wide chase cap counts events, not soldiers.
+        if (_token == "") then {
+            _token = format ["bus_hunt_%1_%2", netId _bus, floor time];
+        };
+        private _claimPriority = _prio;
         if (!([_u, _token, _claimPriority, 45] call co_main_fnc_claimUnit)) exitWith {};
 
         // Switch escort to hunting posture
@@ -210,10 +220,21 @@ private _spawnEscortHunter = {
                     } forEach _alerts;
                 };
                 if (count _candidates > 0) then {
-                    _candidates = [_candidates, [], { _x distance2D _u }, "ASCEND"] call BIS_fnc_sortBy;
+                    // Weighted pick (R1-g): players, hot suspects, and armed
+                    // men out-rank whichever NPC civ happens to be nearest.
+                    _candidates = [_candidates, [], {
+                        private _score = _x distance2D _u;
+                        if (isPlayer _x) then { _score = _score - 40 };
+                        _score = _score - (((_x getVariable ["CO_heatLevel", 0]) * 0.5) min 40);
+                        if (primaryWeapon _x != "" || handgunWeapon _x != "") then { _score = _score - 25 };
+                        _score
+                    }, "ASCEND"] call BIS_fnc_sortBy;
                     _myTarget = _candidates select 0;
                     _myTargetUntil = time + 30;
                     _idleAt = -1;
+                    if (_weaponsFree) then {
+                        [_myTarget] call co_main_fnc_installNonLethalDamage;
+                    };
                     [_myTarget, getPosATL _myTarget, "bus_hunter", _claimPriority] call co_main_fnc_alertPublish;
                 };
             };
@@ -221,18 +242,24 @@ private _spawnEscortHunter = {
             if (!isNull _myTarget) then {
                 [[_u], _myTarget] call co_main_fnc_chaseMove;
 
+                // Under-fire doctrine (R1-b): weapons-free hunters shoot to
+                // stun (non-lethal filter installed at acquisition) while
+                // the shooter keeps range open, and tackle when close.
+                if (
+                    _weaponsFree &&
+                    (_u distance _myTarget) > 8 &&
+                    vehicle _myTarget == _myTarget &&
+                    time > (_u getVariable ["CO_nextHunterVolleyAt", 0])
+                ) then {
+                    _u setVariable ["CO_nextHunterVolleyAt", time + 3, false];
+                    _u reveal [_myTarget, 4];
+                    _u doTarget _myTarget;
+                    _u fireAtTarget [_myTarget];
+                };
+
                 if ([[_u], _myTarget] call co_main_fnc_proximityTackle) then {
                     if (isPlayer _myTarget) then {
-                        [_myTarget] remoteExecCall ["co_main_fnc_wrangleMinigame", _myTarget];
-                        private _wrangleDeadline = time + 20;
-                        waitUntil {
-                            sleep 0.3;
-                            !alive _myTarget ||
-                            !isNil { _myTarget getVariable "CO_wrangleResult" } ||
-                            time > _wrangleDeadline
-                        };
-                        private _result = _myTarget getVariable ["CO_wrangleResult", "captured"];
-                        _myTarget setVariable ["CO_wrangleResult", nil, true];
+                        private _result = [_myTarget, 20] call co_main_fnc_runWrangle;
 
                         if (_result == "captured") then {
                             _myTarget setCaptive true;
@@ -244,11 +271,14 @@ private _spawnEscortHunter = {
                                 netId _bus, name _myTarget
                             ];
                             _myTarget = objNull;
-                        } else {
+                        };
+                        if (_result == "escaped") then {
                             _myTarget setVariable ["CO_tackleImmuneUntil", time + 6, true];
                             _myTargetUntil = time + 12;
                             sleep 2;
                         };
+                        // "busy": another controller owns the grab — hold
+                        // the cordon and re-check next tick.
                     } else {
                         [_u, _myTarget, 60, true] call co_main_fnc_applyKnockout;
                     };
@@ -393,12 +423,98 @@ while { alive _veh } do {
     };
     _driver = driver _veh;
 
-    // ---- Captive cap reached → idle (delivery scheduler picks up) -----
+    // ====================================================================
+    // UNDER-FIRE EMERGENCY (R1-b). fn_reportCrime / the Hit EH set
+    // CO_busEmergency* when this truck's squad is attacked or a shot is
+    // fired near it. Every escort dismounts immediately and hunts the
+    // attacker — weapons-free if blood was drawn. Before this existed a
+    // player could execute a mounted squad point-blank with no response.
+    // ====================================================================
+    private _emUntil = _veh getVariable ["CO_busEmergencyUntil", 0];
+    private _emTarget = _veh getVariable ["CO_busEmergencyTarget", objNull];
+    if (
+        _emUntil > time &&
+        !isNull _emTarget && alive _emTarget && !captive _emTarget &&
+        !(_emTarget getVariable ["CO_knockedOut", false]) &&
+        ((time - (_veh getVariable ["CO_busEmergencyHandledAt", -999])) > 45) &&
+        !(_state in ["delivering", "abandoned", "reboarding"])
+    ) then {
+        _veh setVariable ["CO_busEmergencyHandledAt", time, false];
+        private _weaponsFree = _veh getVariable ["CO_busEmergencyWeapons", false];
+        diag_log format [
+            "[CO] Bus %1 UNDER FIRE at %2 — emergency dismount (weaponsFree=%3, target=%4).",
+            netId _veh, mapGridPosition _veh, _weaponsFree, _emTarget
+        ];
+
+        [_emTarget] call co_main_fnc_installNonLethalDamage;
+        [_emTarget, getPosATL _emTarget, "bus_emergency", 90] call co_main_fnc_alertPublish;
+        [_emTarget, if (_weaponsFree) then { "WEAPONS" } else { "PURSUIT" }, "bus_under_fire", 85, _escortGrp] call co_main_fnc_setEscalationState;
+        ["bus_emergency_dismount"] call co_main_fnc_kpi;
+
+        _veh setVariable ["CO_busState", "dismounted", true];
+        _state = "dismounted";
+        _dismountUntil = time + BUS_DISMOUNT_DURATION;
+        _approachStarted = -1;
+        if (!isNull _driver && alive _driver) then { doStop _driver };
+        _veh forceSpeed 0;
+        _escortGrp setBehaviour "AWARE";
+        _escortGrp setCombatMode (if (_weaponsFree) then { "RED" } else { "YELLOW" });
+        _escortGrp setSpeedMode "FULL";
+
+        private _emToken = format ["bus_hunt_%1_%2", netId _veh, floor time];
+        {
+            if (alive _x) then {
+                // NO truck guard held back in an emergency — everyone fights.
+                if (vehicle _x == _veh) then {
+                    _x allowGetIn false;
+                    unassignVehicle _x;
+                    _x action ["GetOut", _veh];
+                    doGetOut _x;
+                    [_x, _veh] spawn {
+                        params ["_u", "_v"];
+                        sleep 1.2;
+                        if (alive _u && vehicle _u == _v) then {
+                            moveOut _u;
+                            if (vehicle _u == _v) then {
+                                _u setPosATL ((getPosATL _v) vectorAdd [
+                                    (random 6) - 3, (random 6) - 3, 0
+                                ]);
+                            };
+                        };
+                    };
+                };
+                [_x, _veh, _dismountUntil, _emTarget, _emToken, 90, _weaponsFree] call _spawnEscortHunter;
+            };
+        } forEach (units _escortGrp);
+    };
+
+    // ---- Captive cap reached → deliver (R1-c) --------------------------
+    // The old code `continue`d here, which skipped the whole state machine
+    // while delivery is only triggered FROM the state machine — a full
+    // truck froze forever with its escorts standing around it.
     private _aboard = (_veh getVariable ["CO_busCaptives", []]) select {
         !isNull _x && alive _x && captive _x
     };
     _veh setVariable ["CO_busCaptives", _aboard, true];
-    if (count _aboard >= _maxCaptives) then { continue };
+    if (count _aboard >= _maxCaptives) then {
+        if (_state in ["traveling", "approaching"]) then {
+            private _driverNow = driver _veh;
+            if (isNull _driverNow || !alive _driverNow) then {
+                private _alts = ((units _driverGrp) + (units _escortGrp)) select { alive _x };
+                if (count _alts > 0) then { (_alts select 0) moveInDriver _veh };
+            };
+            _veh setVariable ["CO_transportVehicle", _veh, true];
+            _escortGrp setVariable ["CO_transportVehicle", _veh, true];
+            [_aboard select 0, _escortGrp] spawn co_main_fnc_transportToDetention;
+            diag_log format ["[CO] Bus %1 full (%2 captives) — forcing detention delivery.", netId _veh, count _aboard];
+            continue;
+        };
+        // Dismounted: force the reboard path now; the reboard branch
+        // handles the delivery handoff itself.
+        if (_state == "dismounted") then {
+            _dismountUntil = _dismountUntil min time;
+        };
+    };
 
     // ====================================================================
     // GLOBAL IDLE-DISMOUNT TRIGGER
@@ -431,6 +547,7 @@ while { alive _veh } do {
 
             private _dismountCount = 0;
             private _keptTruckGuard = false;
+            private _idleToken = format ["bus_hunt_%1_%2", netId _veh, floor time];
             {
                 // Dismount EVERY mounted escort — no cap.
                 if (alive _x && vehicle _x == _veh) then {
@@ -457,7 +574,7 @@ while { alive _veh } do {
                             };
                         };
                     };
-                    [_x, _veh, _dismountUntil, objNull] call _spawnEscortHunter;
+                    [_x, _veh, _dismountUntil, objNull, _idleToken, 50, false] call _spawnEscortHunter;
                     _dismountCount = _dismountCount + 1;
                 };
             } forEach (units _escortGrp);
@@ -486,7 +603,15 @@ while { alive _veh } do {
             };
             private _nearAlerts = [getPosATL _veh, 140, 45] call co_main_fnc_alertQuery;
 
-            if (!(_nearTargets isEqualTo []) || !(_nearAlerts isEqualTo [])) then {
+            // Only extend the hunt while the truck still has captive space
+            // (a full truck must reboard and deliver — see R1-c fix above).
+            private _aboardNow = (_veh getVariable ["CO_busCaptives", []]) select {
+                !isNull _x && alive _x && captive _x
+            };
+            if (
+                (!(_nearTargets isEqualTo []) || !(_nearAlerts isEqualTo [])) &&
+                count _aboardNow < _maxCaptives
+            ) then {
                 _dismountUntil = time + 20;
             } else {
             // Reboard
@@ -686,6 +811,8 @@ while { alive _veh } do {
 
                 private _dismountCount = 0;
                 private _keptTruckGuard = false;
+                private _huntToken = format ["bus_hunt_%1_%2", netId _veh, floor time];
+                private _huntPrio = if (isPlayer _huntTarget) then { 70 } else { 50 };
                 {
                     if (alive _x && vehicle _x == _veh) then {
                         if (!_keptTruckGuard) then {
@@ -714,7 +841,7 @@ while { alive _veh } do {
                                 };
                             };
                         };
-                        [_x, _veh, _dismountUntil, _huntTarget] call _spawnEscortHunter;
+                        [_x, _veh, _dismountUntil, _huntTarget, _huntToken, _huntPrio, false] call _spawnEscortHunter;
                         _dismountCount = _dismountCount + 1;
                     };
                 } forEach (units _escortGrp);

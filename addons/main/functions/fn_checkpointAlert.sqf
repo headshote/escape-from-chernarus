@@ -40,10 +40,13 @@ if (isNull _hostileGrp) exitWith {};
     [getPosATL _target, _hostileGrp, _target] call co_main_fnc_crowdResistance;
     [_target, getPosATL (vehicle _target), "checkpoint_alert", _priority] call co_main_fnc_alertPublish;
 
+    // One-time posture. AWARE (not COMBAT) — COMBAT behaviour makes AI
+    // bound/crawl tactically, which is exactly how a chase dies (R2-12).
+    // fn_chaseMove owns movement from here; explicit fireAtTarget commands
+    // below don't need COMBAT mode.
     {
-        _x doTarget _target;
-        _x setCombatMode "RED";
-        _x setBehaviour "COMBAT";
+        _x setBehaviour "AWARE";
+        _x setCombatMode "YELLOW";
         _x reveal [_target, 4];
     } forEach _claimed;
 
@@ -54,6 +57,11 @@ if (isNull _hostileGrp) exitWith {};
         private _startedAt = time;
         private _lastAlertAt = 0;
         private _deadline = time + 180;
+        // Static guards never abandon their post beyond the leash —
+        // beyond it, the runner's position is radioed to mobile units.
+        private _anchor = _grp getVariable ["CO_aggroAnchor", getPosATL (leader _grp)];
+        private _leash = missionNamespace getVariable ["CO_checkpoint_chaseLeash", 250];
+        private _leashed = false;
 
         private _capturePlayerOrNpc = {
             params [["_attacker", objNull]];
@@ -62,17 +70,11 @@ if (isNull _hostileGrp) exitWith {};
             _target setVariable ["CO_wantedLevel", _wl min 100, true];
 
             if (isPlayer _target) then {
-                [_target] remoteExecCall ["co_main_fnc_wrangleMinigame", _target];
-                private _wrangleDeadline = time + 20;
-                waitUntil {
-                    sleep 0.3;
-                    !alive _target ||
-                    !isNil { _target getVariable "CO_wrangleResult" } ||
-                    time > _wrangleDeadline
-                };
+                private _result = [_target, 20] call co_main_fnc_runWrangle;
 
-                private _result = _target getVariable ["CO_wrangleResult", "captured"];
-                _target setVariable ["CO_wrangleResult", nil, true];
+                // Grab owned by another controller or player gone —
+                // hold the cordon, try again next tick.
+                if (_result in ["busy", "dead"]) exitWith { false };
 
                 if (_result == "captured") exitWith {
                     _target setCaptive true;
@@ -116,13 +118,16 @@ if (isNull _hostileGrp) exitWith {};
             };
             if (_liveUnits isEqualTo []) exitWith {};
 
+            // Leash: a checkpoint that empties itself chasing one runner
+            // is a checkpoint you can walk through. Hand the runner to
+            // the alert net and go home.
+            if ((_target distance2D _anchor) > _leash) exitWith {
+                _leashed = true;
+                [_target, getPosATL (vehicle _target), "checkpoint_leash", 65] call co_main_fnc_alertPublish;
+                [_target, "SEARCH", "checkpoint_leash", 60, _grp] call co_main_fnc_setEscalationState;
+            };
+
             private _engageObject = if (vehicle _target != _target) then { vehicle _target } else { _target };
-            {
-                _x reveal [_engageObject, 4];
-                _x doTarget _engageObject;
-                _x setCombatMode "RED";
-                _x setBehaviour "COMBAT";
-            } forEach _liveUnits;
 
             if (vehicle _target == _target) then {
                 [_liveUnits, _target] call co_main_fnc_chaseMove;
@@ -148,12 +153,19 @@ if (isNull _hostileGrp) exitWith {};
                     _finished = [_closest] call _capturePlayerOrNpc;
                 };
             } else {
-                private _shooters = _liveUnits select [0, (3 min count _liveUnits)];
-                {
-                    _x reveal [_engageObject, 4];
-                    _x doWatch _engageObject;
-                    _x fireAtTarget [_engageObject];
-                } forEach _shooters;
+                // Target in a vehicle: shoot at the DRIVER, not the hull —
+                // hull fire blows the car up and kills the "non-lethal"
+                // target (R2-15). Only inside 100 m; beyond that the leash
+                // or the alert net handles it.
+                private _drv = driver (vehicle _target);
+                if (!isNull _drv && (_target distance (leader _grp)) < 100) then {
+                    private _shooters = _liveUnits select [0, (3 min count _liveUnits)];
+                    {
+                        _x reveal [_drv, 4];
+                        _x doWatch _drv;
+                        _x fireAtTarget [_drv];
+                    } forEach _shooters;
+                };
             };
 
             if (_target getVariable ["CO_knockedOut", false]) then {
@@ -174,9 +186,20 @@ if (isNull _hostileGrp) exitWith {};
             _target setVariable ["CO_captureInProgress", false, true];
         };
 
+        // Return to post: walk back to the anchor and restore the guard
+        // posture + patrol waypoints so the checkpoint re-arms itself.
         {
+            if (alive _x && vehicle _x == _x) then {
+                _x setBehaviour "AWARE";
+                _x setCombatMode "YELLOW";
+                _x setUnitPos "AUTO";
+                _x doMove (_anchor getPos [3 + random 6, random 360]);
+            };
             [_x, _token] call co_main_fnc_releaseUnit;
         } forEach _claimed;
+        if (count (waypoints _grp) > 0) then {
+            _grp setCurrentWaypoint [_grp, 0];
+        };
 
         _grp setVariable ["CO_grpEngaging", false, false];
     };
