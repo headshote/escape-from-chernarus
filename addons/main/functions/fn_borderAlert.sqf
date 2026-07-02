@@ -34,16 +34,8 @@ private _capture = {
     params [["_attacker", objNull]];
 
     if (isPlayer _target) then {
-        [_target] remoteExecCall ["co_main_fnc_wrangleMinigame", _target];
-        private _wrangleDeadline = time + 20;
-        waitUntil {
-            sleep 0.3;
-            !alive _target ||
-            !isNil { _target getVariable "CO_wrangleResult" } ||
-            time > _wrangleDeadline
-        };
-        private _result = _target getVariable ["CO_wrangleResult", "captured"];
-        _target setVariable ["CO_wrangleResult", nil, true];
+        private _result = [_target, 20] call co_main_fnc_runWrangle;
+        if (_result in ["busy", "dead"]) exitWith { false };
         if (_result == "captured") exitWith {
             _target setCaptive true;
             [_target, _grp] call co_main_fnc_transportToDetention;

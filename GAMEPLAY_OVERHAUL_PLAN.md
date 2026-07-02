@@ -606,29 +606,46 @@ again, R4 finishes the remaining original phases against that harness.
 
 ### Phase R3 — Verification harness (why Round 1 "passed" while broken)
 
-- **R3-a. Scenario self-tests.** `fn_qaScenarios` (admin-triggered or
+> **Status 2026-07-03: R3 code complete**, PBO rebuilt, `validate_build.ps1` +
+> `validate_mission.ps1` passed. New: `fn_qaScenarios`, `tools/check_rpt.ps1`,
+> derived KPI rates + watchdog recovery counter. Current QA scenarios:
+> `police_id_approach`, `police_foot_capture`, `tck_emergency_dismount`,
+> `checkpoint_failed_papers_pursuit`. Run `["all"] call co_main_fnc_qaScenarios`
+> in a live/server session, then run `tools/check_rpt.ps1`; any `[CO][QA] FAIL`,
+> script error, or `[CO][WATCHDOG]` line blocks `[DONE]`.
+
+- `[CODE]` **R3-a. Scenario self-tests.** `fn_qaScenarios` (admin-triggered or
   `-serverMod` param): spawns a dummy target with configurable wanted/heat near a
   chosen system (police car, TCK truck, checkpoint, border camp), drives it on a
   scripted path, and logs `[CO][QA] PASS/FAIL <scenario> <reason>` by asserting
   observable outcomes (dismount happened, chase started, capture or search occurred,
   car resumed patrol, flags cleared). Run after every build; a failing scenario blocks
   "done".
-- **R3-b. RPT triage as a gate.** Any script error in a session is a P0 (per R2-3, one
+- `[CODE]` **R3-b. RPT triage as a gate.** Any script error in a session is a P0 (per R2-3, one
   error = one lobotomized controller). `tools/check_rpt.ps1` greps the newest RPT for
   `Error in expression` / `[CO][WATCHDOG]` / missing-sound lines and prints a summary.
-- **R3-c. KPI assertions.** Extend `fn_kpi` logging with derived rates; a healthy
+- `[CODE]` **R3-c. KPI assertions.** Extend `fn_kpi` logging with derived rates; a healthy
   session must show chases started > 0, catch-rate 40–70 %, zero watchdog recoveries.
 
 ### Phase R4 — Finish the original vision (re-scoped, against the harness)
 
-- Checkpoints: verify legal-passage flow end-to-end with the pursuit car; leash;
+> **Status 2026-07-03: R4 code complete**, built and validated against the new
+> harness surface. Added physical police inspection movement (`fn_policeOrderInspection`)
+> so "document check" means officers stop/dismount/approach the suspect instead of
+> timing out from a stale patrol position. Added direct bus-emergency flips from
+> `Hit`/`Killed` EHs so the truck-cabin magdump path forces dismount even if broader
+> witness logic is delayed. Added lockdown patrols, checkpoint pursuit handoff/leash,
+> admin difficulty preset buttons, remaining wrangle mutex conversions, and weighted
+> truck target acquisition.
+
+- `[CODE]` Checkpoints: verify legal-passage flow end-to-end with the pursuit car; leash;
   spike-strip consequence chain (C2–C4 acceptance from Part 3).
-- Town lockdown (P3) after violent crimes: temporary suspicion multiplier + extra
+- `[CODE]` Town lockdown (P3) after violent crimes: temporary suspicion multiplier + extra
   foot patrols for 10 min in the affected town — pairs with R1-a.
-- Border: run the Part 3 Phase-4 acceptance walk (patrol contact per km, tripflare +
+- `[CODE]` Border: run the Part 3 Phase-4 acceptance walk (patrol contact per km, tripflare +
   manhunt at night, scouted-gap crossing) and fix what fails; audit `fn_borderZone`,
   `fn_borderAlert` rewrites with the same claim/flag-leak lens as 4.1.
-- Feel: chase stingers only on state *transitions the player can see*; difficulty
+- `[CODE]` Feel: chase stingers only on state *transitions the player can see*; difficulty
   presets exposed in the admin panel; final KPI-driven tuning pass.
 
 ### Suggested implementation order

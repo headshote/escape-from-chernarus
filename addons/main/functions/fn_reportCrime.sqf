@@ -134,9 +134,16 @@ if (isPlayer _perp) then {
 if (!isNil "CO_policeTownPosts") then {
     private _bestIdx = -1;
     private _bestD = 900;
+    private _bestCenter = [0,0,0];
+    private _bestRadius = 400;
     {
         private _d = _refPos distance2D (_x select 0);
-        if (_d < _bestD) then { _bestD = _d; _bestIdx = _forEachIndex };
+        if (_d < _bestD) then {
+            _bestD = _d;
+            _bestIdx = _forEachIndex;
+            _bestCenter = _x select 0;
+            _bestRadius = _x select 1;
+        };
     } forEach CO_policeTownPosts;
     if (_bestIdx >= 0) then {
         if (isNil "CO_townAlertLevels") then { CO_townAlertLevels = createHashMap };
@@ -145,6 +152,15 @@ if (!isNil "CO_policeTownPosts") then {
         private _lvl = if ((_cur select 1) > time) then { _cur select 0 } else { 0 };
         CO_townAlertLevels set [_bestIdx, [(_lvl + _inc) min 3, time + 600]];
         diag_log format ["[CO][CRIME] Town %1 alert level -> %2 (%3).", _bestIdx, (_lvl + _inc) min 3, _type];
+        if (_type in ["kill", "wound"]) then {
+            [
+                _bestIdx,
+                _bestCenter,
+                _bestRadius,
+                missionNamespace getVariable ["CO_lockdown_duration", 600],
+                missionNamespace getVariable ["CO_lockdown_extraPatrols", 2]
+            ] call co_main_fnc_spawnLockdownPatrol;
+        };
     };
 };
 

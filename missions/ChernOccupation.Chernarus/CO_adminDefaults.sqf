@@ -64,7 +64,7 @@ CO_conscript_detainTime         = 300;    // seconds in detention before transfe
 CO_conscript_trainTime          = 600;    // seconds in training before front deploy
 
 // --- Police ---
-CO_police_carStopChance         = 0.05;
+CO_police_carStopChance         = 0.08;
 CO_police_active                = true;
 CO_difficultyPreset             = "Standard"; // Quiet Occupation | Standard | Martial Law
 CO_suspicion_baseRate           = 12;
@@ -86,6 +86,8 @@ CO_crime_woundWanted            = 40;     // ... for a witnessed wounding
 CO_crime_gunfireWanted          = 10;     // ... per reported gunshot (throttled)
 CO_checkpoint_chaseLeash        = 250;    // max chase distance from a checkpoint before radio handoff
 CO_police_chaseDeadline         = 180;    // seconds before a police foot chase converts to search
+CO_lockdown_extraPatrols        = 2;      // temporary foot-patrol pairs after witnessed violence
+CO_lockdown_duration            = 600;    // seconds
 
 // --- Admin ---
 CO_adminUIDs                    = [76561198054336866];     // add Steam64 UIDs allowed to open the admin panel
@@ -115,5 +117,6 @@ CO_adminUIDs                    = [76561198054336866];     // add Steam64 UIDs a
     "CO_kpiLogInterval","CO_maxSimultaneousChases",
     "CO_crime_killWanted","CO_crime_woundWanted","CO_crime_gunfireWanted",
     "CO_checkpoint_chaseLeash","CO_police_chaseDeadline",
+    "CO_lockdown_extraPatrols","CO_lockdown_duration",
     "CO_adminUIDs"
 ];

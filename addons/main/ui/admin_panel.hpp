@@ -200,6 +200,31 @@ class CO_AdminPanel {
             x = RIGHT; y = ROW(13); w = 0.06; h = LBL_H;
         };
 
+        // ---- Gameplay difficulty presets ----
+        class Lbl_Diff: RscText {
+            idc = -1; text = "DIFFICULTY PRESET";
+            colorText[] = {0.6,0.8,1,1};
+            x = LEFT; y = ROW(14); w = 0.25; h = LBL_H;
+        };
+        class BtnQuiet: RscButton {
+            idc = 350;
+            text = "QUIET";
+            x = MID; y = ROW(14); w = 0.09; h = BTN_H;
+            onButtonClick = "['Quiet Occupation'] remoteExecCall ['co_main_fnc_setDifficultyPreset', 2]; systemChat 'Difficulty: Quiet Occupation';";
+        };
+        class BtnStandard: RscButton {
+            idc = 351;
+            text = "STANDARD";
+            x = (MID + 0.10); y = ROW(14); w = 0.11; h = BTN_H;
+            onButtonClick = "['Standard'] remoteExecCall ['co_main_fnc_setDifficultyPreset', 2]; systemChat 'Difficulty: Standard';";
+        };
+        class BtnMartial: RscButton {
+            idc = 352;
+            text = "MARTIAL";
+            x = (MID + 0.22); y = ROW(14); w = 0.10; h = BTN_H;
+            onButtonClick = "['Martial Law'] remoteExecCall ['co_main_fnc_setDifficultyPreset', 2]; systemChat 'Difficulty: Martial Law';";
+        };
+
         // ---- Close button ----
         class BtnClose: RscButton {
             idc = 399;

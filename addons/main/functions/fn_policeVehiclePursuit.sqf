@@ -56,6 +56,8 @@ private _lastMoveAt = 0;
 private _roadblockAt = -1;
 private _backupAt = -1;
 private _done = false;
+private _checkpointAnchor = _grp getVariable ["CO_checkpointAnchor", []];
+private _checkpointLeash = _grp getVariable ["CO_checkpointLeash", missionNamespace getVariable ["CO_checkpoint_chaseLeash", 250]];
 
 while {
     alive _car &&
@@ -68,6 +70,14 @@ while {
     if (vehicle _target == _target) exitWith {
         [_grp, _car, _target] spawn co_main_fnc_policeFootChase;
         _done = true;
+    };
+
+    if !(_checkpointAnchor isEqualTo []) then {
+        if ((_target distance2D _checkpointAnchor) > (_checkpointLeash + 120)) exitWith {
+            [_target, getPosATL (vehicle _target), "checkpoint_vehicle_leash", 70] call co_main_fnc_alertPublish;
+            [_target, "SEARCH", "checkpoint_vehicle_leash", 60, _grp] call co_main_fnc_setEscalationState;
+            _done = false;
+        };
     };
 
     // Replace a dead/missing driver mid-pursuit (audit R2-16).

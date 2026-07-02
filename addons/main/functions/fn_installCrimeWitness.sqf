@@ -38,8 +38,16 @@ _unit addEventHandler ["Hit", {
     private _grp = group _victim;
     _grp setVariable ["CO_retaliateTarget", _src, false];
     _grp setVariable ["CO_retaliateUntil", time + 90, false];
+    if ((_grp getVariable ["CO_isBusDriverGrp", false]) || (_grp getVariable ["CO_isBusEscortGrp", false])) then {
+        private _bus = _grp getVariable ["CO_transportVehicle", objNull];
+        if (!isNull _bus && alive _bus) then {
+            _bus setVariable ["CO_busEmergencyTarget", _src, false];
+            _bus setVariable ["CO_busEmergencyUntil", time + 90, false];
+            _bus setVariable ["CO_busEmergencyWeapons", true, false];
+        };
+    };
 
-    [_src, _victim, "wound"] call co_main_fnc_reportCrime;
+    [_src, _victim, "wound", _victim] call co_main_fnc_reportCrime;
 }];
 
 _unit addEventHandler ["Killed", {
@@ -52,6 +60,16 @@ _unit addEventHandler ["Killed", {
     };
     if (isNull _src || !(isPlayer _src || side _src == civilian)) exitWith {};
     if ((group _src getVariable ["CO_faction", ""]) in ["CRN_ENF","POLICE","CRN_FRONT","RUS_ADV"]) exitWith {};
+
+    private _grp = group _killed;
+    if ((_grp getVariable ["CO_isBusDriverGrp", false]) || (_grp getVariable ["CO_isBusEscortGrp", false])) then {
+        private _bus = _grp getVariable ["CO_transportVehicle", objNull];
+        if (!isNull _bus && alive _bus) then {
+            _bus setVariable ["CO_busEmergencyTarget", _src, false];
+            _bus setVariable ["CO_busEmergencyUntil", time + 90, false];
+            _bus setVariable ["CO_busEmergencyWeapons", true, false];
+        };
+    };
 
     [_src, _killed, "kill"] call co_main_fnc_reportCrime;
 }];

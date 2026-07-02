@@ -99,6 +99,7 @@ CO_stateWatchdogRunning = true;
                 ((time - (_u getVariable ["CO_wrangleActive", 0])) > 30);
             if ([format ["cip_%1", netId _u], _stuck, 180] call _check) then {
                 _u setVariable ["CO_captureInProgress", false, true];
+                ["watchdog_recovery"] call co_main_fnc_kpi;
                 diag_log format ["[CO][WATCHDOG] Cleared stuck CO_captureInProgress on %1.", _u];
             };
 
@@ -106,6 +107,7 @@ CO_stateWatchdogRunning = true;
             private _wLock = _u getVariable ["CO_wrangleActive", 0];
             if ([format ["wl_%1", netId _u], (_wLock > 0 && (time - _wLock) > 30), 60] call _check) then {
                 _u setVariable ["CO_wrangleActive", 0, false];
+                ["watchdog_recovery"] call co_main_fnc_kpi;
                 diag_log format ["[CO][WATCHDOG] Cleared stale wrangle lock on %1.", _u];
             };
         } forEach _suspects;
@@ -127,6 +129,7 @@ CO_stateWatchdogRunning = true;
                 _grp setVariable ["CO_vehiclePursuitActive", false, false];
                 if (!isNull _car) then { _car setVariable ["CO_responseActive", false, true] };
                 [_grp, _car] call co_main_fnc_policeResumePatrol;
+                ["watchdog_recovery"] call co_main_fnc_kpi;
                 diag_log format ["[CO][WATCHDOG] Reset dead chase flags on %1.", _grp];
             };
 
@@ -136,6 +139,7 @@ CO_stateWatchdogRunning = true;
                     (_car getVariable ["CO_responseActive", false]) && !_chasing;
                 if ([_gid + "_fx", _sirenGhost, 90] call _check) then {
                     _car setVariable ["CO_responseActive", false, true];
+                    ["watchdog_recovery"] call co_main_fnc_kpi;
                     diag_log format ["[CO][WATCHDOG] Cleared ghost siren on %1.", _car];
                 };
 
@@ -147,6 +151,7 @@ CO_stateWatchdogRunning = true;
                     ({ alive _x } count units _grp) > 0;
                 if ([_gid + "_park", _parked, 150] call _check) then {
                     [_grp, _car] call co_main_fnc_policeResumePatrol;
+                    ["watchdog_recovery"] call co_main_fnc_kpi;
                     diag_log format ["[CO][WATCHDOG] Un-parked police car %1 at %2.", _car, mapGridPosition _car];
                 };
             };
@@ -159,6 +164,7 @@ CO_stateWatchdogRunning = true;
                                 ({ alive _x } count units _grp) > 0;
             if ([format ["eng_%1", groupId _grp], _engaging, 300] call _check) then {
                 _grp setVariable ["CO_grpEngaging", false, false];
+                ["watchdog_recovery"] call co_main_fnc_kpi;
                 diag_log format ["[CO][WATCHDOG] Cleared stuck CO_grpEngaging on %1.", _grp];
             };
         } forEach allGroups;
@@ -181,6 +187,7 @@ CO_stateWatchdogRunning = true;
                     _drv enableAI "PATH";
                     _drv setBehaviour "SAFE";
                 };
+                ["watchdog_recovery"] call co_main_fnc_kpi;
                 diag_log format ["[CO][WATCHDOG] Unfroze bus %1 from state '%2'.", netId _bus, _state];
             };
         } forEach allGroups;

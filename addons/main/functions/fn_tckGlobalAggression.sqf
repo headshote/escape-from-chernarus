@@ -209,22 +209,14 @@ diag_log "[CO] tckGlobalAggression: starting global failsafe loop (radius=60m, t
                         [[_u], _t] call co_main_fnc_chaseMove;
                         if ([[_u], _t] call co_main_fnc_proximityTackle) then {
                             if (isPlayer _t) then {
-                                [_t] remoteExecCall ["co_main_fnc_wrangleMinigame", _t];
-                                private _wrangleDeadline = time + 20;
-                                waitUntil {
-                                    sleep 0.3;
-                                    !alive _t ||
-                                    !isNil { _t getVariable "CO_wrangleResult" } ||
-                                    time > _wrangleDeadline
-                                };
-                                private _result = _t getVariable ["CO_wrangleResult", "captured"];
-                                _t setVariable ["CO_wrangleResult", nil, true];
+                                private _result = [_t, 20] call co_main_fnc_runWrangle;
                                 if (_result == "captured") then {
                                     _t setCaptive true;
                                     _t setVariable ["CO_captureInProgress", false, true];
                                     [_t, group _u] spawn co_main_fnc_spawnCaptureTransport;
                                     _captured = true;
-                                } else {
+                                };
+                                if (_result == "escaped") then {
                                     _t setVariable ["CO_tackleImmuneUntil", time + 6, true];
                                     sleep 2;
                                 };

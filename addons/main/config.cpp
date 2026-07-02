@@ -118,6 +118,7 @@ class CfgFunctions {
             class getEscalationState {};
             class kpi              {};
             class applyDifficultyPreset {};
+            class setDifficultyPreset {};
             class chaseStinger     {};
             class heatHud          {};
             class policeResponseFX {};
@@ -131,7 +132,10 @@ class CfgFunctions {
             class runWrangle       {};
             class stateWatchdog    {};
             class policeBrain      {};
+            class policeOrderInspection {};
             class policeResumePatrol {};
+            class qaScenarios      {};
+            class spawnLockdownPatrol {};
             class buildTrainingGround {};
             class showEscapeUnlockScreen {};
             class crowdResistance  {};

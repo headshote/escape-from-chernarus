@@ -97,6 +97,8 @@ _pGuard moveInCargo _pursuitCar;
 _pursuitGrp setBehaviour "SAFE";
 _pursuitGrp setCombatMode "YELLOW";
 _pursuitGrp setSpeedMode "LIMITED";
+_pursuitGrp setVariable ["CO_checkpointAnchor", _pos, false];
+_pursuitGrp setVariable ["CO_checkpointLeash", missionNamespace getVariable ["CO_checkpoint_chaseLeash", 250], false];
 _grp setVariable ["CO_checkpointPursuitGroup", _pursuitGrp, false];
 _grp setVariable ["CO_checkpointPursuitCar", _pursuitCar, false];
 

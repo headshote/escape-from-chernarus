@@ -140,6 +140,7 @@ CO_fnc_policeInspection = missionNamespace getVariable ["CO_fnc_policeInspection
         if (!CO_police_active) then { continue };
         if (_grp getVariable ["CO_policeFootChaseActive", false]) then { continue };
         if (_grp getVariable ["CO_vehiclePursuitActive", false]) then { continue };
+        if (_grp getVariable ["CO_policeInspectionActive", false]) then { continue };
 
         // Car destroyed mid-session → keep working as a foot patrol.
         private _carAlive = _isCar && { !isNull _car && alive _car };
@@ -229,9 +230,9 @@ CO_fnc_policeInspection = missionNamespace getVariable ["CO_fnc_policeInspection
             // slow suspicion ramp, they need to not be SEEN. Disguise is
             // honored by fn_policeRecognise.
             private _recognised = _visible && _wanted >= 60 &&
-                { [leader _grp, _p] call co_main_fnc_policeRecognise };
+                { _dist < 65 || { [leader _grp, _p] call co_main_fnc_policeRecognise } };
 
-            if (_visible) then {
+                if (_visible) then {
                 private _base = missionNamespace getVariable ["CO_suspicion_baseRate", 12];
                 private _disguise = _p getVariable ["CO_disguiseLevel", 0];
                 private _armed = (primaryWeapon _p != "") || (handgunWeapon _p != "");
@@ -245,6 +246,9 @@ CO_fnc_policeInspection = missionNamespace getVariable ["CO_fnc_policeInspection
                 _rate = _rate * (1 - ((_dist min 150) / 220));
                 _rate = _rate * (1 + (_townAlert * 0.35));
                 _sus = (_sus + (_rate max 0)) min 100;
+                if (_wanted >= 60 && _dist < 90) then {
+                    _sus = _sus max 65;
+                };
             } else {
                 _sus = (_sus - 15) max 0;
             };
@@ -270,7 +274,7 @@ CO_fnc_policeInspection = missionNamespace getVariable ["CO_fnc_policeInspection
                 } else {
                     private _canInspect = !_hardTrigger && !_recognised && abs (speed _p) < 2 && _wanted < 75;
                     if (_canInspect) then {
-                        [_grp, _car, _p, _key, _townAlert] spawn CO_fnc_policeInspection;
+                        [_grp, _car, _p, _key, _townAlert] spawn co_main_fnc_policeOrderInspection;
                     } else {
                         [_grp, _car, _p] spawn co_main_fnc_policeFootChase;
                     };
@@ -284,7 +288,7 @@ CO_fnc_policeInspection = missionNamespace getVariable ["CO_fnc_policeInspection
                 private _chance = (missionNamespace getVariable ["CO_police_carStopChance", 0.05]) * (1 + _townAlert);
                 if ((random 1) < _chance) then {
                     _p setVariable ["CO_nextRandomIdAt", time + 240, true];
-                    [_grp, _car, _p, _key, _townAlert] spawn CO_fnc_policeInspection;
+                    [_grp, _car, _p, _key, _townAlert] spawn co_main_fnc_policeOrderInspection;
                 };
             };
         } forEach allPlayers;

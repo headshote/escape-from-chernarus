@@ -72,14 +72,17 @@ _grp setVariable ["CO_checkpointControlActive", true, false];
                 if (isPlayer _driver) then {
                     ["Checkpoint inspection. Stop and keep the engine quiet."] remoteExecCall ["systemChat", _driver];
                 };
-                [_veh, _driver, _grp] spawn {
-                    params ["_veh", "_driver", "_grp"];
+                [_veh, _driver, _grp, _pursuitCar, _pursuitGrp] spawn {
+                    params ["_veh", "_driver", "_grp", "_pursuitCar", "_pursuitGrp"];
                     sleep (10 + random 5);
                     if (!alive _driver || captive _driver) exitWith {};
                     if ((_veh distance2D (leader _grp)) > 55 || abs (speed _veh) > 12) exitWith {
                         private _wl = ((_driver getVariable ["CO_wantedLevel", 0]) + 20) min 100;
                         _driver setVariable ["CO_wantedLevel", _wl, true];
                         [_driver, "PURSUIT", "checkpoint_fled_inspection", 65, _grp] call co_main_fnc_setEscalationState;
+                        if (!isNull _pursuitCar && alive _pursuitCar && !isNull _pursuitGrp) then {
+                            [_pursuitGrp, _pursuitCar, _driver, "checkpoint_pursuit"] spawn co_main_fnc_policeVehiclePursuit;
+                        };
                     };
                     private _wanted = _driver getVariable ["CO_wantedLevel", 0];
                     private _disguise = _driver getVariable ["CO_disguiseLevel", 0];
@@ -91,6 +94,9 @@ _grp setVariable ["CO_checkpointControlActive", true, false];
                         private _add = if (_risk < 65) then { 10 } else { 30 };
                         _driver setVariable ["CO_wantedLevel", ((_wanted + _add) min 100), true];
                         [_driver, "PURSUIT", "checkpoint_failed_papers", 75, _grp] call co_main_fnc_setEscalationState;
+                        if (!isNull _pursuitCar && alive _pursuitCar && !isNull _pursuitGrp) then {
+                            [_pursuitGrp, _pursuitCar, _driver, "checkpoint_pursuit"] spawn co_main_fnc_policeVehiclePursuit;
+                        };
                         [[_driver], _grp] call co_main_fnc_checkpointAlert;
                     };
                 };

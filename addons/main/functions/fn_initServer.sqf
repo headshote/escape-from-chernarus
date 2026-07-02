@@ -28,6 +28,7 @@
     "CO_kpiLogInterval","CO_maxSimultaneousChases",
     "CO_crime_killWanted","CO_crime_woundWanted","CO_crime_gunfireWanted",
     "CO_checkpoint_chaseLeash","CO_police_chaseDeadline",
+    "CO_lockdown_extraPatrols","CO_lockdown_duration",
     "CO_adminUIDs"
 ];
 sleep 0.5;

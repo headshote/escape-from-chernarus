@@ -728,10 +728,18 @@ while { alive _veh } do {
         _scan = _scan + (_scanVehDrivers apply { driver _x });
     };
 
-    // Pick nearest target
+    // Weighted pick (R1-g) for the vehicle-level acquisition too:
+    // otherwise a truck in a crowd still turns toward the nearest NPC
+    // before the improved escort-hunter scoring ever gets a chance.
     private _bestTarget = objNull;
     if (count _scan > 0) then {
-        private _sorted = [_scan, [], { _x distance2D _veh }, "ASCEND"] call BIS_fnc_sortBy;
+        private _sorted = [_scan, [], {
+            private _score = _x distance2D _veh;
+            if (isPlayer _x) then { _score = _score - 40 };
+            _score = _score - (((_x getVariable ["CO_heatLevel", 0]) * 0.5) min 40);
+            if (primaryWeapon _x != "" || handgunWeapon _x != "") then { _score = _score - 25 };
+            _score
+        }, "ASCEND"] call BIS_fnc_sortBy;
         _bestTarget = _sorted select 0;
     };
 

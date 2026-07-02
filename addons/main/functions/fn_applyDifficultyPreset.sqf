@@ -12,6 +12,7 @@ private _values = switch (_preset) do {
     case "Quiet Occupation": {
         [
             ["CO_suspicion_baseRate", 8],
+            ["CO_police_carStopChance", 0.03],
             ["CO_search_duration", 90],
             ["CO_chase_speedCoef", 1.08],
             ["CO_chase_aiStaminaDrain", 0.5],
@@ -26,6 +27,7 @@ private _values = switch (_preset) do {
     case "Martial Law": {
         [
             ["CO_suspicion_baseRate", 18],
+            ["CO_police_carStopChance", 0.16],
             ["CO_search_duration", 210],
             ["CO_chase_speedCoef", 1.18],
             ["CO_chase_aiStaminaDrain", 0.32],
@@ -40,6 +42,7 @@ private _values = switch (_preset) do {
     default {
         [
             ["CO_suspicion_baseRate", 12],
+            ["CO_police_carStopChance", 0.08],
             ["CO_search_duration", 150],
             ["CO_chase_speedCoef", 1.12],
             ["CO_chase_aiStaminaDrain", 0.42],
