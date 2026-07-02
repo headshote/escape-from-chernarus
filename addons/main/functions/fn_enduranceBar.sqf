@@ -77,7 +77,7 @@ CO_enduranceAimCoefSet = -1;
         } else {
             format ["<t color='%2'>Stamina %1</t>", _barStr, _color]
         };
-        hintSilent parseText _label;
+        missionNamespace setVariable ["CO_enduranceHudText", _label, false];
     };
 
 }, 0.25, []] call CBA_fnc_addPerFrameHandler;

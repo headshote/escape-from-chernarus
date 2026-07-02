@@ -1,5 +1,8 @@
 // fn_initServer.sqf — revised call order
-// CO_adminDefaults.sqf is executed from mission init.sqf before this runs
+// CO_adminDefaults.sqf is executed from mission init.sqf before this runs.
+// Apply profile tuning before broadcasting globals.
+[] call co_main_fnc_applyDifficultyPreset;
+
 // Globals should already be set; broadcast them again for connected clients.
 {
     publicVariable _x;
@@ -19,6 +22,10 @@
     "CO_airfield_guardCount","CO_airfield_gateGuards",
     "CO_conscript_detainTime","CO_conscript_trainTime",
     "CO_police_carStopChance","CO_police_active",
+    "CO_difficultyPreset","CO_suspicion_baseRate","CO_search_duration",
+    "CO_chase_speedCoef","CO_chase_aiStaminaDrain","CO_chase_tackleRange","CO_chase_tackleTime",
+    "CO_tracker_speedCoef","CO_checkpoint_maxCount","CO_border_innerJitter","CO_heat_decayPerMinute",
+    "CO_kpiLogInterval","CO_maxSimultaneousChases",
     "CO_adminUIDs"
 ];
 sleep 0.5;
@@ -109,6 +116,7 @@ setTimeMultiplier 6;
 ["swBorderFort", { [] call co_main_fnc_buildSWBorderFort; }] call _launchStep;
 ["perimeterBorderForts", { [] call co_main_fnc_buildBorderForts; }] call _launchStep;
 ["borderRovingPatrols", { [] call co_main_fnc_borderPatrol; }] call _launchStep;
+["borderLayeredZone", { [] call co_main_fnc_borderZone; }] call _launchStep;
 ["frontSystem", {
     [] call co_main_fnc_buildEasternFront;
     [] call co_main_fnc_frontMilitary;

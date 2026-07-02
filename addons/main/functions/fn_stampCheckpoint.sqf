@@ -81,5 +81,26 @@ for "_i" from 0 to (CO_checkpoint_hostilesPerPost - 1) do {
 // checkpoint are flagged well before they roll past the barriers.
 [_grp, _pos, 90, "CRN_ENF"] call co_main_fnc_guardAggroLoop;
 
+// Dedicated pursuit vehicle for bypass/barrier runners.
+private _pursuitGrp = createGroup west;
+_pursuitGrp setVariable ["CO_faction", "CRN_ENF", true];
+private _pursuitCar = "C_Offroad_01_F" createVehicle (_pos getPos [24, _dir + 180]);
+_pursuitCar setDir _dir;
+_pursuitCar setVariable ["CO_checkpointPursuitCar", true, true];
+_objects pushBack _pursuitCar;
+private _pDriver = _pursuitGrp createUnit ["B_Soldier_F", getPosATL _pursuitCar, [], 0, "CARGO"];
+private _pGuard = _pursuitGrp createUnit ["B_Soldier_F", getPosATL _pursuitCar, [], 0, "CARGO"];
+[_pDriver] call co_main_fnc_initHostileUnit;
+[_pGuard] call co_main_fnc_initHostileUnit;
+_pDriver moveInDriver _pursuitCar;
+_pGuard moveInCargo _pursuitCar;
+_pursuitGrp setBehaviour "SAFE";
+_pursuitGrp setCombatMode "YELLOW";
+_pursuitGrp setSpeedMode "LIMITED";
+_grp setVariable ["CO_checkpointPursuitGroup", _pursuitGrp, false];
+_grp setVariable ["CO_checkpointPursuitCar", _pursuitCar, false];
+
+[_pos, _dir, _grp, _objects, _pursuitCar, _pursuitGrp] call co_main_fnc_checkpointControl;
+
 // Return data struct
-[_pos, _dir, _objects, _grp]
+[_pos, _dir, _objects, _grp, _pursuitCar, _pursuitGrp]

@@ -13,8 +13,9 @@
 //
 // What this loop does
 // -------------------
-// Every 4 s on the server, walk every group whose CO_faction is
-// "CRN_ENF" or "POLICE". For each foot-mobile unit in that group:
+// Every 3 s on the server, walk every group whose CO_faction is
+// "CRN_ENF". Police have their own controller and are intentionally
+// excluded so this failsafe cannot distract an officer mid-chase.
 //
 //   1. If a non-female civilian or player is within 22 m AND in
 //      line-of-sight ish (we use nearEntities which already does
@@ -55,13 +56,13 @@ diag_log "[CO] tckGlobalAggression: starting global failsafe loop (radius=60m, t
         _heartbeat = _heartbeat + 1;
         if (_heartbeat % 20 == 0) then {
             private _grpCount = count (allGroups select {
-                (_x getVariable ["CO_faction", ""]) in ["CRN_ENF", "POLICE"]
+                (_x getVariable ["CO_faction", ""]) == "CRN_ENF"
             });
             diag_log format ["[CO] tckGlobalAggression heartbeat: %1 eligible groups.", _grpCount];
         };
 
         private _groups = allGroups select {
-            (_x getVariable ["CO_faction", ""]) in ["CRN_ENF", "POLICE"]
+            (_x getVariable ["CO_faction", ""]) == "CRN_ENF"
         };
 
         {
@@ -153,11 +154,15 @@ diag_log "[CO] tckGlobalAggression: starting global failsafe loop (radius=60m, t
 
                 private _sorted = [_cands, [], { _x distance2D _u }, "ASCEND"] call BIS_fnc_sortBy;
                 private _target = _sorted select 0;
+                private _token = format ["tck_global_%1_%2", netId _u, floor (time * 10)];
+                private _priority = 40;
+                if (!([_u, _token, _priority, 45] call co_main_fnc_claimUnit)) then { continue };
 
                 _u setVariable ["CO_lastAggressionAt", time, false];
+                [_target, getPosATL _target, "tck_global", _priority] call co_main_fnc_alertPublish;
 
-                [_u, _target] spawn {
-                    params ["_u", "_t"];
+                [_u, _target, _token, _priority] spawn {
+                    params ["_u", "_t", "_token", "_priority"];
                     if (isNull _u || isNull _t) exitWith {};
 
                     // Switch the unit into an aware/aggressive posture so it
@@ -169,22 +174,50 @@ diag_log "[CO] tckGlobalAggression: starting global failsafe loop (radius=60m, t
                     _u enableAI "PATH";
                     _u setUnitPos "UP";
 
-                    private _deadline = time + 25;
+                    private _deadline = time + 60;
+                    private _captured = false;
                     while {
                         alive _u && alive _t &&
                         !captive _t &&
                         !(_t getVariable ["CO_knockedOut", false]) &&
                         time < _deadline &&
+                        !_captured &&
                         (vehicle _u == _u) &&
-                        (vehicle _t == _t)
+                        (vehicle _t == _t) &&
+                        { [_u, _token, _priority, 25] call co_main_fnc_claimUnit }
                     } do {
-                        _u doMove (getPosATL _t);
-                        if ((_u distance _t) < TCK_MELEE_RANGE) then {
-                            [_u, _t] call co_main_fnc_applyMeleeHit;
-                            sleep 1.0;
-                        } else {
-                            sleep 1.5;
+                        [[_u], _t] call co_main_fnc_chaseMove;
+                        if ([[_u], _t] call co_main_fnc_proximityTackle) then {
+                            if (isPlayer _t) then {
+                                [_t] remoteExecCall ["co_main_fnc_wrangleMinigame", _t];
+                                private _wrangleDeadline = time + 20;
+                                waitUntil {
+                                    sleep 0.3;
+                                    !alive _t ||
+                                    !isNil { _t getVariable "CO_wrangleResult" } ||
+                                    time > _wrangleDeadline
+                                };
+                                private _result = _t getVariable ["CO_wrangleResult", "captured"];
+                                _t setVariable ["CO_wrangleResult", nil, true];
+                                if (_result == "captured") then {
+                                    _t setCaptive true;
+                                    _t setVariable ["CO_captureInProgress", false, true];
+                                    [_t, group _u] spawn co_main_fnc_spawnCaptureTransport;
+                                    _captured = true;
+                                } else {
+                                    _t setVariable ["CO_tackleImmuneUntil", time + 6, true];
+                                    sleep 2;
+                                };
+                            } else {
+                                [_u, _t, 60, true] call co_main_fnc_applyKnockout;
+                                if (_t getVariable ["CO_knockedOut", false]) then {
+                                    _t setCaptive true;
+                                    [_u, _t] spawn co_main_fnc_dispatchCaptureTransport;
+                                    _captured = true;
+                                };
+                            };
                         };
+                        sleep 0.7;
                     };
 
                     // After knockout: try to summon transport
@@ -192,6 +225,8 @@ diag_log "[CO] tckGlobalAggression: starting global failsafe loop (radius=60m, t
                         _t setCaptive true;
                         [_u, _t] spawn co_main_fnc_dispatchCaptureTransport;
                     };
+
+                    [_u, _token] call co_main_fnc_releaseUnit;
                 };
             } forEach (units _grp);
         } forEach _groups;

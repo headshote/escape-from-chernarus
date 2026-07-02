@@ -35,6 +35,10 @@ CO_borderSegments = [
         private _t   = _i / _steps;
         private _pos = _start vectorMultiply (1 - _t) vectorAdd (_end vectorMultiply _t);
         _pos = _pos vectorAdd [random 30 - 15, random 30 - 15, 0];
+        private _jitter = missionNamespace getVariable ["CO_border_innerJitter", 200];
+        if (_jitter > 0) then {
+            _pos = _pos getPos [random _jitter, random 360];
+        };
 
         // Alternate tower and outpost
         private _template = if (_i % 3 == 0) then {"border_outpost"} else {"border_tower"};

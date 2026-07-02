@@ -66,6 +66,19 @@ CO_conscript_trainTime          = 600;    // seconds in training before front de
 // --- Police ---
 CO_police_carStopChance         = 0.05;
 CO_police_active                = true;
+CO_difficultyPreset             = "Standard"; // Quiet Occupation | Standard | Martial Law
+CO_suspicion_baseRate           = 12;
+CO_search_duration              = 150;
+CO_chase_speedCoef              = 1.12;
+CO_chase_aiStaminaDrain         = 0.42;
+CO_chase_tackleRange            = 2.2;
+CO_chase_tackleTime             = 1.5;
+CO_tracker_speedCoef            = 1.25;
+CO_checkpoint_maxCount          = 20;
+CO_border_innerJitter           = 200;
+CO_heat_decayPerMinute          = 5;
+CO_kpiLogInterval               = 120;
+CO_maxSimultaneousChases        = 6;
 
 // --- Admin ---
 CO_adminUIDs                    = [76561198054336866];     // add Steam64 UIDs allowed to open the admin panel
@@ -89,5 +102,9 @@ CO_adminUIDs                    = [76561198054336866];     // add Steam64 UIDs a
     "CO_airfield_guardCount","CO_airfield_gateGuards",
     "CO_conscript_detainTime","CO_conscript_trainTime",
     "CO_police_carStopChance","CO_police_active",
+    "CO_difficultyPreset","CO_suspicion_baseRate","CO_search_duration",
+    "CO_chase_speedCoef","CO_chase_aiStaminaDrain","CO_chase_tackleRange","CO_chase_tackleTime",
+    "CO_tracker_speedCoef","CO_checkpoint_maxCount","CO_border_innerJitter","CO_heat_decayPerMinute",
+    "CO_kpiLogInterval","CO_maxSimultaneousChases",
     "CO_adminUIDs"
 ];
