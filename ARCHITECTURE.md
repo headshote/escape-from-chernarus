@@ -286,6 +286,34 @@ VS Code will show false-positive CBA namespace errors. These do not affect build
 
 ---
 
+## Round R6 — Boot camp props, escape leash, AWOL fate roll, respawn wipe
+
+- **Boot camp props are persistent world objects** (`fn_buildTrainingGround`), not
+  per-quest-run spawns. Root cause of the vanishing/smoking crate: the old rack was
+  created each run at [10,-16] — the exact position of a firing-line sandbag — so it
+  clipped, blew up (the smoke), and was also deleted whenever stage 2 ended. Now:
+  indestructible rifle rack at [6,-28] (`CO_bootCampRack`/`CO_bootCampRackPos`,
+  JIP-persistent pickup action), grenade crate at the pit (`CO_bootCampGrenadeCrate`,
+  "Take grenades" action, 500 HandGrenades cargo), wreck + barrel targets at the
+  impact area, and two armed range wardens (firing line + pit). Firing-line sandbags
+  rotated to dir 90 — parallel to the target line. `fn_bootCampQuest` no longer
+  creates or deletes any of these.
+- **Training escape leash tunable:** `CO_training_escapeRadius` (default 250 m,
+  clamped to the old airfield+30 value) replaces the fixed 380 m in
+  `fn_trainingPhase`'s perimeter sentinel.
+- **`fn_awolConfrontation`** (new server loop, 2 s tick, launched in `fn_initServer`):
+  when armed CRN_ENF/POLICE stand within 12 m of a live AWOL for ~2 s, the squad
+  rolls the deserter's fate once (`CO_awol_detainChance`, default 0.5):
+  *detain* — cease fire, wipe AWOL/cleared/graduated/escape flags, knockout,
+  `spawnCaptureTransport` back to NWAF → `fn_trainingPhase` restarts (the
+  conscription loop is fully cyclical); *execute* — deliberate point-blank volley,
+  with `CO_awolExecution` lifting the non-lethal damage cap in
+  `fn_installNonLethalDamage` so the execution can actually kill.
+- **Respawn slate wipe:** server `EntityRespawned` mission EH (in `fn_initServer`)
+  resets every per-player state var (AWOL, cleared, detain phase, boot camp, wanted,
+  heat, escalation, captureInProgress, captive) on the new body — death is a clean
+  restart.
+
 ## Round R5 — Situational HUD + police uniform fix
 
 - **`fn_policeLoadout`** (new): shared police gear applicator; resolves the uniform

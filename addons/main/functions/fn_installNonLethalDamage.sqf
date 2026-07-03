@@ -47,6 +47,11 @@ _unit addEventHandler ["HandleDamage", {
     // non-lethal cap entirely.
     if ((group _shooter) getVariable ["CO_lethalShooter", false]) exitWith { _damage };
 
+    // A deserter condemned by an AWOL confrontation (fn_awolConfrontation
+    // rolled "execute") can actually be killed — otherwise the point-blank
+    // execution volley would just stun-loop forever.
+    if (_target getVariable ["CO_awolExecution", false]) exitWith { _damage };
+
     // Hard ceiling: this target can NEVER cross 0.85 cumulative damage
     // from TCK fire. We compute headroom and clamp the per-hit return
     // value below it so chained shots don't accidentally kill.
@@ -110,6 +115,8 @@ _unit addEventHandler ["Hit", {
     if !(_fac in ["CRN_ENF","POLICE"]) exitWith {};
     // Lethal border guards bypass the Hit-EH clamp too.
     if ((group _src) getVariable ["CO_lethalShooter", false]) exitWith {};
+    // Condemned deserters (AWOL execution) bypass the clamp too.
+    if (_target getVariable ["CO_awolExecution", false]) exitWith {};
 
     if ((damage _target) > 0.85) then {
         _target setDamage 0.85;

@@ -33,7 +33,10 @@ if (isServer) then {
         params ["_c"];
         if (isNil "CO_airfieldCenter") then { CO_airfieldCenter = [2100, 12800, 0] };
         if (isNil "CO_airfieldRadius") then { CO_airfieldRadius = 350 };
-        private _escapeRadius = CO_airfieldRadius + 30;
+        // Tighter, tunable leash: the old CO_airfieldRadius+30 (=380 m)
+        // let recruits wander far past the range before anyone reacted.
+        private _escapeRadius = (missionNamespace getVariable ["CO_training_escapeRadius", 250])
+            min (CO_airfieldRadius + 30);
         private _outside = false;
         private _outsideSince = -1;
 

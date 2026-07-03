@@ -299,6 +299,23 @@ All defaults live in `missions/ChernOccupation.Chernarus/CO_adminDefaults.sqf`.
   Clients start with `ItemMap`, `ItemCompass`, `ItemWatch` only — `ItemGPS`, `ItemRadio`,
   `B_UavTerminal` are stripped on init (per spec point 16).
 
+## Round R6 Changes — boot camp works, deserters get a second chance
+
+- **The rifle rack and grenade crate are always at the range now** (indestructible,
+  never despawn — the old crate spawned inside a sandbag and blew itself up). The
+  grenade pit has visible targets (a wreck and barrels), the firing-line sandbags
+  actually face downrange, and two armed wardens watch the range and the pit.
+- **Escaping training is riskier:** the escape line is much tighter (250 m from the
+  airfield center, tunable), and the new range wardens are close enough to shoot
+  immediately.
+- **Cornered deserters face a fate roll (50/50, tunable):** stand point-blank in
+  front of the hunters and the squad either executes you on the spot — for real, the
+  stun cap is lifted — or decides you're worth more alive: they knock you out, your
+  AWOL status is wiped, and a truck hauls you back to boot camp. Train, desert, get
+  caught, train again — the loop is endless.
+- **Death is a clean slate:** respawning clears AWOL, wanted, heat, and every
+  pipeline flag. A fresh body is a fresh civilian.
+
 ## Round R5 Changes — the HUD follows your story
 
 - **The threat display now matches your situation:**

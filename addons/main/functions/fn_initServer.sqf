@@ -29,9 +29,48 @@
     "CO_crime_killWanted","CO_crime_woundWanted","CO_crime_gunfireWanted",
     "CO_checkpoint_chaseLeash","CO_police_chaseDeadline",
     "CO_lockdown_extraPatrols","CO_lockdown_duration",
+    "CO_training_escapeRadius","CO_awol_detainChance",
     "CO_adminUIDs"
 ];
 sleep 0.5;
+
+// ---- Death wipes the slate (server-authoritative) --------------------
+// A fresh body must not inherit AWOL/wanted/heat/pipeline state from the
+// corpse — respawn is the "new civilian" reset. (Playtest: AWOL status
+// survived a respawn.) EntityRespawned fires on the server for every
+// player respawn and gives us the new unit to scrub.
+addMissionEventHandler ["EntityRespawned", {
+    params ["_newUnit", "_oldUnit"];
+    if (!isPlayer _newUnit) exitWith {};
+
+    _newUnit setCaptive false;
+    {
+        _newUnit setVariable [_x select 0, _x select 1, true];
+    } forEach [
+        ["CO_isAWOL", false],
+        ["CO_isCleared", false],
+        ["CO_awolExecution", false],
+        ["CO_detainPhase", ""],
+        ["CO_trainingEscape", false],
+        ["CO_hotHostile", 0],
+        ["CO_bootCampActive", false],
+        ["CO_bootCampGraduated", false],
+        ["CO_bootCampStage", ""],
+        ["CO_wantedLevel", 0],
+        ["CO_heatLevel", 0],
+        ["CO_escalationState", "UNAWARE"],
+        ["CO_escalationSource", ""],
+        ["CO_escalationUntil", 0],
+        ["CO_captureInProgress", false],
+        ["CO_knockedOut", false],
+        ["CO_hasFiredWeapon", false],
+        ["CO_threatNear", [99999, 99999]]
+    ];
+    _newUnit setVariable ["CO_wrangleActive", 0, false];
+    _newUnit setVariable ["CO_awolFate", ["", -999], false];
+    _newUnit setVariable ["CO_awolCloseSince", -1, false];
+    diag_log format ["[CO] Respawn slate wipe for %1.", name _newUnit];
+}];
 
 // Each init step is wrapped so an SQF error in one subsystem cannot silently
 // abort downstream subsystems. We track per-step status in
@@ -109,6 +148,7 @@ setTimeMultiplier 6;
 // subsystem, so it must survive even if a later step fails.
 ["stateWatchdog", { [] call co_main_fnc_stateWatchdog; }] call _launchStep;
 ["threatInfoLoop", { [] call co_main_fnc_threatInfoLoop; }] call _launchStep;
+["awolConfrontation", { [] call co_main_fnc_awolConfrontation; }] call _launchStep;
 ["spawnAllBuses", { [] call co_main_fnc_spawnAllBuses; }] call _launchStep;
 ["tckGlobalAggression", { [] call co_main_fnc_tckGlobalAggression; }] call _launchStep;
 ["civilianAI", { [] call co_main_fnc_civilianAI; }] call _launchStep;

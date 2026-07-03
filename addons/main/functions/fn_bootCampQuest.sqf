@@ -45,7 +45,13 @@ private _obstacleB       = CO_airfieldCenter vectorAdd [ 90,   20, 0];
 // training range and unmissable from the firing line. Previous round-8
 // placement at x=-110 (west of CO_trainingFieldPos) was in obstructed
 // off-runway terrain and players couldn't see the targets at all.
-private _weaponRackPos   = CO_trainingFieldPos vectorAdd [ 10, -16, 0];
+// The rack is a PERSISTENT prop built once by fn_buildTrainingGround
+// (indestructible, clear of the sandbags). Per-run creation at the
+// old [10,-16] offset spawned the crate INSIDE a firing-line sandbag,
+// which blew it up on spawn and deleted it at stage end.
+private _weaponRackPos   = missionNamespace getVariable [
+    "CO_bootCampRackPos", CO_trainingFieldPos vectorAdd [6, -28, 0]
+];
 private _riflePos        = CO_trainingFieldPos vectorAdd [ 10, -20, 0];
 private _rifleFireLine   = _riflePos;
 private _rifleTargetPositions = [
@@ -153,49 +159,8 @@ _player setVariable ["CO_bootCampStage", "2/3 — Rifle range", true];
  _riflePos, "ASSIGNED", 2
 ] call _fnc_makeTask;
 
-private _rack = createVehicle ["Box_NATO_WpsSpecial_F", _weaponRackPos, [], 0, "CAN_COLLIDE"];
-_rack setPos _weaponRackPos;
-_rack setDir 180;
-clearWeaponCargoGlobal _rack;
-clearMagazineCargoGlobal _rack;
-clearItemCargoGlobal _rack;
-// Bulk training stockpile (per user spec): ample weapons & ammo so an
-// entire wave of conscripts can pull from the same rack without it
-// emptying. clearWeaponCargoGlobal + addWeaponCargoGlobal is the safe
-// network-replicated path.
-_rack addWeaponCargoGlobal   ["arifle_AKM_F", 900];
-_rack addMagazineCargoGlobal ["30Rnd_762x39_Mag_F", 100000];
-// Per user spec: 1000 ammo carriers each so a wave of recruits can
-// kit up off the same rack without depleting. Box_NATO_WpsSpecial_F
-// supports backpack + item cargo for vests.
-_rack addBackpackCargoGlobal ["B_AssaultPack_rgr", 1000];
-_rack addItemCargoGlobal     ["V_HarnessO_brn",   1000];
-
-// addAction must be added on every client to be usable; remoteExec
-// with JIP=false (no persistent JIP entry — the rack is deleted at the
-// end of stage 2, so late-joiners never need it and a persistent JIP
-// queue entry per training run accumulates and degrades performance).
-private _rackAction = [
-    _rack,
-    [
-        "<t color='#00ff00'>Pick up training rifle</t>",
-        {
-            params ["_target", "_caller"];
-            if (!(_caller getVariable ["CO_bootCampActive", false])) exitWith {};
-            if ("arifle_AKM_F" in (weapons _caller)) exitWith {
-                hint "You already have the training rifle.";
-            };
-            _caller addWeapon "arifle_AKM_F";
-            _caller addMagazine "30Rnd_762x39_Mag_F";
-            _caller addMagazine "30Rnd_762x39_Mag_F";
-            _caller addMagazine "30Rnd_762x39_Mag_F";
-            _caller selectWeapon "arifle_AKM_F";
-            hint "Training rifle issued.\nDestroy the three wooden targets downrange.";
-        },
-        nil, 1.5, true, true, "",
-        "_this distance _target < 3 && (_this getVariable ['CO_bootCampActive', false])"
-    ]
-] remoteExec ["addAction", 0, false];
+// Rack + pickup action are persistent world props (fn_buildTrainingGround).
+// Nothing to spawn here — the marker below just points the recruit at it.
 
 // Pop-up wooden targets. Engine `damage` on TargetP_Inf_F does NOT rise
 // reliably from rifle hits (it animates rather than taking damage),
@@ -247,7 +212,6 @@ waitUntil {
 };
 
 { if (!isNull _x) then { deleteVehicle _x } } forEach _targets;
-if (!isNull _rack) then { deleteVehicle _rack };
 deleteMarker _mkR;
 { deleteMarker _x } forEach _targetMarkers;
 
