@@ -88,6 +88,7 @@ class CfgFunctions {
             class buildKrasnostavGarrison {};
             class spawnRussianReplacement {};
             class deployToFront    {};
+            class applyFrontLoadout {};
             class transportToDetention {};
             class spawnDetentionGuards {};
             class desertionMonitor {};
