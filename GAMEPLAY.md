@@ -299,6 +299,26 @@ All defaults live in `missions/ChernOccupation.Chernarus/CO_adminDefaults.sqf`.
   Clients start with `ItemMap`, `ItemCompass`, `ItemWatch` only — `ItemGPS`, `ItemRadio`,
   `B_UavTerminal` are stripped on init (per spec point 16).
 
+## Round R7 Changes — prisoner transports and living towns
+
+- **Prisoner vans actually drive now** — dedicated crews that no other system can
+  hijack, and no more teleport-hopping around Chernogorsk. A van that genuinely can't
+  move (blocked, flipped, destroyed) falls back once to the familiar
+  dismount-and-deliver at the training camp.
+- **You ride locked in the cargo hold** — and the scroll menu offers *Force the cargo
+  latch*: a 5-key lockpick puzzle. Crack it and you're dumped on the road as a hunted
+  fugitive (wanted +20, SEARCH posture, the escort chases for a while). If someone
+  shoots the crew dead, you're simply free. Escaping properly clears the
+  "DETAINED — IN TRANSPORT" state.
+- **Towns feel occupied:** TCK trucks disperse along staggered patrol routes instead
+  of idling nose-to-tail; one truck per big town parks and permanently dumps its
+  squad as a foot-harassment patrol (driver stays at the wheel); cruising trucks
+  periodically pull over near pedestrians and jump out to grab someone. NPC civilians
+  still get caught, loaded, and shipped to the training camp exactly as before.
+- **The parade formation is back** — recruits saluting in front of the flag with the
+  drill sergeant facing them. (They'd been getting drafted into escape pursuits and
+  marched off the map; they're props again, permanently.)
+
 ## Round R6 Changes — boot camp works, deserters get a second chance
 
 - **The rifle rack and grenade crate are always at the range now** (indestructible,

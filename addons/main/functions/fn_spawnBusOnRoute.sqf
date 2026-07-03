@@ -32,7 +32,7 @@
 // waypoints are intentionally NOT used.
 // ============================================================
 
-params ["_routeWps", "_hostilesCount"];
+params ["_routeWps", "_hostilesCount", ["_garrison", false]];
 
 if (count _routeWps == 0) exitWith {
     diag_log "[CO] spawnBusOnRoute: empty route — abort.";
@@ -173,6 +173,7 @@ _veh engineOn true;
 _veh allowDamage true;
 
 _veh setVariable ["CO_isBusPatrol", true, true];
+_veh setVariable ["CO_busGarrison", _garrison, true];
 _veh setVariable ["CO_busState", "traveling", true];
 _veh setVariable ["CO_busRouteWps", _routeWps, true];
 _veh setVariable ["CO_busCaptives", [], true];

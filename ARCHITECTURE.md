@@ -286,6 +286,39 @@ VS Code will show false-positive CBA namespace errors. These do not affect build
 
 ---
 
+## Round R7 — Transport overhaul, breakout, town garrisons, formation restored
+
+- **`fn_spawnCaptureTransport` rebuilt.** (a) The crew is now spawned FRESH in its own
+  group and claimed at priority 90 — the old version borrowed the driver from the
+  capturing group, whose controller kept re-tasking him (even moveInCargo'ing him back
+  into his TCK truck mid-route) and whose waypoints the transport overwrote. (b) The
+  stuck-watchdog no longer teleports the van: ladder = re-issue route → reverse out →
+  after the 3rd failure ONE fallback, the accepted dismount-and-deliver-to-training
+  flow (same as flipped/destroyed vans, which still work as before). (c) The drive
+  loop resolves to explicit outcomes: arrived / escaped / rescued (crew killed frees
+  the captive) / failsafe / dead. (d) Captive rides in **locked cargo**; escaping
+  clears the transport state, adds wanted +20, sets SEARCH, publishes the LKP, and the
+  crew chases for 45 s (tackle → re-transport). Vans/crews despawn when unobserved.
+- **`fn_breakoutMinigame`** (new, client): "Force the cargo latch" self-action while
+  in a capture transport — 5-key lockpick-style sequence (reuses CO_LockpickDialog);
+  success sets `CO_breakoutAt`, consumed by the transport drive loop; failure = 8 s
+  cooldown. Action installed in `fn_initClient` (re-added on respawn).
+- **Town TCK behavior** (`fn_spawnAllBuses` / `fn_spawnBusOnRoute` / `fn_busAgroLoop`):
+  buses sharing a route get ROTATED route starts (the guaranteed town trucks used to
+  all spawn at waypoint 0 nose-to-tail and gridlock into permanent idling); the first
+  bus per intra-town route becomes the **town garrison** (`CO_busGarrison`): parks,
+  driver stays, squad released as a permanent foot-harassment patrol driven by
+  tckGlobalAggression; and the lost `CO_bus_patrolStopInterval` behavior is restored —
+  cruising trucks periodically pull over near pedestrians and jump the squad out
+  through the normal dismount/hunt/reboard cycle.
+- **`fn_tckGlobalAggression`** now refuses to touch units holding a claim of
+  priority ≥ 60 (transport crews, AWOL detain squads) — including via the
+  retaliation path, which bypasses normal claim acquisition.
+- **Parade formation restored.** The training-escape sentinel was drafting the
+  saluting recruit dummies and the drill instructor (both CRN_ENF) into pursuits,
+  marching the whole formation off the map. They're excluded now, and both anim
+  loops self-heal (walk back + re-disable MOVE if displaced).
+
 ## Round R6 — Boot camp props, escape leash, AWOL fate roll, respawn wipe
 
 - **Boot camp props are persistent world objects** (`fn_buildTrainingGround`), not

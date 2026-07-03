@@ -140,6 +140,7 @@ class CfgFunctions {
             class policeLoadout    {};
             class threatInfoLoop   {};
             class awolConfrontation {};
+            class breakoutMinigame {};
             class qaScenarios      {};
             class spawnLockdownPatrol {};
             class buildTrainingGround {};

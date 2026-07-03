@@ -61,6 +61,8 @@ if (count _routeWps == 0) then { _routeWps = [getPosATL _veh] };
 
 private _stuckSince     = -1;
 private _lastDoMove     = 0;
+private _nextPatrolStop = time + 40 + random 60;
+private _forcePatrolDismount = false;
 private _huntTarget     = objNull;
 private _huntUntil      = 0;
 private _dismountUntil  = 0;
@@ -79,6 +81,68 @@ _veh setVariable ["CO_busState", "traveling", true];
 _veh engineOn true;
 _veh forceSpeed -1;
 sleep 2;
+
+// ---------------------------------------------------------------
+// TOWN GARRISON MODE: one designated truck per large town parks at
+// its spawn and dumps the whole squad as a permanent foot-harassment
+// patrol (the driver stays with the truck). The escorts are released
+// from the bus so fn_tckGlobalAggression drives them exactly like
+// urban TCK foot patrols — including loading captured civilians into
+// dispatched transports.
+// ---------------------------------------------------------------
+if (_veh getVariable ["CO_busGarrison", false]) exitWith {
+    private _drv0 = driver _veh;
+    if (!isNull _drv0) then { doStop _drv0 };
+    _veh forceSpeed 0;
+    _veh engineOn false;
+    _veh setVariable ["CO_busState", "garrison", true];
+
+    _escortGrp setVariable ["CO_isBusEscortGrp", false, true];
+    _escortGrp setBehaviour "AWARE";
+    _escortGrp setCombatMode "YELLOW";
+    _escortGrp setSpeedMode "LIMITED";
+    {
+        if (alive _x && vehicle _x == _veh) then {
+            _x allowGetIn false;
+            unassignVehicle _x;
+            _x action ["GetOut", _veh];
+            doGetOut _x;
+            [_x, _veh] spawn {
+                params ["_u", "_v"];
+                sleep 1.2;
+                if (alive _u && vehicle _u == _v) then {
+                    moveOut _u;
+                    if (vehicle _u == _v) then {
+                        _u setPosATL ((getPosATL _v) vectorAdd [(random 6) - 3, (random 6) - 3, 0]);
+                    };
+                };
+            };
+            _x setBehaviour "AWARE";
+            _x setCombatMode "YELLOW";
+            _x enableAI "AUTOTARGET";
+            _x enableAI "TARGET";
+        };
+    } forEach (units _escortGrp);
+
+    // Foot patrol route around the parked truck.
+    sleep 2;
+    { deleteWaypoint _x } forEach +waypoints _escortGrp;
+    for "_w" from 0 to 4 do {
+        private _wpPos = (getPosATL _veh) getPos [40 + random 110, random 360];
+        private _wp = _escortGrp addWaypoint [_wpPos, 15];
+        _wp setWaypointType "MOVE";
+        _wp setWaypointSpeed "LIMITED";
+        _wp setWaypointBehaviour "AWARE";
+        _wp setWaypointCombatMode "YELLOW";
+    };
+    private _cyc = _escortGrp addWaypoint [getPosATL _veh, 15];
+    _cyc setWaypointType "CYCLE";
+
+    diag_log format [
+        "[CO] Bus %1 GARRISON at %2 — %3 escorts released as foot harassers, driver stays.",
+        netId _veh, mapGridPosition _veh, { alive _x } count units _escortGrp
+    ];
+};
 
 private _resumeRoute = {
     params ["_drvGrp", "_veh"];
@@ -370,7 +434,7 @@ while { alive _veh } do {
     if (!alive _veh) exitWith {};
 
     private _state  = _veh getVariable ["CO_busState", "traveling"];
-    if (_state in ["delivering","abandoned"]) then { continue };
+    if (_state in ["delivering","abandoned","garrison"]) then { continue };
     // Defensive: legacy code paths set state to "cruising" after a
     // delivery. Treat it as a synonym for "traveling" so this loop
     // doesn't drop the bus into a do-nothing state. (The proper post-
@@ -525,12 +589,36 @@ while { alive _veh } do {
     // half-full. Now uses speed-based detection (bus actually below
     // walking pace) and dumps the whole escort squad.
     // ====================================================================
+    // ---- Proactive patrol stop (R6 restore of the lost
+    // CO_bus_patrolStopInterval behavior): while cruising, the truck
+    // periodically pulls over near pedestrians and jumps the squad out
+    // to harass them on foot, then reboards via the normal dismount
+    // cycle. The driver never leaves the wheel.
+    if (_state == "traveling" && time > _nextPatrolStop) then {
+        private _interval = missionNamespace getVariable ["CO_bus_patrolStopInterval", 75];
+        _nextPatrolStop = time + _interval + random _interval;
+        private _pedNearby = ((getPosATL _veh) nearEntities [["Man"], 130]) findIf {
+            alive _x && vehicle _x == _x &&
+            !captive _x &&
+            !(_x getVariable ["CO_isFemale", false]) &&
+            (isPlayer _x || side _x == civilian) &&
+            ((group _x) getVariable ["CO_faction", ""]) == ""
+        };
+        if (_pedNearby >= 0) then {
+            diag_log format ["[CO] Bus %1 patrol stop at %2 — squad jumping out.", netId _veh, mapGridPosition _veh];
+            if (!isNull _driver && alive _driver) then { doStop _driver };
+            _veh forceSpeed 0;
+            _forcePatrolDismount = true;
+        };
+    };
+
     if (_state in ["traveling", "approaching"]) then {
         if ((speed _veh) >= BUS_STUCK_SPEED) then {
             _idleSince = time;
             _lastIdlePos = getPosATL _veh;
         };
-        if ((time - _idleSince) > BUS_IDLE_DISMOUNT_GRACE) then {
+        if (_forcePatrolDismount || (time - _idleSince) > BUS_IDLE_DISMOUNT_GRACE) then {
+            _forcePatrolDismount = false;
             diag_log format [
                 "[CO] Bus %1 idle %2s in state '%3' (speed=%4) — FULL escort dismount.",
                 netId _veh, round (time - _idleSince), _state, round (speed _veh)

@@ -86,6 +86,16 @@ diag_log "[CO] tckGlobalAggression: starting global failsafe loop (radius=60m, t
                 if (_u getVariable ["CO_knockedOut", false]) then { continue };
                 if (_u getVariable ["CO_vehicleChaseDriver", false]) then { continue };
 
+                // Respect high-priority claims (capture-transport crews,
+                // AWOL detain squads): those units belong to another
+                // controller and must never be yanked — even by
+                // retaliation, which bypasses the normal claim attempt.
+                private _claim = _u getVariable ["CO_claim", []];
+                if (
+                    !(_claim isEqualTo []) &&
+                    { (_claim select 2) > time && (_claim select 1) >= 60 }
+                ) then { continue };
+
                 // Retaliation FIRST, before the mounted skip (audit R2-7):
                 // units shot at while sitting in a vehicle dismount and
                 // return fire instead of staring through the windshield.

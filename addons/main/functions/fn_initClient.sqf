@@ -62,9 +62,27 @@ player addEventHandler ["Fired", {
     };
 };
 
+// Breakout self-action: visible only while locked in a capture
+// transport. Runs the latch minigame; success is consumed by the
+// transport's drive loop on the server.
+CO_fnc_addBreakoutAction = {
+    params [["_unit", player]];
+    _unit addAction [
+        "<t color='#FF9944'>Force the cargo latch</t>",
+        { [] spawn co_main_fnc_breakoutMinigame; },
+        nil, 1.6, false, true, "",
+        "(player getVariable ['CO_detainPhase','']) == 'transport'
+         && vehicle player != player
+         && ((vehicle player) getVariable ['CO_isCaptureTransport', false])
+         && time > (player getVariable ['CO_nextBreakoutAt', 0])"
+    ];
+};
+[player] call CO_fnc_addBreakoutAction;
+
 // Re-install after every respawn
 addMissionEventHandler ["Respawn", {
     params ["_newUnit"];
+    [_newUnit] call CO_fnc_addBreakoutAction;
     _newUnit setVariable ["CO_nonLethalInstalled", false, true];
     [_newUnit] call co_main_fnc_installNonLethalDamage;
     // Re-arm the weapon-fired tracker on the new body — the original EH was

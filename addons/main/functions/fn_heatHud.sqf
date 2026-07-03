@@ -194,6 +194,9 @@ CO_fnc_hudPresence = {
             if (_detain == "detention") then {
                 _lines pushBack "<t align='right' size='0.75' color='#C8D2D8'>Cell locks can be picked — look for the action.</t>";
             };
+            if (_detain == "transport") then {
+                _lines pushBack "<t align='right' size='0.75' color='#C8D2D8'>The cargo latch can be forced — check the scroll menu.</t>";
+            };
         };
         case "training": {
             _lines pushBack "<t align='right' size='1.0' color='#E8C558'>CONSCRIPT TRAINING</t>";

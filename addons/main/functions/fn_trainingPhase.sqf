@@ -85,10 +85,18 @@ if (isServer) then {
                 // Pursuit: every CRN_ENF unit within 900 m gets lethal
                 // orders against the escapee and is pushed to run after
                 // them. fireAtTarget bypasses engine side-friendship.
+                // NOTE: the parade-ground recruit dummies and the drill
+                // instructor are CRN_ENF too — drafting them into the
+                // pursuit re-enabled their movement AI and marched the
+                // whole saluting formation off the map, permanently
+                // (playtest: "the formation disappeared"). They are props,
+                // not guards — exclude them.
                 private _shooters = (CO_airfieldCenter nearEntities [["Man"], 900]) select {
                     alive _x &&
                     vehicle _x == _x &&
-                    ((group _x) getVariable ["CO_faction", ""]) == "CRN_ENF"
+                    ((group _x) getVariable ["CO_faction", ""]) == "CRN_ENF" &&
+                    !(_x getVariable ["CO_isRecruitDummy", false]) &&
+                    !(_x getVariable ["CO_drillInstructor", false])
                 };
                 {
                     _x reveal [_c, 4];

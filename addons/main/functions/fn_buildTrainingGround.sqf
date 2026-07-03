@@ -28,12 +28,21 @@ _instructor setDir 180;
 _instructor disableAI "MOVE"; // stay at podium
 _instructor setVariable ["CO_drillInstructor", true, true];
 
-// Whistle-shout loop so the parade ground reads as live
-[_instructor] spawn {
-    params ["_inst"];
+// Whistle-shout loop so the parade ground reads as live. Also
+// self-heals the podium pose: if any aggression loop re-enabled
+// his movement AI, he walks back and plants himself again.
+[_instructor, CO_trainingFieldPos] spawn {
+    params ["_inst", "_podium"];
     while { alive _inst } do {
         sleep (20 + random 30);
         if (alive _inst) then {
+            if ((_inst distance2D _podium) > 8) then {
+                _inst enableAI "MOVE";
+                _inst doMove _podium;
+            } else {
+                _inst disableAI "MOVE";
+                _inst setDir 180;
+            };
             [_inst, "GestureGo"] remoteExec ["playActionNow", 0];
         };
     };
@@ -61,10 +70,19 @@ for "_row" from 0 to 2 do {
         _r allowFleeing 0;
         _r setVariable ["CO_isRecruitDummy", true, true];
 
-        // Idle drill: switchMove between attention and parade rest
-        [_r] spawn {
-            params ["_u"];
+        // Idle drill: switchMove between attention and parade rest.
+        // Re-asserts disableAI MOVE + formation spot every cycle so no
+        // aggression loop can permanently march the dummy away.
+        [_r, _rPos] spawn {
+            params ["_u", "_spot"];
             while { alive _u } do {
+                if ((_u distance2D _spot) > 5) then {
+                    _u enableAI "MOVE";
+                    _u doMove _spot;
+                    sleep 6;
+                };
+                _u disableAI "MOVE";
+                _u setDir 90;
                 _u playMoveNow "AmovPercMstpSnonWnonDnon_Salute";
                 sleep (4 + random 3);
                 if (!alive _u) exitWith {};
