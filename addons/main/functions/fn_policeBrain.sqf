@@ -74,6 +74,33 @@ if (!isNil "CO_policeTownPosts") then {
 
         private _leadPos = getPosATL (leader _grp);
 
+        // ---- 0. Retaliation: partner knocked out / squad assaulted ----
+        // POLICE are excluded from tckGlobalAggression, so nothing was
+        // consuming their CO_retaliateTarget — a cop could watch his
+        // partner get beaten unconscious and go back to patrolling.
+        // fn_applyMeleeHit / fn_applyKnockout now set the retaliate vars;
+        // response doctrine is chase-and-DETAIN (foot chase's tackle path),
+        // not execute.
+        private _retUntil = _grp getVariable ["CO_retaliateUntil", 0];
+        private _retTarget = _grp getVariable ["CO_retaliateTarget", objNull];
+        if (
+            _retUntil > time &&
+            !isNull _retTarget && alive _retTarget &&
+            !captive _retTarget &&
+            !(_retTarget getVariable ["CO_knockedOut", false]) &&
+            !(_retTarget getVariable ["CO_captureInProgress", false]) &&
+            ((leader _grp) distance2D _retTarget) < 260
+        ) then {
+            _grp setVariable ["CO_retaliateUntil", 0, false];
+            diag_log format ["[CO] Police retaliation: %1 pursuing assailant %2.", _grp, _retTarget];
+            if (vehicle _retTarget != _retTarget && _carAlive) then {
+                [_grp, _car, _retTarget, "police_retaliate"] spawn co_main_fnc_policeVehiclePursuit;
+            } else {
+                [_grp, _car, _retTarget] spawn co_main_fnc_policeFootChase;
+            };
+            continue;
+        };
+
         // ---- 1. Alert-net response -----------------------------------
         private _radioRange = if (_carAlive) then { 700 } else { 400 };
         private _alerts = [_leadPos, _radioRange, 90] call co_main_fnc_alertQuery;

@@ -59,6 +59,29 @@ if ((time - _lastHitAt) > 8) then {
 _hitCount = _hitCount + 1;
 _target setVariable ["CO_meleePunchState", [_hitCount, time], true];
 
+// Assaulting a security-forces member is a CRIME — but this melee
+// system applies damage via setHitPointDamage, which never fires the
+// "Hit" event handler, so the crime/retaliation system was blind to
+// it: knocked-out cops woke up amnesiac and their partners watched
+// you punch them out without reacting. Wire it in explicitly.
+private _tFac = (group _target) getVariable ["CO_faction", ""];
+if (_tFac in ["CRN_ENF", "POLICE"] && { isPlayer _attacker || side _attacker == civilian }) then {
+    private _tGrp = group _target;
+    _tGrp setVariable ["CO_retaliateTarget", _attacker, false];
+    _tGrp setVariable ["CO_retaliateUntil", time + 180, false];
+    // Bus squads get the emergency-dismount order too.
+    if ((_tGrp getVariable ["CO_isBusDriverGrp", false]) || (_tGrp getVariable ["CO_isBusEscortGrp", false])) then {
+        private _bus = _tGrp getVariable ["CO_transportVehicle", objNull];
+        if (!isNull _bus && alive _bus) then {
+            _bus setVariable ["CO_busEmergencyTarget", _attacker, false];
+            _bus setVariable ["CO_busEmergencyUntil", time + 90, false];
+            _bus setVariable ["CO_busEmergencyWeapons", false, false];
+        };
+    };
+    // Wanted/witness consequences (internally throttled per attacker).
+    [_attacker, _target, "wound"] call co_main_fnc_reportCrime;
+};
+
 if (!isPlayer _target) then {
     _target setVariable ["CO_civState", "fleeing", false];
     _target setVariable ["CO_civAlertUntil", time + 12, false];

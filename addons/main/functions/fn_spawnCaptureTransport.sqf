@@ -457,7 +457,8 @@ _captive setCaptive true;
             { [_x, _token] call co_main_fnc_releaseUnit } forEach (units _crewGrp);
             if (_recaptured && alive _captive) then {
                 _captive setCaptive true;
-                [_captive, _crewGrp] spawn co_main_fnc_spawnCaptureTransport;
+                // Re-tackled at reach → kneel beat, then a fresh transport.
+                [_captive, _crewGrp] call co_main_fnc_detainSequence;
             };
             call _despawnCrewAndVan;
         };

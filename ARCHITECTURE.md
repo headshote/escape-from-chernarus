@@ -286,6 +286,36 @@ VS Code will show false-positive CBA namespace errors. These do not affect build
 
 ---
 
+## Round R8 — Police reaction, return-fire, physical detain
+
+- **Melee assaults are now crimes.** `fn_applyMeleeHit` applies damage via
+  `setHitPointDamage`, which NEVER fires the "Hit" event handler — so punching a cop
+  was invisible to the crime/retaliation system (knocked-out cops woke amnesiac; their
+  partners ignored the assault). Melee on a CRN_ENF/POLICE unit now explicitly sets the
+  group's `CO_retaliateTarget`/`CO_retaliateUntil` (+ bus emergency) and calls
+  `fn_reportCrime` "wound".
+- **Knocked-out officers remember.** `fn_applyKnockout` records `CO_lastKnockoutBy`;
+  on wake-up, a POLICE/CRN_ENF unit re-arms its group's retaliation against the
+  assailant (if still nearby) so they don't get up and wander off.
+- **Police retaliation response.** `fn_policeBrain` gained a top-priority block that
+  consumes `CO_retaliateTarget` (POLICE were excluded from tckGlobalAggression, so
+  nothing was reading it): partner-down / squad-assaulted → chase-and-DETAIN via
+  `fn_policeFootChase` (or vehicle pursuit), within 260 m.
+- **Return-fire window.** `fn_policeFootChase` now keys the firefight on the player's
+  last shot: while they've fired within `CO_police_returnFireWindow` (10 s) officers
+  trade fire back (non-lethal-filtered) at any range and the tackle is suppressed; once
+  they stop shooting for the whole window officers holster and drop back to
+  chase/tackle/detain. Replaces the old WEAPONS-only >18 m volley.
+- **`fn_detainSequence`** (new): the physical arrest beat — an officer must be at arm's
+  reach (walks up to a target downed at range; aborts and frees the target if none can
+  reach), the detainee is forced to a kneeling pose (`Acts_ExecutionVictim_Loop`,
+  re-asserted through the hold), THEN `fn_spawnCaptureTransport` is dispatched. No more
+  telekinetic grabs. Wired into every conscious player-capture path: police foot chase,
+  checkpoint (tackle + downed-at-range), bus hunter (tackle + downed), TCK global
+  aggression, and the transport-breakout recapture. NPC capture paths (bus loading,
+  transportToDetention) are unchanged. New flag `CO_detainInProgress` (cleared by the
+  state watchdog and the respawn wipe).
+
 ## Round R7 — Transport overhaul, breakout, town garrisons, formation restored
 
 - **`fn_spawnCaptureTransport` rebuilt.** (a) The crew is now spawned FRESH in its own

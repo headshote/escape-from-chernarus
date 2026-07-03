@@ -327,11 +327,11 @@ private _spawnEscortHunter = {
 
                         if (_result == "captured") then {
                             _myTarget setCaptive true;
-                            _myTarget setVariable ["CO_captureInProgress", false, true];
                             [getPosATL _bus, 120, _bus] call co_main_fnc_civilianPanic;
-                            [_myTarget, group _u] spawn co_main_fnc_spawnCaptureTransport;
+                            // Kneel-and-load beat (escort is at tackle range).
+                            [_myTarget, group _u] call co_main_fnc_detainSequence;
                             diag_log format [
-                                "[CO] Bus %1: player %2 tackled -> dedicated capture-transport dispatched.",
+                                "[CO] Bus %1: player %2 tackled -> detain sequence.",
                                 netId _bus, name _myTarget
                             ];
                             _myTarget = objNull;
@@ -362,18 +362,13 @@ private _spawnEscortHunter = {
                         _myTarget setVariable ["CO_busLastCaptureTime", time, true];
 
                         if (isPlayer _myTarget) then {
-                            // Wake them up — spawnCaptureTransport teleports
-                            // them into the truck cab so they need to be
-                            // conscious to ride.
-                            _myTarget setUnconscious false;
-                            _myTarget setVariable ["CO_knockedOut", false, true];
                             [getPosATL _bus, 120, _bus] call co_main_fnc_civilianPanic;
-                            // Dispatch a dedicated capture truck with driver
-                            // + jailer. The bus continues cruising and can
-                            // capture more NPCs in the meantime.
-                            [_myTarget, group _u] spawn co_main_fnc_spawnCaptureTransport;
+                            // Downed by weapons-free fire → an escort must
+                            // reach the player and cuff them (kneel beat)
+                            // before the truck is dispatched. No telegrab.
+                            [_myTarget, group _u] call co_main_fnc_detainSequence;
                             diag_log format [
-                                "[CO] Bus %1: player %2 knocked out → dedicated capture-transport dispatched.",
+                                "[CO] Bus %1: player %2 knocked out → detain sequence.",
                                 netId _bus, name _myTarget
                             ];
                             _myTarget = objNull;

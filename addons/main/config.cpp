@@ -141,6 +141,7 @@ class CfgFunctions {
             class threatInfoLoop   {};
             class awolConfrontation {};
             class breakoutMinigame {};
+            class detainSequence   {};
             class qaScenarios      {};
             class spawnLockdownPatrol {};
             class buildTrainingGround {};

@@ -99,6 +99,7 @@ CO_stateWatchdogRunning = true;
                 ((time - (_u getVariable ["CO_wrangleActive", 0])) > 30);
             if ([format ["cip_%1", netId _u], _stuck, 180] call _check) then {
                 _u setVariable ["CO_captureInProgress", false, true];
+                _u setVariable ["CO_detainInProgress", false, true];
                 ["watchdog_recovery"] call co_main_fnc_kpi;
                 diag_log format ["[CO][WATCHDOG] Cleared stuck CO_captureInProgress on %1.", _u];
             };

@@ -299,6 +299,21 @@ All defaults live in `missions/ChernOccupation.Chernarus/CO_adminDefaults.sqf`.
   Clients start with `ItemMap`, `ItemCompass`, `ItemWatch` only — `ItemGPS`, `ItemRadio`,
   `B_UavTerminal` are stripped on init (per spec point 16).
 
+## Round R8 Changes — cops that react, and real arrests
+
+- **Assaulting police has consequences.** Knock a cop out and he gets up angry — he and
+  his partner come after you to arrest you (before, they'd wake up and shrug, and a
+  partner watched you beat his colleague without reacting). Punching an officer now
+  counts as a crime and raises your wanted level.
+- **Firefights, then arrests.** If you draw a weapon and shoot, police shoot back for
+  as long as you keep firing — they won't walk into your muzzle to grab you. Stop
+  shooting for ~10 seconds and they holster and close in to detain you instead.
+- **No more telekinetic arrests.** Getting detained now requires an officer to actually
+  walk up to you: you're forced to your knees for a moment, and only then is the
+  transport truck sent. If they shoot you down from range, a guard has to reach your
+  body first — and if nobody can get to you, you're not taken at all. The same applies
+  to TCK snatch squads: no grabbing you from across the street.
+
 ## Round R7 Changes — prisoner transports and living towns
 
 - **Prisoner vans actually drive now** — dedicated crews that no other system can

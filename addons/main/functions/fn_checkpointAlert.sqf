@@ -80,7 +80,8 @@ if (isNull _hostileGrp) exitWith {};
                     _target setCaptive true;
                     private _grpFac = _grp getVariable ["CO_faction", ""];
                     if (_grpFac == "CRN_ENF") then {
-                        [_target, _grp] spawn co_main_fnc_spawnCaptureTransport;
+                        // Kneel-and-load beat (guard is at tackle range).
+                        [_target, _grp] call co_main_fnc_detainSequence;
                     } else {
                         [_target, _grp] call co_main_fnc_transportToDetention;
                     };
@@ -172,7 +173,10 @@ if (isNull _hostileGrp) exitWith {};
                 _target setCaptive true;
                 private _grpFac = _grp getVariable ["CO_faction", ""];
                 if (isPlayer _target && _grpFac == "CRN_ENF") then {
-                    [_target, _grp] spawn co_main_fnc_spawnCaptureTransport;
+                    // Downed at range → a guard must physically reach the
+                    // player and cuff them (kneel beat) before any truck
+                    // shows up. No teleport-grab from across the post.
+                    [_target, _grp] call co_main_fnc_detainSequence;
                 } else {
                     [_target, _grp] call co_main_fnc_transportToDetention;
                 };

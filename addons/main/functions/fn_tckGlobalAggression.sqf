@@ -222,8 +222,9 @@ diag_log "[CO] tckGlobalAggression: starting global failsafe loop (radius=60m, t
                                 private _result = [_t, 20] call co_main_fnc_runWrangle;
                                 if (_result == "captured") then {
                                     _t setCaptive true;
-                                    _t setVariable ["CO_captureInProgress", false, true];
-                                    [_t, group _u] spawn co_main_fnc_spawnCaptureTransport;
+                                    // Kneel-and-load beat (this unit is at
+                                    // tackle range).
+                                    [_t, group _u] call co_main_fnc_detainSequence;
                                     _captured = true;
                                 };
                                 if (_result == "escaped") then {

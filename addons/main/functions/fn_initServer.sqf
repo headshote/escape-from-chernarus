@@ -27,7 +27,7 @@
     "CO_tracker_speedCoef","CO_checkpoint_maxCount","CO_border_innerJitter","CO_heat_decayPerMinute",
     "CO_kpiLogInterval","CO_maxSimultaneousChases",
     "CO_crime_killWanted","CO_crime_woundWanted","CO_crime_gunfireWanted",
-    "CO_checkpoint_chaseLeash","CO_police_chaseDeadline",
+    "CO_checkpoint_chaseLeash","CO_police_chaseDeadline","CO_police_returnFireWindow",
     "CO_lockdown_extraPatrols","CO_lockdown_duration",
     "CO_training_escapeRadius","CO_awol_detainChance",
     "CO_adminUIDs"
@@ -64,6 +64,7 @@ addMissionEventHandler ["EntityRespawned", {
         ["CO_escalationSource", ""],
         ["CO_escalationUntil", 0],
         ["CO_captureInProgress", false],
+        ["CO_detainInProgress", false],
         ["CO_knockedOut", false],
         ["CO_hasFiredWeapon", false],
         ["CO_threatNear", [99999, 99999]]

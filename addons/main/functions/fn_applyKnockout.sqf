@@ -27,6 +27,9 @@ _duration = (_duration max 5) min 120;
 _target setVariable ["CO_knockedOut", true, true];
 _target setVariable ["CO_knockedOutUntil", time + _duration, true];
 _target setVariable ["CO_knockoutPersistentCaptive", _keepCaptive, true];
+if (!isNull _attacker) then {
+    _target setVariable ["CO_lastKnockoutBy", _attacker, false];
+};
 _target setCaptive true;
 _target setUnconscious true;
 
@@ -52,6 +55,23 @@ if (!isPlayer _target) then {
         _target enableAI "PATH";
         _target enableAI "AUTOTARGET";
         _target enableAI "TARGET";
+
+        // A security-forces member who wakes up REMEMBERS who dropped
+        // him: re-arm the squad's retaliation so his group's brain
+        // (police) or the global aggression loop (TCK) chases the
+        // attacker down instead of shrugging and walking off.
+        private _fac = (group _target) getVariable ["CO_faction", ""];
+        if (_fac in ["POLICE", "CRN_ENF"]) then {
+            private _byWhom = _target getVariable ["CO_lastKnockoutBy", objNull];
+            if (
+                !isNull _byWhom && alive _byWhom && !captive _byWhom &&
+                !(_byWhom getVariable ["CO_knockedOut", false]) &&
+                (_target distance2D _byWhom) < 220
+            ) then {
+                (group _target) setVariable ["CO_retaliateTarget", _byWhom, false];
+                (group _target) setVariable ["CO_retaliateUntil", time + 120, false];
+            };
+        };
     };
 
     if (!_keepCaptive) then {

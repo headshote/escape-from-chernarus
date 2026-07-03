@@ -92,6 +92,7 @@ CO_crime_woundWanted            = 40;     // ... for a witnessed wounding
 CO_crime_gunfireWanted          = 10;     // ... per reported gunshot (throttled)
 CO_checkpoint_chaseLeash        = 250;    // max chase distance from a checkpoint before radio handoff
 CO_police_chaseDeadline         = 180;    // seconds before a police foot chase converts to search
+CO_police_returnFireWindow      = 10;     // seconds since the player's last shot that police keep trading fire
 CO_lockdown_extraPatrols        = 2;      // temporary foot-patrol pairs after witnessed violence
 CO_lockdown_duration            = 600;    // seconds
 
@@ -126,7 +127,7 @@ CO_adminUIDs                    = [76561198054336866];     // add Steam64 UIDs a
     "CO_tracker_speedCoef","CO_checkpoint_maxCount","CO_border_innerJitter","CO_heat_decayPerMinute",
     "CO_kpiLogInterval","CO_maxSimultaneousChases",
     "CO_crime_killWanted","CO_crime_woundWanted","CO_crime_gunfireWanted",
-    "CO_checkpoint_chaseLeash","CO_police_chaseDeadline",
+    "CO_checkpoint_chaseLeash","CO_police_chaseDeadline","CO_police_returnFireWindow",
     "CO_lockdown_extraPatrols","CO_lockdown_duration",
     "CO_training_escapeRadius","CO_awol_detainChance",
     "CO_adminUIDs"

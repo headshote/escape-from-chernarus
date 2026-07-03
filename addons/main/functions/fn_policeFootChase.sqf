@@ -116,9 +116,9 @@ private _captureTarget = {
             _target setCaptive true;
             _target setUnconscious false;
             _target setVariable ["CO_knockedOut", false, true];
-            _target setVariable ["CO_captureInProgress", false, true];
-            [_target, _grp] spawn co_main_fnc_spawnCaptureTransport;
-            diag_log format ["[CO] Police foot chase captured player %1.", name _target];
+            // Kneel-and-load beat (guard is already at tackle range).
+            [_target, _grp] call co_main_fnc_detainSequence;
+            diag_log format ["[CO] Police foot chase detained player %1.", name _target];
             true
         };
 
@@ -196,7 +196,14 @@ while {
         };
     };
 
-    if (vehicle _target == _target && { [_live, _target] call co_main_fnc_proximityTackle }) then {
+    // Is the fugitive actively shooting? (fired within the return-fire
+    // window). Drives the firefight-vs-detain decision below.
+    private _fireWindow = missionNamespace getVariable ["CO_police_returnFireWindow", 10];
+    private _recentlyFired = (time - (_target getVariable ["CO_lastFireTime", -999])) < _fireWindow;
+
+    // Tackle/detain ONLY when the target is not mid-firefight — you
+    // don't walk up to grab someone who's shooting at you.
+    if (!_recentlyFired && vehicle _target == _target && { [_live, _target] call co_main_fnc_proximityTackle }) then {
         private _sorted = [_live, [], { _x distance _target }, "ASCEND"] call BIS_fnc_sortBy;
         private _attacker = _sorted select 0;
         _captured = [_attacker] call _captureTarget;
@@ -221,26 +228,40 @@ while {
         };
     };
 
-    if ((_target getVariable ["CO_wantedLevel", 0]) >= 75 || (_target getVariable ["CO_hasFiredWeapon", false])) then {
-        [_target, "WEAPONS", "police_escalation", 85, _grp] call co_main_fnc_setEscalationState;
-    };
-
-    // WEAPONS posture: officers fire to stun (fn_installNonLethalDamage
-    // was applied to the target at chase start) when the fugitive keeps
-    // opening distance. Without this, police pistols were decorative.
-    if (
-        time > _nextVolleyAt && _hasSight &&
-        (_target getVariable ["CO_escalationState", ""]) == "WEAPONS" &&
-        vehicle _target == _target
-    ) then {
-        private _byDist = [_live, [], { _x distance _target }, "ASCEND"] call BIS_fnc_sortBy;
-        if ((( _byDist select 0) distance _target) > 18) then {
+    // ---- Return-fire vs. detain -----------------------------------
+    // The fugitive is shooting → trade fire back (rounds are kept
+    // non-lethal by fn_installNonLethalDamage: stun → downed → capture)
+    // at ANY range, for as long as they keep firing. When they stop for
+    // the whole window, officers holster and drop straight back to the
+    // chase/tackle/detain posture above. This is the "shoot back until
+    // you stop shooting" behavior.
+    if (_recentlyFired) then {
+        [_target, "WEAPONS", "police_firefight", 85, _grp] call co_main_fnc_setEscalationState;
+        if (_hasSight && time > _nextVolleyAt) then {
+            private _byDist = [_live, [], { _x distance _target }, "ASCEND"] call BIS_fnc_sortBy;
             {
                 _x reveal [_target, 4];
                 _x doTarget _target;
+                _x setCombatMode "RED";
                 _x fireAtTarget [_target];
-            } forEach (_byDist select [0, 2 min count _byDist]);
-            _nextVolleyAt = time + 4;
+            } forEach (_byDist select [0, 3 min count _byDist]);
+            _nextVolleyAt = time + 2.5;
+        };
+    } else {
+        // Firefight lull — holster and return to arrest posture.
+        if ((_target getVariable ["CO_escalationState", ""]) == "WEAPONS") then {
+            {
+                if (alive _x) then {
+                    _x setCombatMode "YELLOW";
+                    _x doTarget objNull;
+                };
+            } forEach _live;
+            [_target, "PURSUIT", "police_chase", 70, _grp] call co_main_fnc_setEscalationState;
+        };
+        // Persistent high-wanted / armed-fugitive stays flagged WEAPONS-
+        // eligible so the next shot re-opens the firefight instantly.
+        if ((_target getVariable ["CO_wantedLevel", 0]) >= 90) then {
+            [_target, "WEAPONS", "police_escalation", 85, _grp] call co_main_fnc_setEscalationState;
         };
     };
 
