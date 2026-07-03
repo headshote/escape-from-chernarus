@@ -87,9 +87,12 @@ if (_primaryWeapon != "") then {
 };
 
 private _launcherCandidates = [
-    ["launch_RPG7_F", "RPG7_F", 2],
-    ["launch_NLAW_F", "NLAW_F", 1],
-    ["launch_RPG32_F", "RPG32_F", 1]
+    ["launch_I_Titan_short_F", "Titan_AT", 3],
+    ["launch_B_Titan_short_F", "Titan_AT", 3],
+    ["launch_O_Titan_short_F", "Titan_AT", 3],
+    ["launch_RPG32_F", "RPG32_F", 5],
+    ["launch_NLAW_F", "NLAW_F", 4],
+    ["launch_RPG7_F", "RPG7_F", 6]
 ];
 private _launcher = "";
 private _rocket = "";

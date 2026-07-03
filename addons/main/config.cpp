@@ -86,6 +86,7 @@ class CfgFunctions {
             class awolMonitor      {};
             class isFrontSafeZone  {};
             class russianHostilityTick {};
+            class russianAssaultBrain {};
             class buildKrasnostavGarrison {};
             class spawnRussianReplacement {};
             class deployToFront    {};

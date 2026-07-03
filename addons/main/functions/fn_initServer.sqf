@@ -153,6 +153,7 @@ setTimeMultiplier 6;
 ["awolConfrontation", { [] call co_main_fnc_awolConfrontation; }] call _launchStep;
 ["spawnAllBuses", { [] call co_main_fnc_spawnAllBuses; }] call _launchStep;
 ["tckGlobalAggression", { [] call co_main_fnc_tckGlobalAggression; }] call _launchStep;
+["russianAssaultBrain", { [] call co_main_fnc_russianAssaultBrain; }] call _launchStep;
 ["civilianAI", { [] call co_main_fnc_civilianAI; }] call _launchStep;
 ["trafficSystem", { [] call co_main_fnc_trafficSystem; }] call _launchStep;
 ["policePatrols", { [] call co_main_fnc_policePatrols; }] call _launchStep;

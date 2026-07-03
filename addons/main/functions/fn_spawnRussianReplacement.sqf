@@ -25,7 +25,7 @@ if (isNil "CO_rus_waveCount") then { CO_rus_waveCount = 0 };
 // could climb to hundreds of active units in the north sector,
 // overwhelming AI simulation. If we're already at the cap, skip
 // the replacement entirely.
-private _maxActive = missionNamespace getVariable ["CO_rus_maxActive", 80];
+private _maxActive = missionNamespace getVariable ["CO_rus_maxActive", 120];
 private _activeCount = {
     alive _x &&
     !(_x isKindOf "AllVehicles" && {_x isKindOf "Vehicle" && !(_x isKindOf "Man")}) &&
@@ -37,7 +37,7 @@ if (_activeCount >= _maxActive) exitWith {
 
 private _lane = _dead getVariable ["CO_advanceLane", "north"];
 private _spawnX     = missionNamespace getVariable ["CO_rus_spawnX", 13000];
-private _northX     = missionNamespace getVariable ["CO_rus_spawnXNorth", 12800];
+private _northX     = missionNamespace getVariable ["CO_rus_spawnXNorth", 12550];
 
 private _spawnPos = switch (_lane) do {
     case "north":   { [_northX - random 80, 12300 + random 180 - 90, 0] };

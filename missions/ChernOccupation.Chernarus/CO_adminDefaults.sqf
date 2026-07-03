@@ -17,14 +17,14 @@ CO_bus_townGuaranteed           = 3;      // min intra-town buses per large city
 CO_bus_vehiclePool              = ["C_Van_01_transport_F","C_Truck_02_transport_F"];
 
 // --- Eastern Front ---
-CO_rus_waveCooldown             = 100;    // seconds between Russian waves (was 150)
-CO_rus_unitsPerWave             = 30;     // total infantry across the three lanes (was 21)
-CO_rus_armorFrequency           = 2;      // every Nth wave gets an APC (was 3)
-CO_rus_tankFrequency            = 4;      // every Nth wave gets an MBT
-CO_rus_firstWaveDelay           = 12;     // seconds after init before first visible wave
+CO_rus_waveCooldown             = 70;     // seconds between Russian waves
+CO_rus_unitsPerWave             = 42;     // total infantry across the three lanes
+CO_rus_armorFrequency           = 1;      // every Nth wave gets an APC
+CO_rus_tankFrequency            = 3;      // every Nth wave gets an MBT
+CO_rus_firstWaveDelay           = 8;      // seconds after init before first visible wave
 CO_rus_spawnX                   = 13000;  // central/south lane spawn (closer to front; was 14100)
-CO_rus_spawnXNorth              = 12800;  // north (Krasnostav) lane spawn — closer still
-CO_rus_maxActive                = 80;     // hard cap on live RUS_ADV units (round 9: Krasnostav FPS fix)
+CO_rus_spawnXNorth              = 12550;  // north (Krasnostav) lane spawn
+CO_rus_maxActive                = 120;    // hard cap on live RUS_ADV units
 CO_awolRadius                   = 1800;   // base Krasnostav safe radius before AWOL warning logic
 CO_frontSafeZones               = [
     [[11200, 12300, 0], 1800, "Krasnostav town/outskirts"],

@@ -1,5 +1,5 @@
 // fn_russianAdvanceWaypoints.sqf
-// Gives a group a series of westward road-following waypoints
+// Gives a Russian advance group lane-specific movement and combat patrols.
 params ["_grp"];
 
 private _lane = _grp getVariable ["CO_advanceLane", ""];
@@ -7,55 +7,57 @@ if (_lane isEqualTo "") then {
     private _leaderPos = getPosATL (leader _grp);
     _lane = switch (true) do {
         case ((_leaderPos select 1) > 10500): { "north" };
-        case ((_leaderPos select 1) < 5200):  { "south" };
-        default                               { "central" };
+        case ((_leaderPos select 1) < 5200): { "south" };
+        default { "central" };
     };
 };
 
 private _advanceRoute = switch (_lane) do {
     case "north": {
-        // Closer-to-Krasnostav spawn arm. The first waypoint is set to
-        // start near the new northern spawn (CO_rus_spawnXNorth ~12800),
-        // then steps straight onto the Krasnostav combat axis.
         [
-            [12700, 12340, 0],
+            [12650, 12340, 0],
             [12100, 12320, 0],
             [11600, 12300, 0],
-            [11200, 12300, 0],  // Krasnostav combat axis
-            [10000, 11600, 0],
-            [ 8500, 10200, 0],
-            [ 7300,  7900, 0]
+            [11200 + random 500 - 250, 12300 + random 500 - 250, 0],
+            [12050 + random 500 - 250, 12650 + random 500 - 250, 0],
+            [11200 + random 650 - 325, 13600 + random 650 - 325, 0],
+            [10850 + random 450 - 225, 12200 + random 450 - 225, 0],
+            [11200, 12300, 0]
         ]
     };
     case "south": {
         [
-            [14050,  3300, 0],
-            [12400,  3100, 0],
-            [10200,  2300, 0],  // Elektro
-            [ 8500,  2500, 0],
-            [ 6400,  2400, 0]   // Chernogorsk
+            [14050, 3300, 0],
+            [12400, 3100, 0],
+            [10200, 2300, 0],
+            [8500, 2500, 0],
+            [6400, 2400, 0]
         ]
     };
     default {
         [
-            [14050,  7800, 0],
-            [12800,  7500, 0],
-            [12300,  9700, 0],  // Berezino
-            [ 9800,  6900, 0],
-            [ 8500,  5000, 0],
-            [ 6400,  2400, 0]
+            [14050, 7800, 0],
+            [12800, 7500, 0],
+            [12300, 9700, 0],
+            [9800, 6900, 0],
+            [8500, 5000, 0],
+            [6400, 2400, 0]
         ]
     };
 };
 
 {
-    private _wp = _grp addWaypoint [_x, 30];
-    _wp setWaypointType "MOVE";
-    _wp setWaypointSpeed "NORMAL";
+    private _wp = _grp addWaypoint [_x, 50];
+    private _isNorthPatrol = _lane == "north" && { _forEachIndex >= 2 };
+    _wp setWaypointType (if (_isNorthPatrol) then { "SAD" } else { "MOVE" });
+    _wp setWaypointSpeed (if (_lane == "north") then { "FULL" } else { "NORMAL" });
     _wp setWaypointBehaviour "COMBAT";
     _wp setWaypointCombatMode "RED";
+    _wp setWaypointCompletionRadius (if (_isNorthPatrol) then { 120 } else { 60 });
 } forEach _advanceRoute;
 
-// Final hold
-private _holdWp = _grp addWaypoint [_advanceRoute select (count _advanceRoute - 1), 0];
-_holdWp setWaypointType "HOLD";
+private _lastPos = _advanceRoute select ((count _advanceRoute) - 1);
+private _cycleWp = _grp addWaypoint [_lastPos, 0];
+_cycleWp setWaypointType (if (_lane == "north") then { "CYCLE" } else { "HOLD" });
+_cycleWp setWaypointBehaviour "COMBAT";
+_cycleWp setWaypointCombatMode "RED";
