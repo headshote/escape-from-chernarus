@@ -1,62 +1,61 @@
 // ============================================================
 // fn_awolMonitor.sqf
 //
-// Watches a cleared conscript (CO_isCleared=true). If they leave
-// the Krasnostav front zone for longer than CO_awolGrace seconds,
-// they're flagged AWOL — all factions (TCK, border, police,
-// RUS_ADV) treat them as a lethal target via guardAggroLoop's
-// AWOL-priority filter.
-//
-// Re-entering the front zone CANCELS the warning but, once
-// flagged AWOL, the status sticks for the rest of the round —
-// AWOL conscripts cannot un-AWOL by hiding.
-//
-// Params:
-//   _player       - the cleared conscript
-//   _frontCenter  - position [x,y,z] of Krasnostav (front anchor)
+// Watches a deployed conscript. If they leave the accepted Krasnostav/front
+// duty area for longer than CO_awolGrace seconds, they are marked AWOL and
+// hostile systems may hunt them. Re-entering before the grace expires clears
+// the warning timer.
 // ============================================================
-params ["_player", "_frontCenter"];
+params ["_player", ["_frontCenter", [11200, 12300, 0]]];
 
 if (!isServer) exitWith {};
 if (isNull _player) exitWith {};
 
-private _grace      = missionNamespace getVariable ["CO_awolGrace", 60];
-private _radius     = missionNamespace getVariable ["CO_awolRadius", 1200];
-private _outsideAt  = -1;
-private _warned     = false;
+private _grace = missionNamespace getVariable ["CO_awolGrace", 60];
+private _outsideAt = -1;
+private _warned = false;
 
 while {
     alive _player &&
     (_player getVariable ["CO_isCleared", false]) &&
+    ((_player getVariable ["CO_detainPhase", ""]) == "deployed") &&
     !(_player getVariable ["CO_isAWOL", false])
 } do {
     sleep 5;
-    private _d = _player distance2D _frontCenter;
-    if (_d > _radius) then {
+
+    private _frontState = [_player, _frontCenter] call co_main_fnc_isFrontSafeZone;
+    _frontState params ["_insideFront", "_zoneName", "_distance"];
+
+    if (!_insideFront) then {
         if (_outsideAt < 0) then { _outsideAt = time };
-        if (!_warned && (time - _outsideAt) > 15) then {
+        private _outsideFor = time - _outsideAt;
+
+        if (!_warned && { _outsideFor > 15 }) then {
             _warned = true;
-            [["AWOL WARNING\nReturn to Krasnostav front in 60 seconds or you will be hunted."]]
-                remoteExec ["hint", _player];
+            private _remaining = (_grace - _outsideFor) max 0;
+            [[format [
+                "AWOL WARNING\nReturn to the Krasnostav front area in %1 seconds or you will be hunted.",
+                round _remaining
+            ]]] remoteExec ["hint", _player];
         };
-        if ((time - _outsideAt) > _grace) then {
+
+        if (_outsideFor > _grace) then {
             _player setVariable ["CO_isAWOL", true, true];
-            [["YOU ARE AWOL\nAll factions will engage on sight."]]
-                remoteExec ["hint", _player];
+            _player setVariable ["CO_detainPhase", "awol", true];
+            _player setVariable ["CO_awolSource", "front_desertion", true];
+            [["YOU ARE AWOL\nAll factions will engage on sight."]] remoteExec ["hint", _player];
             diag_log format [
-                "[CO] AWOL: %1 left Krasnostav (%2 m) for %3 s — flagged hostile.",
-                name _player, round _d, round (time - _outsideAt)
+                "[CO] AWOL: %1 left the Krasnostav front safe area (nearest zone %2 m) for %3 s.",
+                name _player,
+                round _distance,
+                round _outsideFor
             ];
         };
     } else {
-        // Reset grace if they come back in
         _outsideAt = -1;
         if (_warned) then {
             _warned = false;
-            [["Welcome back to the front. AWOL warning cleared."]]
-                remoteExec ["hint", _player];
+            [[format ["Welcome back to the front: %1. AWOL warning cleared.", _zoneName]] remoteExec ["hint", _player];
         };
     };
 };
-
-// If they died or got flagged, we exit the loop. AWOL monitor stops.

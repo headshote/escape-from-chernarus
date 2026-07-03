@@ -76,6 +76,7 @@ if (isServer) then {
                     !(_c getVariable ["CO_isAWOL", false])) then {
                     _c setVariable ["CO_isAWOL", true, true];
                     _c setVariable ["CO_detainPhase", "awol", true];
+                    _c setVariable ["CO_awolSource", "training_escape", true];
                     if (isPlayer _c) then {
                         ["DESERTER\nYou are now AWOL. Every faction will shoot to kill."] remoteExec ["hint", _c];
                     };

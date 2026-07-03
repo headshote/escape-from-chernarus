@@ -5,6 +5,16 @@ params ["_conscript"];
 if (_conscript getVariable ["CO_deployToFrontDone", false]) exitWith {};
 _conscript setVariable ["CO_deployToFrontDone", true, true];
 
+// Deployment is the authoritative end of the training pipeline. Set this
+// before teleporting so the training-camp perimeter sentinel cannot see the
+// Krasnostav move as an escape from the airfield.
+_conscript setVariable ["CO_detainPhase", "deployed", true];
+_conscript setVariable ["CO_trainingEscape", false, true];
+_conscript setVariable ["CO_hotHostile", 0, true];
+_conscript setVariable ["CO_bootCampActive", false, true];
+_conscript setVariable ["CO_bootCampStage", "", true];
+_conscript setVariable ["CO_awolSource", "", true];
+
 // ---- Full military loadout (cleared conscript) -----------------
 // Inventory operations must run where the unit is local, especially for
 // players. The helper also validates weapon/ammo pairs so deployment cannot
