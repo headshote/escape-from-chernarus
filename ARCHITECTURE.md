@@ -286,6 +286,25 @@ VS Code will show false-positive CBA namespace errors. These do not affect build
 
 ---
 
+## Round R5 — Situational HUD + police uniform fix
+
+- **`fn_policeLoadout`** (new): shared police gear applicator; resolves the uniform
+  via `isClass` over `U_B_GEN_Soldier_F` → `U_B_GendarmerieSuit_01_F` → guerilla
+  fallback, verifies the result (never underwear), caches in
+  `CO_policeUniformClass`, installs crime-witness EHs. Used by all three police
+  spawners.
+- **`fn_threatInfoLoop`** (new, launched in `fn_initServer`): 4 s server loop; one
+  `allGroups` classification pass per tick, then per player broadcasts
+  `CO_threatNear = [nearestPoliceDist, nearestOccupationDist]` (CRN_ENF covers TCK +
+  checkpoints + border).
+- **`fn_heatHud`** rewritten as a phase-aware display driven by
+  `CO_detainPhase` / `CO_isAWOL` / `CO_isCleared` / `CO_bootCampActive`:
+  free (POLICE + TCK/BORDER tiles, escalation split by `CO_escalationSource`
+  prefix), detained/transport, training (uses new `CO_bootCampStage` broadcasts
+  from `fn_bootCampQuest`), frontline (minimal), AWOL (banner + both tiles).
+- Removed the dead `CO_fnc_policeInspection` global block from `fn_policeBrain`
+  (superseded by `fn_policeOrderInspection` in the R3/R4 commit).
+
 ## Round R2 — Make it legible (repair plan Phase R2)
 
 - **Persistent threat HUD.** `ui/threat_hud.hpp` (RscTitles `CO_ThreatHUD`, idd 9400)

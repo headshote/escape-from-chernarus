@@ -32,24 +32,11 @@ private _spawnPolicePatrol = {
     _partner moveInCargo _car;
 
     {
-        removeAllWeapons _x;
-        removeAllItems _x;
-        removeUniform _x;
-        removeVest _x;
-        removeHeadgear _x;
-        _x forceAddUniform "U_B_GendarmerieSuit_01_F";
-        _x addVest "V_HarnessOGL_ghex_F";
-        _x addHeadgear "H_Cap_blk_Raven";
-        _x addWeapon "hgun_P07_F";
-        _x addMagazine "16Rnd_9x21_Mag";
-        _x addMagazine "16Rnd_9x21_Mag";
+        [_x] call co_main_fnc_policeLoadout;
         _x setCombatMode "YELLOW";
         _x setBehaviour "SAFE";
-        _x allowFleeing 0;
         _x disableAI "AUTOTARGET";
         _x disableAI "TARGET";
-        // Officers witness crimes and feed fn_reportCrime.
-        [_x] call co_main_fnc_installCrimeWitness;
     } forEach [_driver, _partner];
 
     _driver setVariable ["CO_isPoliceDriver", true, true];

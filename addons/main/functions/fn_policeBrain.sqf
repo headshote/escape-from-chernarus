@@ -46,86 +46,6 @@ if (!isNil "CO_policeTownPosts") then {
     } forEach CO_policeTownPosts;
 };
 
-// --------------------------------------------------------------
-// Inspection beat, spawned per target. Hail → wait for compliance
-// → papers check → pass / move-along / detain. Fleeing at any
-// point = wanted +20 + foot chase.
-// --------------------------------------------------------------
-CO_fnc_policeInspection = missionNamespace getVariable ["CO_fnc_policeInspection", {
-    params ["_grp", "_car", "_p", "_susKey", "_townAlert"];
-
-    if (_p getVariable ["CO_policeInspecting", false]) exitWith {};
-    _p setVariable ["CO_policeInspecting", true, true];
-
-    private _cleanup = {
-        params ["_p"];
-        _p setVariable ["CO_policeInspecting", false, true];
-    };
-
-    [_p, "SUSPICIOUS", "police_id_check", 30, _grp] call co_main_fnc_setEscalationState;
-    if (isPlayer _p) then {
-        ["Police: STOP. Document check — stand still."] remoteExecCall ["systemChat", _p];
-    };
-
-    // Compliance window: 8 s to stop near the patrol.
-    private _complyEnd = time + 8;
-    waitUntil {
-        sleep 0.5;
-        !alive _p || captive _p || time > _complyEnd ||
-        ((abs (speed _p)) < 2 && ((leader _grp) distance2D _p) < 50)
-    };
-    if (!alive _p || captive _p) exitWith { [_p] call _cleanup };
-
-    private _fled = (abs (speed _p)) > 4 || ((leader _grp) distance2D _p) > 60;
-    if (_fled) exitWith {
-        [_p] call _cleanup;
-        private _wl = ((_p getVariable ["CO_wantedLevel", 0]) + 20) min 100;
-        _p setVariable ["CO_wantedLevel", _wl, true];
-        [_p, "PURSUIT", "police_fled_id", 65, _grp] call co_main_fnc_setEscalationState;
-        ["police_id_fled"] call co_main_fnc_kpi;
-        [_grp, _car, _p] spawn co_main_fnc_policeFootChase;
-    };
-
-    if (isPlayer _p) then {
-        ["Police are checking your papers. Stay still."] remoteExecCall ["systemChat", _p];
-    };
-    sleep (8 + random 5);
-    if (!alive _p || captive _p) exitWith { [_p] call _cleanup };
-
-    // Walked off mid-check = fled.
-    if ((abs (speed _p)) > 4 || ((leader _grp) distance2D _p) > 60) exitWith {
-        [_p] call _cleanup;
-        private _wl = ((_p getVariable ["CO_wantedLevel", 0]) + 20) min 100;
-        _p setVariable ["CO_wantedLevel", _wl, true];
-        [_p, "PURSUIT", "police_fled_id", 65, _grp] call co_main_fnc_setEscalationState;
-        [_grp, _car, _p] spawn co_main_fnc_policeFootChase;
-    };
-
-    private _wanted = _p getVariable ["CO_wantedLevel", 0];
-    private _disguise = _p getVariable ["CO_disguiseLevel", 0];
-    private _risk = _wanted - (_disguise * 12) + random 20 + (_townAlert * 5);
-
-    [_p] call _cleanup;
-
-    if (_risk < 45 && _wanted < 50) exitWith {
-        _grp setVariable [_susKey, 0, false];
-        [_p, "CLEAR", "police_id_pass", 0, _grp] call co_main_fnc_setEscalationState;
-        ["police_id_pass"] call co_main_fnc_kpi;
-        if (isPlayer _p) then { ["Police: Documents in order. Move along."] remoteExecCall ["systemChat", _p] };
-    };
-
-    if (_risk < 65 && _wanted < 50) exitWith {
-        _grp setVariable [_susKey, 25, false];
-        [_p, "SUSPICIOUS", "police_id_warned", 30, _grp] call co_main_fnc_setEscalationState;
-        if (isPlayer _p) then { ["Police: We're watching you. Move along."] remoteExecCall ["systemChat", _p] };
-    };
-
-    // Detain.
-    [_p, "PURSUIT", "police_id_fail", 70, _grp] call co_main_fnc_setEscalationState;
-    ["police_id_detain"] call co_main_fnc_kpi;
-    [_grp, _car, _p] spawn co_main_fnc_policeFootChase;
-}];
-
 [_grp, _car, _center, _radius, _isCar, _townIdx] spawn {
     params ["_grp", "_car", "_center", "_radius", "_isCar", "_townIdx"];
 
@@ -232,7 +152,7 @@ CO_fnc_policeInspection = missionNamespace getVariable ["CO_fnc_policeInspection
             private _recognised = _visible && _wanted >= 60 &&
                 { _dist < 65 || { [leader _grp, _p] call co_main_fnc_policeRecognise } };
 
-                if (_visible) then {
+            if (_visible) then {
                 private _base = missionNamespace getVariable ["CO_suspicion_baseRate", 12];
                 private _disguise = _p getVariable ["CO_disguiseLevel", 0];
                 private _armed = (primaryWeapon _p != "") || (handgunWeapon _p != "");

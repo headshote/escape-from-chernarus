@@ -108,6 +108,7 @@ setTimeMultiplier 6;
 // Watchdog first: it recovers stuck flags/vehicles from every other
 // subsystem, so it must survive even if a later step fails.
 ["stateWatchdog", { [] call co_main_fnc_stateWatchdog; }] call _launchStep;
+["threatInfoLoop", { [] call co_main_fnc_threatInfoLoop; }] call _launchStep;
 ["spawnAllBuses", { [] call co_main_fnc_spawnAllBuses; }] call _launchStep;
 ["tckGlobalAggression", { [] call co_main_fnc_tckGlobalAggression; }] call _launchStep;
 ["civilianAI", { [] call co_main_fnc_civilianAI; }] call _launchStep;

@@ -24,6 +24,7 @@ if (!isServer) exitWith {};
 if (isNull _player || !alive _player) exitWith {};
 if (_player getVariable ["CO_bootCampActive", false]) exitWith {};
 _player setVariable ["CO_bootCampActive", true, true];
+_player setVariable ["CO_bootCampStage", "1/3 — Obstacle course", true];
 _player setVariable ["CO_bootCampGraduated", false, true];
 
 if (isNil "CO_airfieldCenter") then { CO_airfieldCenter = [2100, 12800, 0] };
@@ -143,6 +144,8 @@ createMarker [_mkR, _riflePos];
 _mkR setMarkerType  "mil_dot";
 _mkR setMarkerText  "FIRING LINE";
 _mkR setMarkerColor "ColorBLUFOR";
+
+_player setVariable ["CO_bootCampStage", "2/3 — Rifle range", true];
 
 [_player, _tStage2,
  "At the firing line, pick up a training rifle from the weapon rack (mouse-wheel action). Destroy ALL THREE wooden pop-up targets.",
@@ -265,6 +268,8 @@ _mkG setMarkerType  "mil_destroy";
 _mkG setMarkerText  "GRENADE PIT";
 _mkG setMarkerColor "ColorBLUFOR";
 
+_player setVariable ["CO_bootCampStage", "3/3 — Grenade pit", true];
+
 [_player, _tStage3,
  "Move to the grenade pit and detonate TWO grenades inside the marked area.",
  "3/3  Grenade Range",
@@ -313,5 +318,6 @@ sleep 4;
 _player setVariable ["CO_isCleared", true, true];
 _player setVariable ["CO_bootCampGraduated", true, true];
 _player setVariable ["CO_bootCampActive", false, true];
+_player setVariable ["CO_bootCampStage", "", true];
 _player setVariable ["CO_detainPhase", "deployed", true];
 [_player] call co_main_fnc_deployToFront;

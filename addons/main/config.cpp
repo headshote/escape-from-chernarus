@@ -134,6 +134,8 @@ class CfgFunctions {
             class policeBrain      {};
             class policeOrderInspection {};
             class policeResumePatrol {};
+            class policeLoadout    {};
+            class threatInfoLoop   {};
             class qaScenarios      {};
             class spawnLockdownPatrol {};
             class buildTrainingGround {};

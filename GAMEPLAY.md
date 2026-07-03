@@ -299,6 +299,24 @@ All defaults live in `missions/ChernOccupation.Chernarus/CO_adminDefaults.sqf`.
   Clients start with `ItemMap`, `ItemCompass`, `ItemWatch` only — `ItemGPS`, `ItemRadio`,
   `B_UavTerminal` are stripped on init (per spec point 16).
 
+## Round R5 Changes — the HUD follows your story
+
+- **The threat display now matches your situation:**
+  - *Free civilian:* two tiles — **POLICE** (how close they are, your WANTED stars,
+    their current posture) and **TCK/BORDER** (how close the occupation forces are,
+    and a red **TARGETED — RUN OR HIDE** when a snatch squad is actually on you).
+    TCK don't care about your wanted level — that's why their tile shows presence
+    and targeting instead of stars.
+  - *Detained / in transport:* a single DETAINED tile (with the lockpick hint in cells).
+  - *Conscript training:* a CONSCRIPT TRAINING tile with your current drill
+    (1/3 obstacle course → 2/3 rifle range → 3/3 grenade pit); if the camp guards go
+    active on you mid-escape you'll see **GUARDS ALERTED** / **GUARDS WEAPONS FREE**.
+  - *Frontline:* just a FRONTLINE tag — you're a soldier, wanted levels don't apply.
+  - *AWOL:* a red **AWOL — DESERTER** banner, and both threat tiles come back.
+- **Police finally wear uniforms.** The gendarmerie uniform classname was wrong, so
+  the game silently dropped it — that's why your cops patrolled in underwear. Fixed
+  with a verified classname chain and a guaranteed fallback.
+
 ## Round R2 Changes — you can read the threat
 
 - **Always-on threat HUD** (top right): your stamina bar, your **WANTED stars**

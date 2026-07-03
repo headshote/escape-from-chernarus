@@ -655,3 +655,34 @@ again, R4 finishes the remaining original phases against that harness.
 3. R1-e/f/g police lifecycle + urban brain + targeting,
 4. R2 HUD/legibility,
 5. R3 harness, then re-run the Chernogorsk playtest script before touching R4.
+
+### Round R5 — post-R4 review fixes + situational HUD (2026-07-03)
+
+Playtest feedback: TCK detain works (surrounded and captured — good), police were
+inert-looking and **in underwear**, and the single wanted tile didn't explain a TCK
+capture at wanted 0.
+
+- `[CODE]` **Police underwear fixed.** `U_B_GendarmerieSuit_01_F` is not a real
+  class — `forceAddUniform` silently failed in all three police spawners. New shared
+  `fn_policeLoadout` resolves the uniform via `isClass` over candidates
+  (`U_B_GEN_Soldier_F` first — the actual Malden Gendarmerie class), verifies the
+  result, and guarantees a vanilla fallback. Used by `fn_policePatrols`,
+  `fn_spawnUrbanFootPatrols`, `fn_spawnLockdownPatrol`.
+- `[CODE]` **Situational threat HUD.** `fn_heatHud` now adapts to the player's arc:
+  - *Free civilian:* POLICE tile (presence + WANTED stars + police-posture chip) and
+    a separate **TCK/BORDER tile** (presence + occupation chip + "TARGETED — RUN OR
+    HIDE" override) — because TCK snatch-squads ignore wanted level, the tile answers
+    "are they around / are they on me" instead.
+  - *Detained / in transport:* single status tile, lockpick hint in cells.
+  - *Training:* CONSCRIPT TRAINING tile with the live drill stage
+    (`CO_bootCampStage`, broadcast by `fn_bootCampQuest`) and a GUARDS
+    ALERTED / WEAPONS FREE line when camp guards go active on an escapee.
+  - *Frontline:* minimal tag, no wanted display (meaningless while deployed).
+  - *AWOL:* red DESERTER banner + both threat tiles return.
+  Escalation is split into police vs occupation channels by `CO_escalationSource`
+  prefix; presence comes from the new server-side `fn_threatInfoLoop` (4 s tick,
+  broadcasts `CO_threatNear = [policeDist, occupationDist]` per player).
+- `[CODE]` **R3/R4 commit review:** verified sound (physical ID-check beat, bus
+  emergency from Hit/Killed, lockdown patrols, checkpoint pursuit dispatch, KPI
+  rates, QA harness, check_rpt gate). Removed the dead `CO_fnc_policeInspection`
+  block left in `fn_policeBrain` after the `fn_policeOrderInspection` migration.

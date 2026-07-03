@@ -36,19 +36,7 @@ for "_g" from 1 to _count do {
 
     for "_i" from 1 to 2 do {
         private _u = _grp createUnit ["B_Soldier_F", _spawn, [], 0, "FORM"];
-        removeAllWeapons _u;
-        removeAllItems _u;
-        removeUniform _u;
-        removeVest _u;
-        removeHeadgear _u;
-        _u forceAddUniform "U_B_GendarmerieSuit_01_F";
-        _u addVest "V_HarnessOGL_ghex_F";
-        _u addHeadgear "H_Cap_blk_Raven";
-        _u addWeapon "hgun_P07_F";
-        _u addMagazine "16Rnd_9x21_Mag";
-        _u addMagazine "16Rnd_9x21_Mag";
-        _u allowFleeing 0;
-        [_u] call co_main_fnc_installCrimeWitness;
+        [_u] call co_main_fnc_policeLoadout;
     };
 
     for "_w" from 0 to 4 do {
