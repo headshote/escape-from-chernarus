@@ -301,18 +301,19 @@ All defaults live in `missions/ChernOccupation.Chernarus/CO_adminDefaults.sqf`.
 
 ## Round R8 Changes — cops that react, and real arrests
 
-- **Assaulting police has consequences.** Knock a cop out and he gets up angry — he and
-  his partner come after you to arrest you (before, they'd wake up and shrug, and a
-  partner watched you beat his colleague without reacting). Punching an officer now
-  counts as a crime and raises your wanted level.
+- **Assaulting police gets you chased and arrested — not shot.** Punch a cop and his
+  partner (and any police nearby who saw it) come after you to *detain* you; knock him
+  out and he gets up and joins the chase. It never turns into a gunfight and it no
+  longer drags the TCK into shooting at you over a fist fight.
 - **Firefights, then arrests.** If you draw a weapon and shoot, police shoot back for
   as long as you keep firing — they won't walk into your muzzle to grab you. Stop
   shooting for ~10 seconds and they holster and close in to detain you instead.
 - **No more telekinetic arrests.** Getting detained now requires an officer to actually
-  walk up to you: you're forced to your knees for a moment, and only then is the
-  transport truck sent. If they shoot you down from range, a guard has to reach your
-  body first — and if nobody can get to you, you're not taken at all. The same applies
-  to TCK snatch squads: no grabbing you from across the street.
+  walk up to you: you're forced to your knees and held there until the transport truck
+  pulls up and takes you — no more being released to run around for a couple of seconds
+  first. If they shoot you down from range, a guard has to reach your body before any
+  truck appears — and if nobody can get to you, you're not taken at all. The same
+  applies to TCK snatch squads: no grabbing you from across the street.
 
 ## Round R7 Changes — prisoner transports and living towns
 

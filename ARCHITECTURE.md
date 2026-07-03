@@ -288,15 +288,20 @@ VS Code will show false-positive CBA namespace errors. These do not affect build
 
 ## Round R8 — Police reaction, return-fire, physical detain
 
-- **Melee assaults are now crimes.** `fn_applyMeleeHit` applies damage via
-  `setHitPointDamage`, which NEVER fires the "Hit" event handler — so punching a cop
-  was invisible to the crime/retaliation system (knocked-out cops woke amnesiac; their
-  partners ignored the assault). Melee on a CRN_ENF/POLICE unit now explicitly sets the
-  group's `CO_retaliateTarget`/`CO_retaliateUntil` (+ bus emergency) and calls
-  `fn_reportCrime` "wound".
+- **Melee on a cop → non-lethal police chase-and-detain (no shooting).**
+  `fn_applyMeleeHit` applies damage via `setHitPointDamage`, which NEVER fires the "Hit"
+  event handler — so punching a cop was invisible to the retaliation system (knocked-out
+  cops woke amnesiac; partners ignored it). Punching a **POLICE** unit now marks the
+  victim's squad AND any police group within 60 m with `CO_retaliateTarget`, which
+  `fn_policeBrain` consumes as a chase-and-DETAIN order (it only returns fire if the
+  *player* is shooting). It deliberately does NOT call `fn_reportCrime` — that "wound"
+  path armed every nearby CRN_ENF/POLICE group with LETHAL gunfire retaliation and bumped
+  wanted, which was making TCK open fire on you for a fist fight. TCK are left out
+  entirely; a punched TCK is re-detained by the normal proximity loop, without gunfire.
 - **Knocked-out officers remember.** `fn_applyKnockout` records `CO_lastKnockoutBy`;
-  on wake-up, a POLICE/CRN_ENF unit re-arms its group's retaliation against the
-  assailant (if still nearby) so they don't get up and wander off.
+  on wake-up a **POLICE** officer re-arms his squad's chase-and-detain against a
+  player/civilian assailant still nearby (POLICE-only: the marker is a lethal order for
+  TCK, and melee must never escalate to shooting).
 - **Police retaliation response.** `fn_policeBrain` gained a top-priority block that
   consumes `CO_retaliateTarget` (POLICE were excluded from tckGlobalAggression, so
   nothing was reading it): partner-down / squad-assaulted → chase-and-DETAIN via
@@ -308,13 +313,16 @@ VS Code will show false-positive CBA namespace errors. These do not affect build
   chase/tackle/detain. Replaces the old WEAPONS-only >18 m volley.
 - **`fn_detainSequence`** (new): the physical arrest beat — an officer must be at arm's
   reach (walks up to a target downed at range; aborts and frees the target if none can
-  reach), the detainee is forced to a kneeling pose (`Acts_ExecutionVictim_Loop`,
-  re-asserted through the hold), THEN `fn_spawnCaptureTransport` is dispatched. No more
-  telekinetic grabs. Wired into every conscious player-capture path: police foot chase,
-  checkpoint (tackle + downed-at-range), bus hunter (tackle + downed), TCK global
-  aggression, and the transport-breakout recapture. NPC capture paths (bus loading,
-  transportToDetention) are unchanged. New flag `CO_detainInProgress` (cleared by the
-  state watchdog and the respawn wipe).
+  reach), the detainee is forced to a kneeling pose (`Acts_ExecutionVictim_Loop`), and
+  is held there **continuously** — a brief visible beat, then `fn_spawnCaptureTransport`
+  is dispatched and the kneel is re-asserted every 0.4 s until the player is actually
+  seated in the van (or direct-delivered to training). This closes the earlier ~2-3 s
+  free-run window between releasing the pose and the van seating them. No telekinetic
+  grabs. Wired into every conscious player-capture path: police foot chase, checkpoint
+  (tackle + downed-at-range), bus hunter (tackle + downed), TCK global aggression, and
+  the transport-breakout recapture. NPC capture paths (bus loading, transportToDetention)
+  are unchanged. New flag `CO_detainInProgress` (cleared by the state watchdog and the
+  respawn wipe).
 
 ## Round R7 — Transport overhaul, breakout, town garrisons, formation restored
 

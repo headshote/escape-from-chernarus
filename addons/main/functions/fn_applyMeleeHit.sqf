@@ -59,27 +59,32 @@ if ((time - _lastHitAt) > 8) then {
 _hitCount = _hitCount + 1;
 _target setVariable ["CO_meleePunchState", [_hitCount, time], true];
 
-// Assaulting a security-forces member is a CRIME — but this melee
-// system applies damage via setHitPointDamage, which never fires the
-// "Hit" event handler, so the crime/retaliation system was blind to
-// it: knocked-out cops woke up amnesiac and their partners watched
-// you punch them out without reacting. Wire it in explicitly.
+// Punching a POLICE officer is a NON-LETHAL provocation. The victim's
+// squad AND any police who witnessed it chase and DETAIN the attacker.
+// It must NOT open fire and must NOT drag TCK into it:
+//   - we do NOT call fn_reportCrime (its "wound" path arms every nearby
+//     CRN_ENF/POLICE group with LETHAL gunfire retaliation, which is
+//     what was making TCK shoot at you for a fist fight, and bumps
+//     wanted into shoot-to-kill territory);
+//   - we only mark POLICE groups. fn_policeBrain consumes
+//     CO_retaliateTarget purely as a chase-and-detain order (it returns
+//     fire only if the PLAYER is shooting), so a melee never triggers
+//     a gunfight. TCK groups near a punched cop are left alone — they
+//     already detain anyone in reach through their normal proximity
+//     loop, without shooting.
+// (A punched TCK unit likewise needs no special handling: the global
+// aggression proximity loop already tackle-detains the attacker.)
 private _tFac = (group _target) getVariable ["CO_faction", ""];
-if (_tFac in ["CRN_ENF", "POLICE"] && { isPlayer _attacker || side _attacker == civilian }) then {
-    private _tGrp = group _target;
-    _tGrp setVariable ["CO_retaliateTarget", _attacker, false];
-    _tGrp setVariable ["CO_retaliateUntil", time + 180, false];
-    // Bus squads get the emergency-dismount order too.
-    if ((_tGrp getVariable ["CO_isBusDriverGrp", false]) || (_tGrp getVariable ["CO_isBusEscortGrp", false])) then {
-        private _bus = _tGrp getVariable ["CO_transportVehicle", objNull];
-        if (!isNull _bus && alive _bus) then {
-            _bus setVariable ["CO_busEmergencyTarget", _attacker, false];
-            _bus setVariable ["CO_busEmergencyUntil", time + 90, false];
-            _bus setVariable ["CO_busEmergencyWeapons", false, false];
-        };
+if (_tFac == "POLICE" && { isPlayer _attacker || side _attacker == civilian }) then {
+    private _witnessGrps = allGroups select {
+        (_x getVariable ["CO_faction", ""]) == "POLICE" &&
+        { !isNull (leader _x) && alive (leader _x) } &&
+        { (leader _x) distance2D _target < 60 }
     };
-    // Wanted/witness consequences (internally throttled per attacker).
-    [_attacker, _target, "wound"] call co_main_fnc_reportCrime;
+    {
+        _x setVariable ["CO_retaliateTarget", _attacker, false];
+        _x setVariable ["CO_retaliateUntil", time + 180, false];
+    } forEach _witnessGrps;
 };
 
 if (!isPlayer _target) then {

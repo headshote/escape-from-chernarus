@@ -56,15 +56,20 @@ if (!isPlayer _target) then {
         _target enableAI "AUTOTARGET";
         _target enableAI "TARGET";
 
-        // A security-forces member who wakes up REMEMBERS who dropped
-        // him: re-arm the squad's retaliation so his group's brain
-        // (police) or the global aggression loop (TCK) chases the
-        // attacker down instead of shrugging and walking off.
+        // A POLICE officer who wakes up REMEMBERS who dropped him and
+        // his squad chases the attacker down to DETAIN them (via
+        // fn_policeBrain), instead of getting up and wandering off.
+        // POLICE-only on purpose: the retaliate marker is a lethal
+        // gunfire order for TCK (tckGlobalAggression), and a fist fight
+        // must never escalate to shooting — a woken TCK simply re-detains
+        // through the normal proximity loop. Only a player/civilian
+        // assailant counts.
         private _fac = (group _target) getVariable ["CO_faction", ""];
-        if (_fac in ["POLICE", "CRN_ENF"]) then {
+        if (_fac == "POLICE") then {
             private _byWhom = _target getVariable ["CO_lastKnockoutBy", objNull];
             if (
                 !isNull _byWhom && alive _byWhom && !captive _byWhom &&
+                (isPlayer _byWhom || side _byWhom == civilian) &&
                 !(_byWhom getVariable ["CO_knockedOut", false]) &&
                 (_target distance2D _byWhom) < 220
             ) then {

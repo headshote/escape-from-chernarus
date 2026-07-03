@@ -106,10 +106,11 @@ _target setCaptive true;
     _officer doTarget _target;
     [_officer, "GestureFreeze"] remoteExec ["playActionNow", 0];
 
-    // Kneel pose, re-asserted so a struggling player can't just walk
-    // out of the animation before the truck arrives.
-    private _kneelUntil = time + 3.5;
-    while { alive _target && time < _kneelUntil && !(_target getVariable ["CO_transportInProgress", false]) } do {
+    // Helper: hold the detainee down on their knees for this call.
+    // Acts_ExecutionVictim_Loop is a looping ground pose; re-asserting
+    // it (on all machines + the owner) prevents a player from mashing
+    // a movement key back out of the animation.
+    private _pin = {
         _target setUnconscious false;
         _target setVariable ["CO_knockedOut", false, true];
         _target setCaptive true;
@@ -117,17 +118,42 @@ _target setCaptive true;
         if (isPlayer _target) then {
             [_target, "Acts_ExecutionVictim_Loop"] remoteExec ["switchMove", _target];
         };
-        sleep 1.2;
+    };
+
+    // Brief, visible arrest beat.
+    private _kneelUntil = time + 2.5;
+    while { alive _target && vehicle _target == _target && time < _kneelUntil } do {
+        call _pin;
+        sleep 0.5;
     };
 
     if (!alive _target) exitWith { call _abort };
 
-    // ---- Dispatch the transport ----------------------------------
+    // ---- Dispatch the transport, then STAY pinned until seated ---
+    // Previously the kneel was released here and the player got a 2-3 s
+    // free-run window while the van spawned and drove up. Now they are
+    // held on their knees continuously until the transport actually
+    // seats them (vehicle change) or direct-delivers them to training
+    // (failsafe). No free-run window.
     _target setVariable ["CO_detainInProgress", false, true];
-    // Let the detainee stand out of the kneel so the seat animation
-    // resolves cleanly, then hand off.
-    [_target, ""] remoteExec ["switchMove", 0];
     _officer enableAI "AUTOTARGET";
     [_target, _grp] spawn co_main_fnc_spawnCaptureTransport;
+
+    private _pinCap = time + 30;   // safety net if the transport hangs
+    while {
+        alive _target &&
+        vehicle _target == _target &&
+        (_target getVariable ["CO_detainPhase", ""]) != "training" &&
+        time < _pinCap
+    } do {
+        call _pin;
+        sleep 0.4;
+    };
+
+    // Seated / delivered / timed out — let any lingering ground pose
+    // resolve so the seat (or standing) animation takes over cleanly.
+    if (alive _target && vehicle _target == _target) then {
+        [_target, ""] remoteExec ["switchMove", 0];
+    };
     diag_log format ["[CO] Detain complete for %1 — transport dispatched.", _target];
 };
