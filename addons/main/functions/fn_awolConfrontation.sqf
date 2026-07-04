@@ -98,6 +98,7 @@ CO_awolConfrontationRunning = true;
                             _p setVariable ["CO_bootCampGraduated", false, true];
                             _p setVariable ["CO_bootCampActive", false, true];
                             _p setVariable ["CO_trainingEscape", false, true];
+                            _p setVariable ["CO_deployToFrontDone", false, true];
                             _p setVariable ["CO_hotHostile", 0, true];
                             _p setVariable ["CO_awolFate", ["", -999], false];
                             _p setVariable ["CO_awolCloseSince", -1, false];

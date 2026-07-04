@@ -142,7 +142,7 @@ All set in `CO_adminDefaults.sqf`, broadcast with `publicVariable`.
 | `CO_rus_unitsPerWave` | Number | Infantry per wave |
 | `CO_police_carStopChance` | Number | 0–1 probability per traffic check |
 | `CO_police_active` | Bool | Enable/disable police patrols |
-| `CO_adminUIDs` | Array | Steam64 UIDs allowed to open admin panel |
+| `CO_adminUIDs` | String array | Steam64 UIDs allowed to open admin panel |
 
 Per-player variables (set via `setVariable`):
 - `CO_wantedLevel` (0–100, broadcast true)

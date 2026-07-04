@@ -101,7 +101,7 @@ CO_training_escapeRadius        = 250;    // metres from airfield center before 
 CO_awol_detainChance            = 0.5;    // chance a squad detains (vs executes) a cornered deserter
 
 // --- Admin ---
-CO_adminUIDs                    = [76561198054336866];     // add Steam64 UIDs allowed to open the admin panel
+CO_adminUIDs                    = ["76561198054336866"];   // add Steam64 UIDs allowed to open the admin panel
 
 // Broadcast all to clients
 {

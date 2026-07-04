@@ -228,6 +228,7 @@ Sliders broadcast globals via `publicVariable` on change. Key tunables:
 In game, an approved admin now gets an `Open Admin Panel` action on their player.
 If the action does not appear, the player's Steam64 UID is not currently listed in
 `missions/ChernOccupation.Chernarus/CO_adminDefaults.sqf` under `CO_adminUIDs`.
+Store UIDs as strings, e.g. `["76561198054336866"]`.
 
 | Control | Global | Default |
 |---------|--------|---------|

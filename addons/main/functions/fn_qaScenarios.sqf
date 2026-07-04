@@ -20,6 +20,32 @@ params [
 if (!isServer) exitWith {
     [_mode, _anchor] remoteExecCall ["co_main_fnc_qaScenarios", 2];
 };
+
+private _remoteOwner = if (isNil "remoteExecutedOwner") then { 0 } else { remoteExecutedOwner };
+private _authorized = true;
+private _callerUID = "server";
+
+if (_remoteOwner > 2) then {
+    _authorized = false;
+    private _adminUIDs = (missionNamespace getVariable ["CO_adminUIDs", []]) apply {
+        if (_x isEqualType "") then { _x } else { format ["%1", _x] }
+    };
+    {
+        if (owner _x == _remoteOwner) exitWith {
+            _callerUID = getPlayerUID _x;
+            _authorized = _callerUID in _adminUIDs;
+        };
+    } forEach allPlayers;
+};
+
+if (!_authorized) exitWith {
+    diag_log format [
+        "[CO][SECURITY] Rejected QA scenario '%1' from non-admin owner=%2 uid=%3.",
+        _mode, _remoteOwner, _callerUID
+    ];
+    false
+};
+
 if (!canSuspend) exitWith {
     [_mode, _anchor] spawn co_main_fnc_qaScenarios;
 };
