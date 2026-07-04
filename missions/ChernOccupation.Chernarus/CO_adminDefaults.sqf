@@ -16,15 +16,17 @@ CO_bus_hostilesPerBus           = 5;      // hostiles per bus
 CO_bus_townGuaranteed           = 3;      // min intra-town buses per large city
 CO_bus_vehiclePool              = ["C_Van_01_transport_F","C_Truck_02_transport_F"];
 
-// --- Eastern Front ---
-CO_rus_waveCooldown             = 70;     // seconds between Russian waves
-CO_rus_unitsPerWave             = 42;     // total infantry across the three lanes
-CO_rus_armorFrequency           = 1;      // every Nth wave gets an APC
-CO_rus_tankFrequency            = 3;      // every Nth wave gets an MBT
-CO_rus_firstWaveDelay           = 8;      // seconds after init before first visible wave
-CO_rus_spawnX                   = 13000;  // central/south lane spawn (closer to front; was 14100)
-CO_rus_spawnXNorth              = 12550;  // north (Krasnostav) lane spawn
-CO_rus_maxActive                = 120;    // hard cap on live RUS_ADV units
+// --- Eastern Front (permanent Krasnostav siege) ---
+CO_rus_waveCooldown             = 25;     // seconds between siege top-ups (short = always heavy)
+CO_rus_zoneTarget               = 45;     // live RUS infantry the siege maintains in-zone
+CO_rus_unitsPerWave             = 20;     // max infantry added per top-up
+CO_rus_maxActive                = 95;     // global hard cap on live RUS_ADV (server safety)
+CO_rus_armorFrequency           = 2;      // every Nth top-up adds an APC
+CO_rus_tankFrequency            = 3;      // every Nth top-up adds an MBT
+CO_rus_maxVehicles              = 6;      // hard cap on live RUS_ADV armored hulls in the siege
+CO_rus_firstWaveDelay           = 8;      // seconds after init before the siege begins
+CO_rus_spawnX                   = 13000;  // legacy (unused by the siege spawner)
+CO_rus_spawnXNorth              = 12550;  // legacy (unused by the siege spawner)
 CO_awolRadius                   = 1800;   // base Krasnostav safe radius before AWOL warning logic
 CO_frontSafeZones               = [
     [[11200, 12300, 0], 1800, "Krasnostav town/outskirts"],
@@ -119,7 +121,7 @@ CO_adminUIDs                    = ["76561198054336866"];   // add Steam64 UIDs a
     "CO_checkpoint_includeSmall","CO_checkpoint_fortTemplate",
     "CO_bus_totalCruising","CO_bus_hostilesPerBus","CO_bus_townGuaranteed","CO_bus_vehiclePool",
     "CO_rus_waveCooldown","CO_rus_unitsPerWave","CO_rus_armorFrequency","CO_rus_firstWaveDelay","CO_rus_spawnX",
-    "CO_rus_spawnXNorth","CO_rus_tankFrequency","CO_rus_maxActive","CO_awolRadius","CO_frontSafeZones","CO_awolGrace",
+    "CO_rus_spawnXNorth","CO_rus_tankFrequency","CO_rus_maxActive","CO_rus_zoneTarget","CO_rus_maxVehicles","CO_awolRadius","CO_frontSafeZones","CO_awolGrace",
     "CO_front_initialStrength","CO_front_lineSpacingY","CO_front_depthRows","CO_front_rowSpacing",
     "CO_border_postSpacing","CO_border_includeCoast","CO_border_includeLand","CO_border_patrolDensity",
     "CO_westBorderCampCount","CO_westBorderCampGuardsMin","CO_westBorderCampGuardsMax",

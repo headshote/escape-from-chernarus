@@ -1,63 +1,39 @@
 // fn_russianAdvanceWaypoints.sqf
-// Gives a Russian advance group lane-specific movement and combat patrols.
+// Commits a RUS_ADV group to the Krasnostav siege: assault in from wherever
+// it spawned, then perpetually SAD-patrol the town <-> airstrip line so it
+// keeps hunting deployed conscripts / CRN_FRONT and never marches off west
+// (the old north/central/south routes drained forces toward Chernogorsk and
+// left Krasnostav empty for players arriving later).
 params ["_grp"];
+if (isNull _grp) exitWith {};
 
-private _lane = _grp getVariable ["CO_advanceLane", ""];
-if (_lane isEqualTo "") then {
-    private _leaderPos = getPosATL (leader _grp);
-    _lane = switch (true) do {
-        case ((_leaderPos select 1) > 10500): { "north" };
-        case ((_leaderPos select 1) < 5200): { "south" };
-        default { "central" };
-    };
+private _townPos  = missionNamespace getVariable ["CO_rus_townPos",  [11200, 12300, 0]];
+private _airstrip = missionNamespace getVariable ["CO_rus_airstripPos", [11600, 13050, 0]];
+
+// Clear any prior waypoints (safe on a fresh group too).
+for "_i" from ((count (waypoints _grp)) - 1) to 0 step -1 do {
+    deleteWaypoint [_grp, _i];
 };
 
-private _advanceRoute = switch (_lane) do {
-    case "north": {
-        [
-            [12650, 12340, 0],
-            [12100, 12320, 0],
-            [11600, 12300, 0],
-            [11200 + random 500 - 250, 12300 + random 500 - 250, 0],
-            [12050 + random 500 - 250, 12650 + random 500 - 250, 0],
-            [11200 + random 650 - 325, 13600 + random 650 - 325, 0],
-            [10850 + random 450 - 225, 12200 + random 450 - 225, 0],
-            [11200, 12300, 0]
-        ]
-    };
-    case "south": {
-        [
-            [14050, 3300, 0],
-            [12400, 3100, 0],
-            [10200, 2300, 0],
-            [8500, 2500, 0],
-            [6400, 2400, 0]
-        ]
-    };
-    default {
-        [
-            [14050, 7800, 0],
-            [12800, 7500, 0],
-            [12300, 9700, 0],
-            [9800, 6900, 0],
-            [8500, 5000, 0],
-            [6400, 2400, 0]
-        ]
-    };
-};
+// Alternating town / airstrip sweep — this is the ground they hold.
+private _route = [
+    _townPos  vectorAdd [(random 220) - 110, (random 220) - 110, 0],
+    _airstrip vectorAdd [(random 320) - 160, (random 200) - 100, 0],
+    _townPos  vectorAdd [(random 300) - 150, (random 300) - 150, 0],
+    _airstrip vectorAdd [(random 260) - 130, (random 220) - 110, 0]
+];
 
 {
-    private _wp = _grp addWaypoint [_x, 50];
-    private _isNorthPatrol = _lane == "north" && { _forEachIndex >= 2 };
-    _wp setWaypointType (if (_isNorthPatrol) then { "SAD" } else { "MOVE" });
-    _wp setWaypointSpeed (if (_lane == "north") then { "FULL" } else { "NORMAL" });
+    private _wp = _grp addWaypoint [_x, 40];
+    _wp setWaypointType "SAD";
+    _wp setWaypointSpeed (if (_forEachIndex == 0) then { "FULL" } else { "LIMITED" });
     _wp setWaypointBehaviour "COMBAT";
     _wp setWaypointCombatMode "RED";
-    _wp setWaypointCompletionRadius (if (_isNorthPatrol) then { 120 } else { 60 });
-} forEach _advanceRoute;
+    _wp setWaypointCompletionRadius 90;
+} forEach _route;
 
-private _lastPos = _advanceRoute select ((count _advanceRoute) - 1);
-private _cycleWp = _grp addWaypoint [_lastPos, 0];
-_cycleWp setWaypointType (if (_lane == "north") then { "CYCLE" } else { "HOLD" });
-_cycleWp setWaypointBehaviour "COMBAT";
-_cycleWp setWaypointCombatMode "RED";
+private _cyc = _grp addWaypoint [_townPos, 0];
+_cyc setWaypointType "CYCLE";
+_cyc setWaypointBehaviour "COMBAT";
+_cyc setWaypointCombatMode "RED";
+_cyc setWaypointCompletionRadius 120;

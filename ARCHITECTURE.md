@@ -286,6 +286,29 @@ VS Code will show false-positive CBA namespace errors. These do not affect build
 
 ---
 
+## Round R10 — Krasnostav siege (persistent Russian assault)
+
+- **Problem:** the Russian advance spread each wave across north/central/south lanes and
+  marched the central/south lanes west to Chernogorsk, spending the global unit budget far
+  from Krasnostav. Combined with the westward-marching `CO_rus_advanceFront` abstraction and
+  the per-death `+1` replacement competing for the same cap, players deploying to the front
+  later in a match often found Krasnostav deserted.
+- **`fn_russianAdvance` reworked into a siege maintainer.** Defines the zone
+  (`CO_rus_zoneCenter` [11400,12650] / `CO_rus_zoneRadius` 1500 = town + airstrip),
+  pins the front-line marker on Krasnostav, and every `CO_rus_waveCooldown` (25 s) calls
+  the wave spawner. No westward march, no town-fall cascade.
+- **`fn_spawnRussianWave` is now a deficit top-up.** Counts live RUS_ADV infantry in-zone,
+  spawns only `min(target − inZone, perWaveMax, globalRoom)` back up to `CO_rus_zoneTarget`
+  (45) under the hard `CO_rus_maxActive` (95) cap. Spawns on the north/east approaches, in
+  ~6-man squads, plus MRAP/APC/MBT on their cadences (each gated on remaining global room).
+  Groups are `createGroup [east, true]` so wiped squads auto-reclaim (no east-side group
+  leak). Per-death replacement EHs removed — the maintainer is the single, bounded
+  repopulation path (`fn_spawnRussianReplacement` is now unwired).
+- **`fn_russianAdvanceWaypoints` rewritten** so every group assaults in then perpetually
+  SAD-patrols the town↔airstrip line (CYCLE), instead of the old lane routes to Chernogorsk.
+- New tunables in `CO_adminDefaults.sqf`: `CO_rus_zoneTarget`; `CO_rus_waveCooldown` 70→25,
+  `CO_rus_unitsPerWave` 42→20, `CO_rus_maxActive` 120→95, `CO_rus_armorFrequency` 1→2.
+
 ## Round R9 — TCK pursuit commitment + capture lock
 
 - **Target-lock hysteresis (`fn_tckAcquireTarget`, new).** TCK escorts and foot

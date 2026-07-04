@@ -169,23 +169,36 @@ the recognition threshold needed for pursuit.
 
 ---
 
-## Russian Advance
+## Russian Advance — the Krasnostav siege
 
-Abstract east-to-west front, modelled by `CO_rus_advanceFront` (X coordinate).
+Rather than an east-to-west marching front, the Russians run a **permanent siege of
+Krasnostav and the airstrip just north of it** — the exact ground where cleared
+conscripts deploy — so the front is always hot when a player arrives.
 
-Each wave (`fn_spawnRussianWave`):
-- `CO_rus_unitsPerWave` infantry + every `CO_rus_armorFrequency` waves one APC.
-- Front advances 120 m per wave (abstract).
-- Town objectives checked west-to-east: Berezino → Elektrozavodsk → Chernogorsk → Balota.
-- When a town falls: `fn_enforcerRetreatFromTown` (ENF groups within 1500 m retreat west),
-  `fn_updateFrontLine` redraws the `co_frontline` map marker.
-- If `CO_front_unitsRemaining ≤ 10`: `fn_frontCollapse`.
-- Deserters (soldiers moving >500 m from front): detected by `fn_desertionMonitor`.
+`fn_russianAdvance` (server) sets the zone (`CO_rus_zoneCenter` [11400,12650], radius
+`CO_rus_zoneRadius` 1500, covering town + airstrip) and runs a top-up loop every
+`CO_rus_waveCooldown` (25 s):
 
-**Population cap.** `CO_rus_maxActive` (default 80) limits the live RUS_ADV unit count.
-Both `fn_spawnRussianWave` and `fn_spawnRussianReplacement` skip spawning when at or above
-the cap. This prevents unbounded growth that was producing severe FPS drops near Krasnostav
-(replacement spawns +1 per kill, wave spawns +30 every 100 s, combined with no cleanup).
+- `fn_spawnRussianWave` counts live RUS_ADV infantry in-zone and spawns only the
+  **deficit** back up to `CO_rus_zoneTarget` (45), capped per top-up by
+  `CO_rus_unitsPerWave` (20) and globally by `CO_rus_maxActive` (95, server-safety).
+- Units spawn on the **north/east approaches** (over the airstrip) and are handed the
+  town↔airstrip patrol by `fn_russianAdvanceWaypoints` — SAD/COMBAT waypoints ending in
+  a CYCLE, so they assault in and never march off west.
+- Armor: an armed MRAP every top-up (room permitting), an APC every
+  `CO_rus_armorFrequency` (2) top-ups, an MBT every `CO_rus_tankFrequency` (3).
+- `fn_russianAssaultBrain` (4 s loop) feeds RUS groups valid deployed-conscript /
+  CRN_FRONT targets (engine relations otherwise ignore civilian-slot players) and
+  re-anchors idle groups onto the Krasnostav patrol points.
+
+**Why it's bounded.** Presence is maintained by deficit top-up (spawn only what died) to
+a fixed in-zone target under a hard global cap — never the old unbounded "+1 per kill"
+replacement. Groups are created `deleteWhenEmpty` so wiped squads reclaim their slot.
+The old per-death `fn_spawnRussianReplacement` is no longer wired in.
+
+Deserters (deployed conscripts leaving the Krasnostav safe zone) are still detected by
+`fn_desertionMonitor` / `fn_awolMonitor`; `CO_front_unitsRemaining ≤ 10` still triggers
+`fn_frontCollapse`.
 
 **Hostility tick throttle.** `fn_russianHostilityTick` (the per-player loop that forces
 RUS_ADV to engage cleared conscripts despite the engine `civilian setFriend [west,1]`
