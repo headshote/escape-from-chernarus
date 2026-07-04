@@ -140,8 +140,13 @@ _captive setCaptive true;
     private _mkCrew = {
         params ["_pos", "_grp", "_token"];
         private _u = _grp createUnit ["B_Soldier_F", _pos, [], 0, "NONE"];
+        if (isNull _u) exitWith { objNull };
         [_u] call co_main_fnc_initHostileUnit;
-        _u setBehaviour "SAFE";
+        // CARELESS so the driver actually cruises to NWAF at road speed
+        // instead of the SAFE crawl (SAFE brakes for every civilian noise
+        // and caps the van at walking pace). AUTOTARGET/TARGET stay off so
+        // he never stops to fight — this is a prisoner run, not a patrol.
+        _u setBehaviour "CARELESS";
         _u setCombatMode "BLUE";
         _u disableAI "AUTOTARGET";
         _u disableAI "TARGET";
@@ -150,15 +155,40 @@ _captive setCaptive true;
         _u
     };
 
+    // CRITICAL: never let a CREWLESS van drive off. createGroup returns
+    // grpNull once the engine's per-side group cap is reached (which is
+    // why later captures — not just the first — produced an empty van
+    // that instantly resolved to "rescued: your escort is dead, you're
+    // free"). Scrap the van and fall back to the accepted direct delivery
+    // whenever the driver can't be created/seated.
+    private _bailCrewFail = {
+        diag_log format [
+            "[CO] Capture transport: crew spawn FAILED (grp=%1) — direct delivery.", _crewGrp
+        ];
+        { if (!isNull _x) then { deleteVehicle _x } } forEach (units _crewGrp);
+        if (!isNull _veh) then { deleteVehicle _veh };
+        if (!isNull _crewGrp) then { deleteGroup _crewGrp };
+        call _deliverDirect;
+    };
+
     private _driverUnit = [_spawnPos, _crewGrp, _token] call _mkCrew;
+    if (isNull _crewGrp || isNull _driverUnit || !alive _driverUnit) exitWith { call _bailCrewFail };
     _driverUnit setVariable ["CO_vehicleChaseDriver", true, true];
     _driverUnit moveInDriver _veh;
     _crewGrp selectLeader _driverUnit;
+    if (driver _veh != _driverUnit) exitWith { call _bailCrewFail };
 
     private _jailerUnit = [_spawnPos, _crewGrp, _token] call _mkCrew;
-    _jailerUnit setVariable ["CO_isJailer", true, true];
-    _jailerUnit assignAsCargo _veh;
-    _jailerUnit moveInCargo _veh;
+    if (!isNull _jailerUnit) then {
+        _jailerUnit setVariable ["CO_isJailer", true, true];
+        _jailerUnit assignAsCargo _veh;
+        _jailerUnit moveInCargo _veh;
+    };
+
+    // Drive the whole crew as a fast, non-hesitant convoy.
+    _crewGrp setBehaviour "CARELESS";
+    _crewGrp setCombatMode "BLUE";
+    _crewGrp setSpeedMode "FULL";
 
     diag_log format [
         "[CO] Capture transport %1 spawned at %2 for %3 (dedicated crew, dest NWAF).",
@@ -218,8 +248,8 @@ _captive setCaptive true;
     { deleteWaypoint _x } forEach +waypoints _crewGrp;
     private _wp = _crewGrp addWaypoint [_dest, 0];
     _wp setWaypointType "MOVE";
-    _wp setWaypointSpeed "NORMAL";
-    _wp setWaypointBehaviour "SAFE";
+    _wp setWaypointSpeed "FULL";
+    _wp setWaypointBehaviour "CARELESS";
     _wp setWaypointCombatMode "BLUE";
     _wp setWaypointCompletionRadius 30;
     _crewGrp setCurrentWaypoint _wp;
@@ -227,6 +257,7 @@ _captive setCaptive true;
     _veh engineOn true;
     _veh setFuel 1;
     _veh forceSpeed -1;
+    _veh limitSpeed 200;
     sleep 0.5;
     _driverUnit doMove _dest;
 
@@ -402,8 +433,11 @@ _captive setCaptive true;
                 _captive setVariable ["CO_transportInProgress", false, true];
             };
 
-            // Crew dismounts into the camp garrison; empty van cleaned
-            // up later so wrecks don't accumulate at NWAF.
+            // Crew dismount at the camp, then the van AND the crew group
+            // are cleaned up once unobserved. Leaving the crew alive as a
+            // permanent "garrison" leaked one west-side group per delivery,
+            // and the engine's per-side group cap is exactly what starves
+            // later transports into spawning crewless (the empty-van bug).
             {
                 if (alive _x && vehicle _x == _veh) then {
                     unassignVehicle _x;
@@ -413,14 +447,22 @@ _captive setCaptive true;
                 _x setVariable ["CO_isJailer", false, true];
             } forEach (units _crewGrp);
             call _releaseCrew;
-            [_veh] spawn {
-                params ["_v"];
-                sleep 300;
-                if (!isNull _v && alive _v &&
-                    { crew _v isEqualTo [] } &&
-                    { allPlayers findIf { alive _x && _x distance2D _v < 120 } < 0 }) then {
-                    deleteVehicle _v;
+            // Gentle cleanup: wait until nobody is watching (the conscript
+            // trains here for minutes, then deploys far north — the van
+            // goes unobserved when they leave), with a long hard backstop
+            // so the group is always reclaimed even if they never wander.
+            [_veh, _crewGrp] spawn {
+                params ["_v", "_g"];
+                private _hardCap = time + 1200;
+                waitUntil {
+                    sleep 15;
+                    (isNull _v) ||
+                    (allPlayers findIf { alive _x && _x distance2D _v < 150 } < 0) ||
+                    (time > _hardCap)
                 };
+                { if (!isNull _x) then { deleteVehicle _x } } forEach (units _g);
+                if (!isNull _v) then { deleteVehicle _v };
+                if (!isNull _g) then { deleteGroup _g };
             };
             diag_log format ["[CO] Capture transport delivery complete at NWAF (%1).", name _captive];
         };
