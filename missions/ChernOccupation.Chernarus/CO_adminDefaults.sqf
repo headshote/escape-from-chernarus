@@ -79,6 +79,14 @@ CO_chase_speedCoef              = 1.12;
 CO_chase_aiStaminaDrain         = 0.42;
 CO_chase_tackleRange            = 2.2;
 CO_chase_tackleTime             = 1.5;
+// TCK hunt-target commitment hysteresis (fn_tckAcquireTarget). A locked
+// victim is only swapped for a closer one when ALL three hold: the new
+// target is at least switchMargin metres closer, the current pursuit has
+// been fruitless for fruitlessTime seconds, and the current target has
+// opened the gap by loseGroundGap metres past our closest approach.
+CO_tck_switchMargin             = 18;     // metres a rival target must be closer by
+CO_tck_fruitlessTime            = 20;     // seconds of no progress before a switch is allowed
+CO_tck_loseGroundGap            = 8;      // metres the locked target must have pulled away
 CO_tracker_speedCoef            = 1.25;
 CO_checkpoint_maxCount          = 20;
 CO_border_innerJitter           = 200;
@@ -124,6 +132,7 @@ CO_adminUIDs                    = ["76561198054336866"];   // add Steam64 UIDs a
     "CO_police_carStopChance","CO_police_active",
     "CO_difficultyPreset","CO_suspicion_baseRate","CO_search_duration",
     "CO_chase_speedCoef","CO_chase_aiStaminaDrain","CO_chase_tackleRange","CO_chase_tackleTime",
+    "CO_tck_switchMargin","CO_tck_fruitlessTime","CO_tck_loseGroundGap",
     "CO_tracker_speedCoef","CO_checkpoint_maxCount","CO_border_innerJitter","CO_heat_decayPerMinute",
     "CO_kpiLogInterval","CO_maxSimultaneousChases",
     "CO_crime_killWanted","CO_crime_woundWanted","CO_crime_gunfireWanted",

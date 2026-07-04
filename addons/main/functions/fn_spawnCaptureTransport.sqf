@@ -237,6 +237,7 @@ _captive setCaptive true;
     private _lastCheck = time;
     private _stuckFails = 0;
     private _flipSince = -1;
+    private _ejectFails = 0;
 
     while { _result == "" } do {
         sleep 2;
@@ -283,12 +284,37 @@ _captive setCaptive true;
             };
         };
 
-        // Breakout (minigame) or any other way out of the vehicle.
+        // The breakout minigame is the ONLY sanctioned mid-route exit.
         if (_result == "" && (_captive getVariable ["CO_breakoutAt", -1]) > _tripStart) then {
             _result = "escaped";
         };
-        if (_result == "" && !(_captive in _veh)) then {
-            _result = "escaped";
+        // Cargo is locked, so an UNEXPLAINED exit (physics ejection from a
+        // stalled/jerking van, a knockout state clearing, or a server-side
+        // locality desync of `in`) is NOT an escape — the pre-rewrite flow
+        // always still delivered the conscript to training. Treating it as
+        // an escape freed the player on the road and never teleported them
+        // to the camp. Re-seat them; if that keeps failing, fall back to
+        // direct delivery rather than dead-ending the pipeline.
+        if (_result == "" && alive _captive && !(_captive in _veh)) then {
+            _ejectFails = _ejectFails + 1;
+            if (_ejectFails >= 3) then {
+                diag_log format [
+                    "[CO] Capture transport %1: captive out of van without breakout — direct delivery.",
+                    netId _veh
+                ];
+                _result = "failsafe";
+            } else {
+                _captive setUnconscious false;
+                _captive setVariable ["CO_knockedOut", false, true];
+                _captive setPos (getPosATL _veh);
+                _captive assignAsCargo _veh;
+                _captive moveInCargo _veh;
+                if (isPlayer _captive) then {
+                    [_captive, _veh] remoteExec ["moveInCargo", _captive];
+                };
+            };
+        } else {
+            if (_captive in _veh) then { _ejectFails = 0 };
         };
 
         if (_result == "" && (_veh distance2D _dest) < 45) then { _result = "arrived" };

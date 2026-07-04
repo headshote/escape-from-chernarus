@@ -286,6 +286,33 @@ VS Code will show false-positive CBA namespace errors. These do not affect build
 
 ---
 
+## Round R9 — TCK pursuit commitment + capture lock
+
+- **Target-lock hysteresis (`fn_tckAcquireTarget`, new).** TCK escorts and foot
+  patrols used to re-pick "nearest valid civilian right now" on a short timer, so a
+  pack thrashed between victims and never committed. The new shared selector LOCKS
+  onto one victim — **players always preferred over NPCs** — and only breaks the lock
+  when the target becomes un-huntable, OR an NPC-holder sees a player in range, OR
+  **all three** of: a rival is closer by `CO_tck_switchMargin` (18 m), the pursuit has
+  been fruitless for `CO_tck_fruitlessTime` (20 s), and the locked target has opened the
+  gap by `CO_tck_loseGroundGap` (8 m) past the chaser's closest approach. Per-hunter
+  lock state (`CO_huntForId/huntMinDist/huntProgressAt`) lives on the unit. Callers
+  invoke it on a **2.5 s throttle** (not per 0.7 s tick) so scanning cost stays bounded.
+  Wired into `fn_tckGlobalAggression` (chase thread now re-selects with hysteresis
+  instead of holding one target 60 s blindly) and `fn_busAgroLoop` escort hunters
+  (replaced the 30 s hard re-pick).
+- **Map-wide capture lock.** `fn_runWrangle` now sets `CO_captureInProgress` on the
+  target the moment it wins the wrangle mutex and clears it unless the grab lands (the
+  detain/transport chain owns it on success). Every TCK chase loop drops a target the
+  instant `CO_captureInProgress` is set, so units stop piling onto — and stop endlessly
+  chasing — a victim who is already being taken. `fn_stateWatchdog`'s 180 s stuck-flag
+  clear remains the backstop. (Police/checkpoint already set this flag at engagement
+  start; only the TCK paths were missing it.)
+- **Detain stays proximity-only.** Confirmed all detain triggers gate on
+  `fn_proximityTackle` (≤ `CO_chase_tackleRange` 2.2 m, sustained ~1.5 s) — TCK, bus,
+  police, and checkpoint. `fn_detainSequence` additionally requires an officer to reach
+  arm's length (≤5 m) or it aborts and frees the target. No detainment at range.
+
 ## Round R8 — Police reaction, return-fire, physical detain
 
 - **Melee on a cop → non-lethal police chase-and-detain (no shooting).**

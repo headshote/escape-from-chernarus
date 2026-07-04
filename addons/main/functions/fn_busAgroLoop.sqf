@@ -233,7 +233,7 @@ private _spawnEscortHunter = {
         } else {
             objNull
         };
-        private _myTargetUntil = if (isNull _myTarget) then { 0 } else { time + 45 };
+        private _nextSelAt = time + 3;   // honour the seed briefly before re-evaluating
         private _idleAt = -1;
 
         while {
@@ -244,62 +244,36 @@ private _spawnEscortHunter = {
         } do {
             sleep 0.7;
 
-            // Drop target if it died/got captured/knocked out
-            if (!isNull _myTarget) then {
-                if (!alive _myTarget ||
-                    captive _myTarget ||
-                    (_myTarget getVariable ["CO_knockedOut", false])) then {
-                    _myTarget = objNull;
-                };
-            };
+            // Cheap per-tick invalidation: stop chasing a victim who is
+            // gone, already captured, or being captured by someone else
+            // (no piling onto an already-caught target).
+            if (!isNull _myTarget && {
+                !alive _myTarget || captive _myTarget ||
+                (vehicle _myTarget != _myTarget) ||
+                (_myTarget getVariable ["CO_knockedOut", false]) ||
+                (_myTarget getVariable ["CO_captureInProgress", false])
+            }) then { _myTarget = objNull };
 
-            // Acquire a target if we don't have one
-            if (isNull _myTarget || time > _myTargetUntil) then {
-                private _center = getPosATL _u;
-                private _candidates = (_center nearEntities [["Man"], BUS_FOOT_SCAN_RADIUS]) select {
-                    private _t = _x;
-                    private _ok = alive _t && vehicle _t == _t;
-                    if (_ok && captive _t) then { _ok = false };
-                    if (_ok && (_t getVariable ["CO_knockedOut", false])) then { _ok = false };
-                    if (_ok && (_t getVariable ["CO_isFemale", false])) then { _ok = false };
-                    if (_ok && (_t getVariable ["CO_captureInProgress", false])) then { _ok = false };
-                    if (_ok) then {
-                        private _f = group _t getVariable ["CO_faction", ""];
-                        if (_f in ["CRN_ENF","POLICE","CRN_FRONT","RUS_ADV"]) then { _ok = false };
-                    };
-                    if (_ok) then {
-                        _ok = (isPlayer _t || side _t == civilian);
-                    };
-                    _ok
-                };
-                if (count _candidates == 0) then {
-                    private _alerts = [_center, 120, 60] call co_main_fnc_alertQuery;
-                    {
-                        private _t = _x select 0;
-                        if (!isNull _t && alive _t && vehicle _t == _t && !captive _t &&
-                            !(_t getVariable ["CO_knockedOut", false]) &&
-                            !(_t getVariable ["CO_isFemale", false])) then {
-                            _candidates pushBackUnique _t;
+            // Throttled (re)selection with commitment hysteresis. Locks
+            // onto one victim (players preferred) and only switches when
+            // the current pursuit has gone cold (see fn_tckAcquireTarget).
+            if (time > _nextSelAt) then {
+                _nextSelAt = time + 2.5;
+                private _extra = [];
+                {
+                    private _t = _x select 0;
+                    if (!isNull _t) then { _extra pushBack _t };
+                } forEach ([getPosATL _u, 120, 60] call co_main_fnc_alertQuery);
+                private _picked = [_u, _myTarget, BUS_FOOT_SCAN_RADIUS, _extra] call co_main_fnc_tckAcquireTarget;
+                if (!(_picked isEqualTo _myTarget)) then {
+                    _myTarget = _picked;
+                    if (!isNull _myTarget) then {
+                        _idleAt = -1;
+                        if (_weaponsFree) then {
+                            [_myTarget] call co_main_fnc_installNonLethalDamage;
                         };
-                    } forEach _alerts;
-                };
-                if (count _candidates > 0) then {
-                    // Weighted pick (R1-g): players, hot suspects, and armed
-                    // men out-rank whichever NPC civ happens to be nearest.
-                    _candidates = [_candidates, [], {
-                        private _score = _x distance2D _u;
-                        if (isPlayer _x) then { _score = _score - 40 };
-                        _score = _score - (((_x getVariable ["CO_heatLevel", 0]) * 0.5) min 40);
-                        if (primaryWeapon _x != "" || handgunWeapon _x != "") then { _score = _score - 25 };
-                        _score
-                    }, "ASCEND"] call BIS_fnc_sortBy;
-                    _myTarget = _candidates select 0;
-                    _myTargetUntil = time + 30;
-                    _idleAt = -1;
-                    if (_weaponsFree) then {
-                        [_myTarget] call co_main_fnc_installNonLethalDamage;
+                        [_myTarget, getPosATL _myTarget, "bus_hunter", _claimPriority] call co_main_fnc_alertPublish;
                     };
-                    [_myTarget, getPosATL _myTarget, "bus_hunter", _claimPriority] call co_main_fnc_alertPublish;
                 };
             };
 
@@ -338,7 +312,6 @@ private _spawnEscortHunter = {
                         };
                         if (_result == "escaped") then {
                             _myTarget setVariable ["CO_tackleImmuneUntil", time + 6, true];
-                            _myTargetUntil = time + 12;
                             sleep 2;
                         };
                         // "busy": another controller owns the grab — hold
@@ -833,6 +806,7 @@ while { alive _veh } do {
         if (isNull _huntTarget || !alive _huntTarget ||
             captive _huntTarget ||
             (_huntTarget getVariable ["CO_knockedOut", false]) ||
+            (_huntTarget getVariable ["CO_captureInProgress", false]) ||
             time > _huntUntil) then {
             _huntTarget = objNull;
             _veh setVariable ["CO_busState", "traveling", true];

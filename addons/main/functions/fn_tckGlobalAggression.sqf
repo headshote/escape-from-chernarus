@@ -192,8 +192,8 @@ diag_log "[CO] tckGlobalAggression: starting global failsafe loop (radius=60m, t
                 [_target, getPosATL _target, "tck_global", _priority] call co_main_fnc_alertPublish;
 
                 [_u, _target, _token, _priority] spawn {
-                    params ["_u", "_t", "_token", "_priority"];
-                    if (isNull _u || isNull _t) exitWith {};
+                    params ["_u", "_myTarget", "_token", "_priority"];
+                    if (isNull _u) exitWith {};
 
                     // Switch the unit into an aware/aggressive posture so it
                     // actually moves and faces the target (CARELESS units
@@ -204,39 +204,65 @@ diag_log "[CO] tckGlobalAggression: starting global failsafe loop (radius=60m, t
                     _u enableAI "PATH";
                     _u setUnitPos "UP";
 
-                    private _deadline = time + 60;
-                    private _captured = false;
+                    private _deadline      = time + 90;
+                    private _nextSelAt     = time + 3;   // honour the initial pick briefly
+                    private _noTargetSince = -1;
+                    private _captured      = false;
+                    private _ended         = false;
+
                     while {
-                        alive _u && alive _t &&
-                        !captive _t &&
-                        !(_t getVariable ["CO_knockedOut", false]) &&
-                        time < _deadline &&
-                        !_captured &&
+                        alive _u && time < _deadline && !_captured && !_ended &&
                         (vehicle _u == _u) &&
-                        (vehicle _t == _t) &&
                         { [_u, _token, _priority, 25] call co_main_fnc_claimUnit }
                     } do {
-                        [[_u], _t] call co_main_fnc_chaseMove;
-                        if ([[_u], _t] call co_main_fnc_proximityTackle) then {
-                            if (isPlayer _t) then {
-                                private _result = [_t, 20] call co_main_fnc_runWrangle;
-                                if (_result == "captured") then {
-                                    _t setCaptive true;
-                                    // Kneel-and-load beat (this unit is at
-                                    // tackle range).
-                                    [_t, group _u] call co_main_fnc_detainSequence;
-                                    _captured = true;
+                        // Cheap per-tick invalidation: never keep chasing a
+                        // victim who is gone, already captured, or being
+                        // captured by someone else.
+                        if (!isNull _myTarget && {
+                            !alive _myTarget || captive _myTarget ||
+                            (vehicle _myTarget != _myTarget) ||
+                            (_myTarget getVariable ["CO_knockedOut", false]) ||
+                            (_myTarget getVariable ["CO_captureInProgress", false])
+                        }) then { _myTarget = objNull };
+
+                        // Throttled (re)selection with commitment hysteresis.
+                        if (time > _nextSelAt) then {
+                            _nextSelAt = time + 2.5;
+                            private _picked = [_u, _myTarget, TCK_SCAN_RADIUS] call co_main_fnc_tckAcquireTarget;
+                            if (!(_picked isEqualTo _myTarget)) then {
+                                _myTarget = _picked;
+                                if (!isNull _myTarget) then {
+                                    [_myTarget, getPosATL _myTarget, "tck_global", _priority] call co_main_fnc_alertPublish;
                                 };
-                                if (_result == "escaped") then {
-                                    _t setVariable ["CO_tackleImmuneUntil", time + 6, true];
-                                    sleep 2;
-                                };
-                            } else {
-                                [_u, _t, 60, true] call co_main_fnc_applyKnockout;
-                                if (_t getVariable ["CO_knockedOut", false]) then {
-                                    _t setCaptive true;
-                                    [_u, _t] spawn co_main_fnc_dispatchCaptureTransport;
-                                    _captured = true;
+                            };
+                        };
+
+                        if (isNull _myTarget) then {
+                            if (_noTargetSince < 0) then { _noTargetSince = time };
+                            if ((time - _noTargetSince) > 6) then { _ended = true };
+                        } else {
+                            _noTargetSince = -1;
+                            [[_u], _myTarget] call co_main_fnc_chaseMove;
+                            if ([[_u], _myTarget] call co_main_fnc_proximityTackle) then {
+                                if (isPlayer _myTarget) then {
+                                    private _result = [_myTarget, 20] call co_main_fnc_runWrangle;
+                                    if (_result == "captured") then {
+                                        _myTarget setCaptive true;
+                                        // Kneel-and-load beat (at tackle range).
+                                        [_myTarget, group _u] call co_main_fnc_detainSequence;
+                                        _captured = true;
+                                    };
+                                    if (_result == "escaped") then {
+                                        _myTarget setVariable ["CO_tackleImmuneUntil", time + 6, true];
+                                        sleep 2;
+                                    };
+                                } else {
+                                    [_u, _myTarget, 60, true] call co_main_fnc_applyKnockout;
+                                    if (_myTarget getVariable ["CO_knockedOut", false]) then {
+                                        _myTarget setCaptive true;
+                                        [_u, _myTarget] spawn co_main_fnc_dispatchCaptureTransport;
+                                        _captured = true;
+                                    };
                                 };
                             };
                         };
@@ -244,9 +270,9 @@ diag_log "[CO] tckGlobalAggression: starting global failsafe loop (radius=60m, t
                     };
 
                     // After knockout: try to summon transport
-                    if (alive _t && (_t getVariable ["CO_knockedOut", false])) then {
-                        _t setCaptive true;
-                        [_u, _t] spawn co_main_fnc_dispatchCaptureTransport;
+                    if (alive _myTarget && (_myTarget getVariable ["CO_knockedOut", false])) then {
+                        _myTarget setCaptive true;
+                        [_u, _myTarget] spawn co_main_fnc_dispatchCaptureTransport;
                     };
 
                     [_u, _token] call co_main_fnc_releaseUnit;

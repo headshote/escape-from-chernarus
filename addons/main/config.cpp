@@ -110,6 +110,7 @@ class CfgFunctions {
             class dispatchCaptureTransport {};
             class spawnCaptureTransport {};
             class tckGlobalAggression {};
+            class tckAcquireTarget {};
             class claimUnit        {};
             class releaseUnit      {};
             class chaseMove        {};
