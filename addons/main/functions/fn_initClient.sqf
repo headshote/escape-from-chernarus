@@ -31,6 +31,7 @@ showGPS false;
 
 // Start endurance bar HUD
 [] call co_main_fnc_enduranceBar;
+[] call co_main_fnc_heatHud;
 
 // Listen for wrangle result broadcast (server reads CO_wrangleResult)
 // (Already handled via setVariable broadcast — nothing extra needed here)
@@ -61,9 +62,52 @@ player addEventHandler ["Fired", {
     };
 };
 
+// ISSUE 3: active transport-destination marker. While being driven to
+// the training camp (CO_detainPhase == "transport"), draw a live on-
+// screen icon at the destination with the remaining drive distance —
+// the classic Arma "active mark". The server stamps CO_transportDest
+// (a position) on the player when they are loaded and blanks it on
+// arrival / escape / rescue / death; the detainPhase gate makes the
+// marker vanish the instant the ride ends even before that broadcast
+// lands. Bound to the mission (not the unit), so it survives respawn.
+addMissionEventHandler ["Draw3D", {
+    if (isNull player || !alive player) exitWith {};
+    if ((player getVariable ["CO_detainPhase", ""]) != "transport") exitWith {};
+    private _dest = player getVariable ["CO_transportDest", []];
+    if (!(_dest isEqualType []) || { count _dest < 2 }) exitWith {};
+    private _iconPos = [_dest select 0, _dest select 1, ((_dest select 2) max 0) + 3];
+    private _dist = round (player distance2D _dest);
+    drawIcon3D [
+        "\A3\ui_f\data\map\markers\military\objective_CA.paa",
+        [0.25, 0.85, 1, 1],
+        _iconPos,
+        1.1, 1.1, 0,
+        format ["TRAINING CAMP  %1 m", _dist],
+        1, 0.032, "PuristaMedium", "center"
+    ];
+}];
+
+// Breakout self-action: visible only while locked in a capture
+// transport. Runs the latch minigame; success is consumed by the
+// transport's drive loop on the server.
+CO_fnc_addBreakoutAction = {
+    params [["_unit", player]];
+    _unit addAction [
+        "<t color='#FF9944'>Force the cargo latch</t>",
+        { [] spawn co_main_fnc_breakoutMinigame; },
+        nil, 1.6, false, true, "",
+        "(player getVariable ['CO_detainPhase','']) == 'transport'
+         && vehicle player != player
+         && ((vehicle player) getVariable ['CO_isCaptureTransport', false])
+         && time > (player getVariable ['CO_nextBreakoutAt', 0])"
+    ];
+};
+[player] call CO_fnc_addBreakoutAction;
+
 // Re-install after every respawn
 addMissionEventHandler ["Respawn", {
     params ["_newUnit"];
+    [_newUnit] call CO_fnc_addBreakoutAction;
     _newUnit setVariable ["CO_nonLethalInstalled", false, true];
     [_newUnit] call co_main_fnc_installNonLethalDamage;
     // Re-arm the weapon-fired tracker on the new body — the original EH was
@@ -77,24 +121,9 @@ addMissionEventHandler ["Respawn", {
     }];
 }];
 
-// Police recognition loop: periodically check nearby police
-[] spawn {
-    while { true } do {
-        sleep 4;
-        if (!alive player) then { continue };
-        if (!CO_police_active) then { continue };
-        private _nearCops = allGroups select {
-            _x getVariable ["CO_faction",""] == "POLICE" &&
-            (leader _x) distance player < 80
-        };
-        {
-            private _cop = leader _x;
-            if ([_cop, player] call co_main_fnc_policeRecognise) then {
-                [[player], group _cop] remoteExec ["co_main_fnc_checkpointAlert", 2];
-            };
-        } forEach _nearCops;
-    };
-};
+// Police recognition is now server-authoritative in fn_policePatrols:
+// suspicion rises, hails, ID checks, pursuits, backup and vehicle chases
+// all run from the patrol controller to avoid client-side false triggers.
 
 // Show initial briefing
 titleText [

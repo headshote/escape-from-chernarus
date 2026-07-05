@@ -59,6 +59,34 @@ if ((time - _lastHitAt) > 8) then {
 _hitCount = _hitCount + 1;
 _target setVariable ["CO_meleePunchState", [_hitCount, time], true];
 
+// Punching a POLICE officer is a NON-LETHAL provocation. The victim's
+// squad AND any police who witnessed it chase and DETAIN the attacker.
+// It must NOT open fire and must NOT drag TCK into it:
+//   - we do NOT call fn_reportCrime (its "wound" path arms every nearby
+//     CRN_ENF/POLICE group with LETHAL gunfire retaliation, which is
+//     what was making TCK shoot at you for a fist fight, and bumps
+//     wanted into shoot-to-kill territory);
+//   - we only mark POLICE groups. fn_policeBrain consumes
+//     CO_retaliateTarget purely as a chase-and-detain order (it returns
+//     fire only if the PLAYER is shooting), so a melee never triggers
+//     a gunfight. TCK groups near a punched cop are left alone — they
+//     already detain anyone in reach through their normal proximity
+//     loop, without shooting.
+// (A punched TCK unit likewise needs no special handling: the global
+// aggression proximity loop already tackle-detains the attacker.)
+private _tFac = (group _target) getVariable ["CO_faction", ""];
+if (_tFac == "POLICE" && { isPlayer _attacker || side _attacker == civilian }) then {
+    private _witnessGrps = allGroups select {
+        (_x getVariable ["CO_faction", ""]) == "POLICE" &&
+        { !isNull (leader _x) && alive (leader _x) } &&
+        { (leader _x) distance2D _target < 60 }
+    };
+    {
+        _x setVariable ["CO_retaliateTarget", _attacker, false];
+        _x setVariable ["CO_retaliateUntil", time + 180, false];
+    } forEach _witnessGrps;
+};
+
 if (!isPlayer _target) then {
     _target setVariable ["CO_civState", "fleeing", false];
     _target setVariable ["CO_civAlertUntil", time + 12, false];

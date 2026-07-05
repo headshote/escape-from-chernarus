@@ -84,10 +84,13 @@ class CfgFunctions {
             class trainingDrills   {};
             class bootCampQuest    {};
             class awolMonitor      {};
+            class isFrontSafeZone  {};
             class russianHostilityTick {};
+            class russianAssaultBrain {};
             class buildKrasnostavGarrison {};
             class spawnRussianReplacement {};
             class deployToFront    {};
+            class applyFrontLoadout {};
             class transportToDetention {};
             class spawnDetentionGuards {};
             class desertionMonitor {};
@@ -107,6 +110,41 @@ class CfgFunctions {
             class dispatchCaptureTransport {};
             class spawnCaptureTransport {};
             class tckGlobalAggression {};
+            class tckAcquireTarget {};
+            class claimUnit        {};
+            class releaseUnit      {};
+            class chaseMove        {};
+            class proximityTackle  {};
+            class alertPublish     {};
+            class alertQuery       {};
+            class searchBehavior   {};
+            class setEscalationState {};
+            class getEscalationState {};
+            class kpi              {};
+            class applyDifficultyPreset {};
+            class setDifficultyPreset {};
+            class chaseStinger     {};
+            class heatHud          {};
+            class policeResponseFX {};
+            class dispatchRoadblock {};
+            class policeVehiclePursuit {};
+            class checkpointControl {};
+            class borderZone       {};
+            class civilianPanic    {};
+            class reportCrime      {};
+            class installCrimeWitness {};
+            class runWrangle       {};
+            class stateWatchdog    {};
+            class policeBrain      {};
+            class policeOrderInspection {};
+            class policeResumePatrol {};
+            class policeLoadout    {};
+            class threatInfoLoop   {};
+            class awolConfrontation {};
+            class breakoutMinigame {};
+            class detainSequence   {};
+            class qaScenarios      {};
+            class spawnLockdownPatrol {};
             class buildTrainingGround {};
             class showEscapeUnlockScreen {};
             class crowdResistance  {};
@@ -174,6 +212,28 @@ class RscCheckBox {
     colorBackground[] = {0,0,0,0};
 };
 
+class RscStructuredText {
+    access = 0;
+    type = 13;
+    idc = -1;
+    style = 0;
+    x = 0;
+    y = 0;
+    w = 0.3;
+    h = 0.1;
+    size = 0.035;
+    text = "";
+    colorText[] = {1,1,1,1};
+    colorBackground[] = {0,0,0,0};
+    shadow = 1;
+    class Attributes {
+        font = "RobotoCondensed";
+        color = "#ffffff";
+        align = "left";
+        shadow = 1;
+    };
+};
+
 class RscButton {
     access = 0;
     type = 1;
@@ -206,3 +266,4 @@ class RscButton {
 #include "ui\lockpick_dialog.hpp"
 #include "ui\wrangle_dialog.hpp"
 #include "ui\admin_panel.hpp"
+#include "ui\threat_hud.hpp"

@@ -2,9 +2,10 @@
 // fn_spawnUrbanFootPatrols.sqf
 //
 // Adds persistent pedestrian pressure in major towns so TCK/Police
-// are not only seen in vehicles. These groups rely on existing
-// aggression systems (tckGlobalAggression + checkpointAlert) for
-// detain/chase behavior.
+// are not only seen in vehicles. TCK foot groups are driven by
+// fn_tckGlobalAggression; POLICE foot groups get their own
+// fn_policeBrain instance (they had NO controller after POLICE was
+// excluded from tckGlobalAggression — audit finding R2-5).
 // ============================================================
 if (!isServer) exitWith {};
 
@@ -27,20 +28,9 @@ private _mkPoliceFoot = {
 
     for "_i" from 1 to 2 do {
         private _u = _grp createUnit ["B_Soldier_F", _pos, [], 0, "FORM"];
-        removeAllWeapons _u;
-        removeAllItems _u;
-        removeUniform _u;
-        removeVest _u;
-        removeHeadgear _u;
-        _u forceAddUniform "U_B_GendarmerieSuit_01_F";
-        _u addVest "V_HarnessOGL_ghex_F";
-        _u addHeadgear "H_Cap_blk_Raven";
-        _u addWeapon "hgun_P07_F";
-        _u addMagazine "16Rnd_9x21_Mag";
-        _u addMagazine "16Rnd_9x21_Mag";
+        [_u] call co_main_fnc_policeLoadout;
         _u setBehaviour "SAFE";
         _u setCombatMode "YELLOW";
-        _u allowFleeing 0;
     };
 
     for "_w" from 0 to 5 do {
@@ -53,6 +43,9 @@ private _mkPoliceFoot = {
     };
     private _cycle = _grp addWaypoint [_center getPos [_radius * 0.2, random 360], 15];
     _cycle setWaypointType "CYCLE";
+
+    // Foot police get the same brain as car patrols (objNull car).
+    [_grp, objNull, _center, _radius] call co_main_fnc_policeBrain;
     _grp
 };
 

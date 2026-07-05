@@ -33,9 +33,18 @@ if (isServer) then {
         params ["_c"];
         if (isNil "CO_airfieldCenter") then { CO_airfieldCenter = [2100, 12800, 0] };
         if (isNil "CO_airfieldRadius") then { CO_airfieldRadius = 350 };
-        private _escapeRadius = CO_airfieldRadius + 30;
+        // Tighter, tunable leash: the old CO_airfieldRadius+30 (=380 m)
+        // let recruits wander far past the range before anyone reacted.
+        private _escapeRadius = (missionNamespace getVariable ["CO_training_escapeRadius", 250])
+            min (CO_airfieldRadius + 30);
         private _outside = false;
         private _outsideSince = -1;
+        // Settle grace: a just-delivered conscript may need a beat for the
+        // teleport-to-field to register server-side. Never judge them as
+        // "escaping" during this window, so a fresh arrival can't be
+        // instantly branded AWOL and gunned down (the "dropped at the base
+        // of the hill, killed as a deserter" report).
+        private _graceUntil = time + 6;
 
         while {
             alive _c &&
@@ -43,6 +52,7 @@ if (isServer) then {
         } do {
             sleep 1.5;
             if (!alive _c) exitWith {};
+            if (time < _graceUntil) then { continue };
 
             private _d = _c distance2D CO_airfieldCenter;
             if (_d > _escapeRadius) then {
@@ -73,6 +83,7 @@ if (isServer) then {
                     !(_c getVariable ["CO_isAWOL", false])) then {
                     _c setVariable ["CO_isAWOL", true, true];
                     _c setVariable ["CO_detainPhase", "awol", true];
+                    _c setVariable ["CO_awolSource", "training_escape", true];
                     if (isPlayer _c) then {
                         ["DESERTER\nYou are now AWOL. Every faction will shoot to kill."] remoteExec ["hint", _c];
                     };
@@ -81,12 +92,25 @@ if (isServer) then {
                 // Pursuit: every CRN_ENF unit within 900 m gets lethal
                 // orders against the escapee and is pushed to run after
                 // them. fireAtTarget bypasses engine side-friendship.
+                // NOTE: the parade-ground recruit dummies and the drill
+                // instructor are CRN_ENF too — drafting them into the
+                // pursuit re-enabled their movement AI and marched the
+                // whole saluting formation off the map, permanently
+                // (playtest: "the formation disappeared"). They are props,
+                // not guards — exclude them.
                 private _shooters = (CO_airfieldCenter nearEntities [["Man"], 900]) select {
                     alive _x &&
                     vehicle _x == _x &&
-                    ((group _x) getVariable ["CO_faction", ""]) == "CRN_ENF"
+                    ((group _x) getVariable ["CO_faction", ""]) == "CRN_ENF" &&
+                    !(_x getVariable ["CO_isRecruitDummy", false]) &&
+                    !(_x getVariable ["CO_drillInstructor", false])
                 };
                 {
+                    // Re-arm the pacified staff: they sit at combatMode
+                    // BLUE with autotargeting off during drills, so lift
+                    // both before issuing fire orders or they won't shoot.
+                    _x enableAI "AUTOTARGET";
+                    _x enableAI "TARGET";
                     _x reveal [_c, 4];
                     _x doWatch _c;
                     _x doTarget _c;
@@ -112,7 +136,17 @@ if (isServer) then {
                         _c setVariable ["CO_hotHostile", 0, true];
                         _c setVariable ["CO_trainingEscape", false, true];
                         {
-                            if (alive _x) then { _x doWatch objNull };
+                            if (alive _x) then {
+                                _x doWatch objNull;
+                                // Re-pacify the range staff so they go back
+                                // to ignoring training fire.
+                                if (_x getVariable ["CO_trainingStaff", false]) then {
+                                    _x doTarget objNull;
+                                    _x setCombatMode "BLUE";
+                                    _x setBehaviour "SAFE";
+                                    _x disableAI "AUTOTARGET";
+                                };
+                            };
                         } forEach ((CO_airfieldCenter nearEntities [["Man"], 900]) select {
                             ((group _x) getVariable ["CO_faction", ""]) == "CRN_ENF"
                         });

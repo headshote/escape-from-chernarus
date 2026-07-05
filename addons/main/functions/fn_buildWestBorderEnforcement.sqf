@@ -52,16 +52,24 @@ private _registerResponseGroup = {
 
             if (_grp getVariable ["CO_borderEngaging", false]) then { continue };
 
-            private _targets = (_center nearEntities [["Man"], _detectRadius]) select {
+            private _scanCenter = if (!isNull (leader _grp) && alive (leader _grp)) then {
+                getPosATL (leader _grp)
+            } else {
+                _center
+            };
+
+            private _targets = (_scanCenter nearEntities [["Man"], _detectRadius]) select {
                 alive _x &&
                 !captive _x &&
-                side _x == civilian &&
-                !(_x getVariable ["CO_isFemale", false])
+                !(_x getVariable ["CO_knockedOut", false]) &&
+                !(_x getVariable ["CO_isFemale", false]) &&
+                (isPlayer _x || side _x == civilian) &&
+                !((group _x getVariable ["CO_faction", ""]) in ["CRN_ENF","POLICE","CRN_FRONT","RUS_ADV"])
             };
 
             if (_targets isEqualTo []) then { continue };
 
-            private _sortedTargets = [_targets, [], { _x distance2D _center }, "ASCEND"] call BIS_fnc_sortBy;
+            private _sortedTargets = [_targets, [], { _x distance2D _scanCenter }, "ASCEND"] call BIS_fnc_sortBy;
             private _target = _sortedTargets select 0;
 
             _grp setVariable ["CO_borderEngaging", true, false];

@@ -42,7 +42,7 @@ if (isNull _veh || isNull _driverGrp) exitWith {};
 
 #define BUS_SCAN_RADIUS        260
 #define BUS_DISMOUNT_RANGE      75
-#define BUS_FOOT_SCAN_RADIUS    30
+#define BUS_FOOT_SCAN_RADIUS    80
 #define BUS_MELEE_RANGE          2.6
 #define BUS_WP_REACHED_DIST     35
 #define BUS_DOMOVE_INTERVAL      5
@@ -61,12 +61,16 @@ if (count _routeWps == 0) then { _routeWps = [getPosATL _veh] };
 
 private _stuckSince     = -1;
 private _lastDoMove     = 0;
+private _nextPatrolStop = time + 40 + random 60;
+private _forcePatrolDismount = false;
 private _huntTarget     = objNull;
 private _huntUntil      = 0;
 private _dismountUntil  = 0;
 private _approachStarted = -1;
 private _idleSince      = time;       // for forced-dismount-on-idle
 private _lastIdlePos    = getPosATL _veh;
+private _stuckRecoveries = 0;
+private _roadblockRequested = false;
 
 _veh setVariable ["CO_busState", "traveling", true];
 
@@ -77,6 +81,68 @@ _veh setVariable ["CO_busState", "traveling", true];
 _veh engineOn true;
 _veh forceSpeed -1;
 sleep 2;
+
+// ---------------------------------------------------------------
+// TOWN GARRISON MODE: one designated truck per large town parks at
+// its spawn and dumps the whole squad as a permanent foot-harassment
+// patrol (the driver stays with the truck). The escorts are released
+// from the bus so fn_tckGlobalAggression drives them exactly like
+// urban TCK foot patrols — including loading captured civilians into
+// dispatched transports.
+// ---------------------------------------------------------------
+if (_veh getVariable ["CO_busGarrison", false]) exitWith {
+    private _drv0 = driver _veh;
+    if (!isNull _drv0) then { doStop _drv0 };
+    _veh forceSpeed 0;
+    _veh engineOn false;
+    _veh setVariable ["CO_busState", "garrison", true];
+
+    _escortGrp setVariable ["CO_isBusEscortGrp", false, true];
+    _escortGrp setBehaviour "AWARE";
+    _escortGrp setCombatMode "YELLOW";
+    _escortGrp setSpeedMode "LIMITED";
+    {
+        if (alive _x && vehicle _x == _veh) then {
+            _x allowGetIn false;
+            unassignVehicle _x;
+            _x action ["GetOut", _veh];
+            doGetOut _x;
+            [_x, _veh] spawn {
+                params ["_u", "_v"];
+                sleep 1.2;
+                if (alive _u && vehicle _u == _v) then {
+                    moveOut _u;
+                    if (vehicle _u == _v) then {
+                        _u setPosATL ((getPosATL _v) vectorAdd [(random 6) - 3, (random 6) - 3, 0]);
+                    };
+                };
+            };
+            _x setBehaviour "AWARE";
+            _x setCombatMode "YELLOW";
+            _x enableAI "AUTOTARGET";
+            _x enableAI "TARGET";
+        };
+    } forEach (units _escortGrp);
+
+    // Foot patrol route around the parked truck.
+    sleep 2;
+    { deleteWaypoint _x } forEach +waypoints _escortGrp;
+    for "_w" from 0 to 4 do {
+        private _wpPos = (getPosATL _veh) getPos [40 + random 110, random 360];
+        private _wp = _escortGrp addWaypoint [_wpPos, 15];
+        _wp setWaypointType "MOVE";
+        _wp setWaypointSpeed "LIMITED";
+        _wp setWaypointBehaviour "AWARE";
+        _wp setWaypointCombatMode "YELLOW";
+    };
+    private _cyc = _escortGrp addWaypoint [getPosATL _veh, 15];
+    _cyc setWaypointType "CYCLE";
+
+    diag_log format [
+        "[CO] Bus %1 GARRISON at %2 — %3 escorts released as foot harassers, driver stays.",
+        netId _veh, mapGridPosition _veh, { alive _x } count units _escortGrp
+    ];
+};
 
 private _resumeRoute = {
     params ["_drvGrp", "_veh"];
@@ -113,9 +179,15 @@ diag_log format [
 // escort so they hunt in parallel without blocking the main loop.
 // ---------------------------------------------------------------
 private _spawnEscortHunter = {
-    params ["_u", "_bus", "_huntUntilTime"];
-    [_u, _bus, _huntUntilTime] spawn {
-        params ["_u", "_bus", "_huntUntilTime"];
+    params [
+        "_u", "_bus", "_huntUntilTime",
+        ["_seedTarget", objNull],
+        ["_token", ""],
+        ["_prio", 50],
+        ["_weaponsFree", false]
+    ];
+    [_u, _bus, _huntUntilTime, _seedTarget, _token, _prio, _weaponsFree] spawn {
+        params ["_u", "_bus", "_huntUntilTime", "_seedTarget", "_token", "_prio", "_weaponsFree"];
         if (isNull _u || !alive _u) exitWith {};
 
         // Wait for the dismount to actually complete. If the previous
@@ -139,6 +211,14 @@ private _spawnEscortHunter = {
             diag_log format ["[CO] busAgroLoop: escort %1 failed to dismount, abandoning hunt.", _u];
         };
 
+        // One token per dismount EVENT (shared by all hunters of this
+        // bus) so the map-wide chase cap counts events, not soldiers.
+        if (_token == "") then {
+            _token = format ["bus_hunt_%1_%2", netId _bus, floor time];
+        };
+        private _claimPriority = _prio;
+        if (!([_u, _token, _claimPriority, 45] call co_main_fnc_claimUnit)) exitWith {};
+
         // Switch escort to hunting posture
         _u setBehaviour "AWARE";
         _u setCombatMode "YELLOW";
@@ -148,62 +228,98 @@ private _spawnEscortHunter = {
         _u enableAI "TARGET";
         _u setUnitPos "UP";
 
-        private _myTarget = objNull;
-        private _myTargetUntil = 0;
+        private _myTarget = if (!isNull _seedTarget && alive _seedTarget && !captive _seedTarget) then {
+            _seedTarget
+        } else {
+            objNull
+        };
+        private _nextSelAt = time + 3;   // honour the seed briefly before re-evaluating
         private _idleAt = -1;
 
         while {
             alive _u && alive _bus &&
             time < _huntUntilTime &&
-            (vehicle _u == _u)
+            (vehicle _u == _u) &&
+            { [_u, _token, _claimPriority, 25] call co_main_fnc_claimUnit }
         } do {
-            sleep 1.5;
+            sleep 0.7;
 
-            // Drop target if it died/got captured/knocked out
-            if (!isNull _myTarget) then {
-                if (!alive _myTarget ||
-                    captive _myTarget ||
-                    (_myTarget getVariable ["CO_knockedOut", false])) then {
-                    _myTarget = objNull;
-                };
-            };
+            // Cheap per-tick invalidation: stop chasing a victim who is
+            // gone, already captured, or being captured by someone else
+            // (no piling onto an already-caught target).
+            if (!isNull _myTarget && {
+                !alive _myTarget || captive _myTarget ||
+                (vehicle _myTarget != _myTarget) ||
+                (_myTarget getVariable ["CO_knockedOut", false]) ||
+                (_myTarget getVariable ["CO_captureInProgress", false])
+            }) then { _myTarget = objNull };
 
-            // Acquire a target if we don't have one
-            if (isNull _myTarget || time > _myTargetUntil) then {
-                private _center = getPosATL _u;
-                private _candidates = (_center nearEntities [["Man"], 28]) select {
-                    private _t = _x;
-                    private _ok = alive _t && vehicle _t == _t;
-                    if (_ok && captive _t) then { _ok = false };
-                    if (_ok && (_t getVariable ["CO_knockedOut", false])) then { _ok = false };
-                    if (_ok && (_t getVariable ["CO_isFemale", false])) then { _ok = false };
-                    if (_ok && (_t getVariable ["CO_captureInProgress", false])) then { _ok = false };
-                    if (_ok) then {
-                        private _f = group _t getVariable ["CO_faction", ""];
-                        if (_f in ["CRN_ENF","POLICE","CRN_FRONT","RUS_ADV"]) then { _ok = false };
+            // Throttled (re)selection with commitment hysteresis. Locks
+            // onto one victim (players preferred) and only switches when
+            // the current pursuit has gone cold (see fn_tckAcquireTarget).
+            if (time > _nextSelAt) then {
+                _nextSelAt = time + 2.5;
+                private _extra = [];
+                {
+                    private _t = _x select 0;
+                    if (!isNull _t) then { _extra pushBack _t };
+                } forEach ([getPosATL _u, 120, 60] call co_main_fnc_alertQuery);
+                private _picked = [_u, _myTarget, BUS_FOOT_SCAN_RADIUS, _extra] call co_main_fnc_tckAcquireTarget;
+                if (!(_picked isEqualTo _myTarget)) then {
+                    _myTarget = _picked;
+                    if (!isNull _myTarget) then {
+                        _idleAt = -1;
+                        if (_weaponsFree) then {
+                            [_myTarget] call co_main_fnc_installNonLethalDamage;
+                        };
+                        [_myTarget, getPosATL _myTarget, "bus_hunter", _claimPriority] call co_main_fnc_alertPublish;
                     };
-                    if (_ok) then {
-                        _ok = (isPlayer _t || side _t == civilian);
-                    };
-                    _ok
-                };
-                if (count _candidates > 0) then {
-                    _candidates = [_candidates, [], { _x distance2D _u }, "ASCEND"] call BIS_fnc_sortBy;
-                    _myTarget = _candidates select 0;
-                    _myTargetUntil = time + 30;
-                    _idleAt = -1;
                 };
             };
 
             if (!isNull _myTarget) then {
-                // Chase: doMove every 3 s
-                _u doMove (getPosATL _myTarget);
-                private _d = _u distance _myTarget;
+                [[_u], _myTarget] call co_main_fnc_chaseMove;
 
-                if (_d < 3.5) then {
-                    // Punch! applyMeleeHit handles cooldown, anim, dmg,
-                    // and the third hit triggers applyKnockout.
-                    [_u, _myTarget] call co_main_fnc_applyMeleeHit;
+                // Under-fire doctrine (R1-b): weapons-free hunters shoot to
+                // stun (non-lethal filter installed at acquisition) while
+                // the shooter keeps range open, and tackle when close.
+                if (
+                    _weaponsFree &&
+                    (_u distance _myTarget) > 8 &&
+                    vehicle _myTarget == _myTarget &&
+                    time > (_u getVariable ["CO_nextHunterVolleyAt", 0])
+                ) then {
+                    _u setVariable ["CO_nextHunterVolleyAt", time + 3, false];
+                    _u reveal [_myTarget, 4];
+                    _u doTarget _myTarget;
+                    _u fireAtTarget [_myTarget];
+                };
+
+                if ([[_u], _myTarget] call co_main_fnc_proximityTackle) then {
+                    if (isPlayer _myTarget) then {
+                        private _result = [_myTarget, 20] call co_main_fnc_runWrangle;
+
+                        if (_result == "captured") then {
+                            _myTarget setCaptive true;
+                            [getPosATL _bus, 120, _bus] call co_main_fnc_civilianPanic;
+                            // Kneel-and-load beat (escort is at tackle range).
+                            [_myTarget, group _u] call co_main_fnc_detainSequence;
+                            diag_log format [
+                                "[CO] Bus %1: player %2 tackled -> detain sequence.",
+                                netId _bus, name _myTarget
+                            ];
+                            _myTarget = objNull;
+                        };
+                        if (_result == "escaped") then {
+                            _myTarget setVariable ["CO_tackleImmuneUntil", time + 6, true];
+                            sleep 2;
+                        };
+                        // "busy": another controller owns the grab — hold
+                        // the cordon and re-check next tick.
+                    } else {
+                        [_u, _myTarget, 60, true] call co_main_fnc_applyKnockout;
+                    };
+                };
 
                     // If they got knocked out, mark them as a captive.
                     // For PLAYERS: dispatch a dedicated capture-transport
@@ -213,23 +329,19 @@ private _spawnEscortHunter = {
                     // the bus's continued patrol behaviour.
                     // For NPC civilians: load them into the bus and keep
                     // cruising until the bus is full → transport to detention.
-                    if (_myTarget getVariable ["CO_knockedOut", false]) then {
+                    if (!isNull _myTarget && { _myTarget getVariable ["CO_knockedOut", false] }) then {
                         _myTarget setCaptive true;
                         _myTarget setVariable ["CO_captureInProgress", false, true];
                         _myTarget setVariable ["CO_busLastCaptureTime", time, true];
 
                         if (isPlayer _myTarget) then {
-                            // Wake them up — spawnCaptureTransport teleports
-                            // them into the truck cab so they need to be
-                            // conscious to ride.
-                            _myTarget setUnconscious false;
-                            _myTarget setVariable ["CO_knockedOut", false, true];
-                            // Dispatch a dedicated capture truck with driver
-                            // + jailer. The bus continues cruising and can
-                            // capture more NPCs in the meantime.
-                            [_myTarget, group _u] spawn co_main_fnc_spawnCaptureTransport;
+                            [getPosATL _bus, 120, _bus] call co_main_fnc_civilianPanic;
+                            // Downed by weapons-free fire → an escort must
+                            // reach the player and cuff them (kneel beat)
+                            // before the truck is dispatched. No telegrab.
+                            [_myTarget, group _u] call co_main_fnc_detainSequence;
                             diag_log format [
-                                "[CO] Bus %1: player %2 knocked out → dedicated capture-transport dispatched.",
+                                "[CO] Bus %1: player %2 knocked out → detain sequence.",
                                 netId _bus, name _myTarget
                             ];
                             _myTarget = objNull;
@@ -241,6 +353,7 @@ private _spawnEscortHunter = {
                                 _bus setVariable ["CO_busCaptives", _caps, true];
                             };
                             if (alive _bus) then {
+                                [getPosATL _bus, 120, _bus] call co_main_fnc_civilianPanic;
                                 _myTarget setUnconscious false;
                                 _myTarget setVariable ["CO_knockedOut", false, true];
                                 _myTarget setPos (getPosATL _bus);
@@ -266,7 +379,6 @@ private _spawnEscortHunter = {
                             _myTarget = objNull;
                         };
                     };
-                };
             } else {
                 // No target — wander a bit so escorts spread out instead
                 // of clumping by the bus door.
@@ -277,6 +389,8 @@ private _spawnEscortHunter = {
                 };
             };
         };
+
+        [_u, _token] call co_main_fnc_releaseUnit;
     };
 };
 
@@ -288,7 +402,7 @@ while { alive _veh } do {
     if (!alive _veh) exitWith {};
 
     private _state  = _veh getVariable ["CO_busState", "traveling"];
-    if (_state in ["delivering","abandoned"]) then { continue };
+    if (_state in ["delivering","abandoned","garrison"]) then { continue };
     // Defensive: legacy code paths set state to "cruising" after a
     // delivery. Treat it as a synonym for "traveling" so this loop
     // doesn't drop the bus into a do-nothing state. (The proper post-
@@ -341,12 +455,98 @@ while { alive _veh } do {
     };
     _driver = driver _veh;
 
-    // ---- Captive cap reached → idle (delivery scheduler picks up) -----
+    // ====================================================================
+    // UNDER-FIRE EMERGENCY (R1-b). fn_reportCrime / the Hit EH set
+    // CO_busEmergency* when this truck's squad is attacked or a shot is
+    // fired near it. Every escort dismounts immediately and hunts the
+    // attacker — weapons-free if blood was drawn. Before this existed a
+    // player could execute a mounted squad point-blank with no response.
+    // ====================================================================
+    private _emUntil = _veh getVariable ["CO_busEmergencyUntil", 0];
+    private _emTarget = _veh getVariable ["CO_busEmergencyTarget", objNull];
+    if (
+        _emUntil > time &&
+        !isNull _emTarget && alive _emTarget && !captive _emTarget &&
+        !(_emTarget getVariable ["CO_knockedOut", false]) &&
+        ((time - (_veh getVariable ["CO_busEmergencyHandledAt", -999])) > 45) &&
+        !(_state in ["delivering", "abandoned", "reboarding"])
+    ) then {
+        _veh setVariable ["CO_busEmergencyHandledAt", time, false];
+        private _weaponsFree = _veh getVariable ["CO_busEmergencyWeapons", false];
+        diag_log format [
+            "[CO] Bus %1 UNDER FIRE at %2 — emergency dismount (weaponsFree=%3, target=%4).",
+            netId _veh, mapGridPosition _veh, _weaponsFree, _emTarget
+        ];
+
+        [_emTarget] call co_main_fnc_installNonLethalDamage;
+        [_emTarget, getPosATL _emTarget, "bus_emergency", 90] call co_main_fnc_alertPublish;
+        [_emTarget, if (_weaponsFree) then { "WEAPONS" } else { "PURSUIT" }, "bus_under_fire", 85, _escortGrp] call co_main_fnc_setEscalationState;
+        ["bus_emergency_dismount"] call co_main_fnc_kpi;
+
+        _veh setVariable ["CO_busState", "dismounted", true];
+        _state = "dismounted";
+        _dismountUntil = time + BUS_DISMOUNT_DURATION;
+        _approachStarted = -1;
+        if (!isNull _driver && alive _driver) then { doStop _driver };
+        _veh forceSpeed 0;
+        _escortGrp setBehaviour "AWARE";
+        _escortGrp setCombatMode (if (_weaponsFree) then { "RED" } else { "YELLOW" });
+        _escortGrp setSpeedMode "FULL";
+
+        private _emToken = format ["bus_hunt_%1_%2", netId _veh, floor time];
+        {
+            if (alive _x) then {
+                // NO truck guard held back in an emergency — everyone fights.
+                if (vehicle _x == _veh) then {
+                    _x allowGetIn false;
+                    unassignVehicle _x;
+                    _x action ["GetOut", _veh];
+                    doGetOut _x;
+                    [_x, _veh] spawn {
+                        params ["_u", "_v"];
+                        sleep 1.2;
+                        if (alive _u && vehicle _u == _v) then {
+                            moveOut _u;
+                            if (vehicle _u == _v) then {
+                                _u setPosATL ((getPosATL _v) vectorAdd [
+                                    (random 6) - 3, (random 6) - 3, 0
+                                ]);
+                            };
+                        };
+                    };
+                };
+                [_x, _veh, _dismountUntil, _emTarget, _emToken, 90, _weaponsFree] call _spawnEscortHunter;
+            };
+        } forEach (units _escortGrp);
+    };
+
+    // ---- Captive cap reached → deliver (R1-c) --------------------------
+    // The old code `continue`d here, which skipped the whole state machine
+    // while delivery is only triggered FROM the state machine — a full
+    // truck froze forever with its escorts standing around it.
     private _aboard = (_veh getVariable ["CO_busCaptives", []]) select {
         !isNull _x && alive _x && captive _x
     };
     _veh setVariable ["CO_busCaptives", _aboard, true];
-    if (count _aboard >= _maxCaptives) then { continue };
+    if (count _aboard >= _maxCaptives) then {
+        if (_state in ["traveling", "approaching"]) then {
+            private _driverNow = driver _veh;
+            if (isNull _driverNow || !alive _driverNow) then {
+                private _alts = ((units _driverGrp) + (units _escortGrp)) select { alive _x };
+                if (count _alts > 0) then { (_alts select 0) moveInDriver _veh };
+            };
+            _veh setVariable ["CO_transportVehicle", _veh, true];
+            _escortGrp setVariable ["CO_transportVehicle", _veh, true];
+            [_aboard select 0, _escortGrp] spawn co_main_fnc_transportToDetention;
+            diag_log format ["[CO] Bus %1 full (%2 captives) — forcing detention delivery.", netId _veh, count _aboard];
+            continue;
+        };
+        // Dismounted: force the reboard path now; the reboard branch
+        // handles the delivery handoff itself.
+        if (_state == "dismounted") then {
+            _dismountUntil = _dismountUntil min time;
+        };
+    };
 
     // ====================================================================
     // GLOBAL IDLE-DISMOUNT TRIGGER
@@ -357,12 +557,36 @@ while { alive _veh } do {
     // half-full. Now uses speed-based detection (bus actually below
     // walking pace) and dumps the whole escort squad.
     // ====================================================================
+    // ---- Proactive patrol stop (R6 restore of the lost
+    // CO_bus_patrolStopInterval behavior): while cruising, the truck
+    // periodically pulls over near pedestrians and jumps the squad out
+    // to harass them on foot, then reboards via the normal dismount
+    // cycle. The driver never leaves the wheel.
+    if (_state == "traveling" && time > _nextPatrolStop) then {
+        private _interval = missionNamespace getVariable ["CO_bus_patrolStopInterval", 75];
+        _nextPatrolStop = time + _interval + random _interval;
+        private _pedNearby = ((getPosATL _veh) nearEntities [["Man"], 130]) findIf {
+            alive _x && vehicle _x == _x &&
+            !captive _x &&
+            !(_x getVariable ["CO_isFemale", false]) &&
+            (isPlayer _x || side _x == civilian) &&
+            ((group _x) getVariable ["CO_faction", ""]) == ""
+        };
+        if (_pedNearby >= 0) then {
+            diag_log format ["[CO] Bus %1 patrol stop at %2 — squad jumping out.", netId _veh, mapGridPosition _veh];
+            if (!isNull _driver && alive _driver) then { doStop _driver };
+            _veh forceSpeed 0;
+            _forcePatrolDismount = true;
+        };
+    };
+
     if (_state in ["traveling", "approaching"]) then {
         if ((speed _veh) >= BUS_STUCK_SPEED) then {
             _idleSince = time;
             _lastIdlePos = getPosATL _veh;
         };
-        if ((time - _idleSince) > BUS_IDLE_DISMOUNT_GRACE) then {
+        if (_forcePatrolDismount || (time - _idleSince) > BUS_IDLE_DISMOUNT_GRACE) then {
+            _forcePatrolDismount = false;
             diag_log format [
                 "[CO] Bus %1 idle %2s in state '%3' (speed=%4) — FULL escort dismount.",
                 netId _veh, round (time - _idleSince), _state, round (speed _veh)
@@ -378,9 +602,18 @@ while { alive _veh } do {
             _escortGrp setSpeedMode "FULL";
 
             private _dismountCount = 0;
+            private _keptTruckGuard = false;
+            private _idleToken = format ["bus_hunt_%1_%2", netId _veh, floor time];
             {
                 // Dismount EVERY mounted escort — no cap.
                 if (alive _x && vehicle _x == _veh) then {
+                    if (!_keptTruckGuard) then {
+                        _keptTruckGuard = true;
+                        _x setBehaviour "AWARE";
+                        _x setCombatMode "YELLOW";
+                        _x doWatch objNull;
+                        continue;
+                    };
                     _x allowGetIn false;
                     unassignVehicle _x;
                     _x action ["GetOut", _veh];
@@ -397,12 +630,12 @@ while { alive _veh } do {
                             };
                         };
                     };
-                    [_x, _veh, _dismountUntil] call _spawnEscortHunter;
+                    [_x, _veh, _dismountUntil, objNull, _idleToken, 50, false] call _spawnEscortHunter;
                     _dismountCount = _dismountCount + 1;
                 };
             } forEach (units _escortGrp);
             diag_log format [
-                "[CO] Bus %1 idle-dispatched %2 escort hunters (full dump).",
+                "[CO] Bus %1 idle-dispatched %2 escort hunters (driver + guard held at truck).",
                 netId _veh, _dismountCount
             ];
             _idleSince = time;
@@ -415,6 +648,28 @@ while { alive _veh } do {
     // ====================================================================
     if (_state == "dismounted") then {
         if (time >= _dismountUntil) then {
+            private _nearTargets = ((getPosATL _veh) nearEntities [["Man"], 120]) select {
+                alive _x &&
+                vehicle _x == _x &&
+                !captive _x &&
+                !(_x getVariable ["CO_knockedOut", false]) &&
+                !(_x getVariable ["CO_isFemale", false]) &&
+                (isPlayer _x || side _x == civilian) &&
+                !((group _x getVariable ["CO_faction", ""]) in ["CRN_ENF","POLICE","CRN_FRONT","RUS_ADV"])
+            };
+            private _nearAlerts = [getPosATL _veh, 140, 45] call co_main_fnc_alertQuery;
+
+            // Only extend the hunt while the truck still has captive space
+            // (a full truck must reboard and deliver — see R1-c fix above).
+            private _aboardNow = (_veh getVariable ["CO_busCaptives", []]) select {
+                !isNull _x && alive _x && captive _x
+            };
+            if (
+                (!(_nearTargets isEqualTo []) || !(_nearAlerts isEqualTo [])) &&
+                count _aboardNow < _maxCaptives
+            ) then {
+                _dismountUntil = time + 20;
+            } else {
             // Reboard
             _veh setVariable ["CO_busState", "reboarding", true];
             // Calm the escort group so reboard doesn't get sidetracked
@@ -481,6 +736,7 @@ while { alive _veh } do {
                 _lastIdlePos = getPosATL _veh;
                 [_driverGrp, _veh] call _resumeRoute;
             };
+            };
         };
         continue;
     };
@@ -528,10 +784,18 @@ while { alive _veh } do {
         _scan = _scan + (_scanVehDrivers apply { driver _x });
     };
 
-    // Pick nearest target
+    // Weighted pick (R1-g) for the vehicle-level acquisition too:
+    // otherwise a truck in a crowd still turns toward the nearest NPC
+    // before the improved escort-hunter scoring ever gets a chance.
     private _bestTarget = objNull;
     if (count _scan > 0) then {
-        private _sorted = [_scan, [], { _x distance2D _veh }, "ASCEND"] call BIS_fnc_sortBy;
+        private _sorted = [_scan, [], {
+            private _score = _x distance2D _veh;
+            if (isPlayer _x) then { _score = _score - 40 };
+            _score = _score - (((_x getVariable ["CO_heatLevel", 0]) * 0.5) min 40);
+            if (primaryWeapon _x != "" || handgunWeapon _x != "") then { _score = _score - 25 };
+            _score
+        }, "ASCEND"] call BIS_fnc_sortBy;
         _bestTarget = _sorted select 0;
     };
 
@@ -542,6 +806,7 @@ while { alive _veh } do {
         if (isNull _huntTarget || !alive _huntTarget ||
             captive _huntTarget ||
             (_huntTarget getVariable ["CO_knockedOut", false]) ||
+            (_huntTarget getVariable ["CO_captureInProgress", false]) ||
             time > _huntUntil) then {
             _huntTarget = objNull;
             _veh setVariable ["CO_busState", "traveling", true];
@@ -581,6 +846,11 @@ while { alive _veh } do {
                 _lastDoMove = time;
             };
 
+            if (!_roadblockRequested && vehicle _huntTarget != _huntTarget && (time - _approachStarted) > 35) then {
+                _roadblockRequested = true;
+                [_huntTarget, getPosATL _veh, "CRN_ENF", 600, 180] call co_main_fnc_dispatchRoadblock;
+            };
+
             private _approachStuckTooLong = (time - _approachStarted) > BUS_APPROACH_TIMEOUT;
 
             if ((_veh distance2D _huntTarget) < BUS_DISMOUNT_RANGE || _approachStuckTooLong) then {
@@ -605,8 +875,18 @@ while { alive _veh } do {
                 ];
 
                 private _dismountCount = 0;
+                private _keptTruckGuard = false;
+                private _huntToken = format ["bus_hunt_%1_%2", netId _veh, floor time];
+                private _huntPrio = if (isPlayer _huntTarget) then { 70 } else { 50 };
                 {
                     if (alive _x && vehicle _x == _veh) then {
+                        if (!_keptTruckGuard) then {
+                            _keptTruckGuard = true;
+                            _x setBehaviour "AWARE";
+                            _x setCombatMode "YELLOW";
+                            _x doWatch objNull;
+                            continue;
+                        };
                         _x allowGetIn false;
                         unassignVehicle _x;
                         _x action ["GetOut", _veh];
@@ -626,7 +906,7 @@ while { alive _veh } do {
                                 };
                             };
                         };
-                        [_x, _veh, _dismountUntil] call _spawnEscortHunter;
+                        [_x, _veh, _dismountUntil, _huntTarget, _huntToken, _huntPrio, false] call _spawnEscortHunter;
                         _dismountCount = _dismountCount + 1;
                     };
                 } forEach (units _escortGrp);
@@ -648,6 +928,8 @@ while { alive _veh } do {
         if (!isNull _bestTarget) then {
             _huntTarget = _bestTarget;
             _huntUntil  = time + 90;
+            _roadblockRequested = false;
+            [_bestTarget, getPosATL (vehicle _bestTarget), "bus_spotted", 50] call co_main_fnc_alertPublish;
             _veh setVariable ["CO_busState", "approaching", true];
             _state = "approaching";
             _lastDoMove = 0;
@@ -680,28 +962,49 @@ while { alive _veh } do {
             };
 
             // Stuck recovery: if the engine waypoints are failing to make
-            // progress, snap to a nearby road and force a fresh waypoint
-            // focus.
+            // progress, refocus the route and nudge toward a reachable
+            // road point without teleporting the vehicle.
             if ((speed _veh) < BUS_STUCK_SPEED) then {
                 if (_stuckSince < 0) then { _stuckSince = time };
                 if ((time - _stuckSince) > BUS_STUCK_GRACE) then {
                     diag_log format [
-                        "[CO] Bus %1 stuck %2s at %3 (wp=%4/%5) — relocating.",
+                        "[CO] Bus %1 stuck %2s at %3 (wp=%4/%5) - replanning.",
                         netId _veh, round (time - _stuckSince), mapGridPosition _veh,
                         currentWaypoint _driverGrp, count (waypoints _driverGrp)
                     ];
+                    _stuckRecoveries = _stuckRecoveries + 1;
+                    private _recoverPos = [];
+                    private _wps = waypoints _driverGrp;
+                    if (count _wps > 0) then {
+                        private _idx = currentWaypoint _driverGrp;
+                        if (_idx >= count _wps) then { _idx = 0 };
+                        _recoverPos = waypointPosition [_driverGrp, _idx];
+                    };
                     private _rds = (getPosATL _veh) nearRoads 200;
-                    if (count _rds > 0) then {
-                        private _r = selectRandom _rds;
-                        _veh setPos ((getPos _r) vectorAdd [0,0,0.3]);
-                        _veh setVectorUp [0,0,1];
+                    if ((_recoverPos isEqualTo [] || _recoverPos isEqualTo [0,0,0]) && { count _rds > 0 }) then {
+                        _recoverPos = getPosATL (selectRandom _rds);
                     };
                     _veh engineOn true;
+                    if (!(_recoverPos isEqualTo [] || _recoverPos isEqualTo [0,0,0])) then {
+                        _veh doMove _recoverPos;
+                        if (!isNull _driver && alive _driver) then {
+                            _driver doMove _recoverPos;
+                        };
+                    };
                     [_driverGrp, _veh] call _resumeRoute;
-                    _stuckSince = time;
+                    if (_stuckRecoveries >= 2) then {
+                        private _bad = missionNamespace getVariable ["CO_badBusRouteNodes", []];
+                        _bad pushBackUnique (getPosATL _veh);
+                        missionNamespace setVariable ["CO_badBusRouteNodes", _bad, true];
+                        private _reverse = (getPosATL _veh) getPos [28, (getDir _veh) + 180];
+                        _veh doMove _reverse;
+                        if (!isNull _driver && alive _driver) then { _driver doMove _reverse };
+                    };
+                    _stuckSince = time + ((_stuckRecoveries min 2) * 4);
                 };
             } else {
                 _stuckSince = -1;
+                _stuckRecoveries = 0;
             };
         };
     };

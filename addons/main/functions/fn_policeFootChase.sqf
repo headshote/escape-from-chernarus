@@ -1,48 +1,62 @@
 // ============================================================
-// fn_policeFootChase.sqf — server-side
+// fn_policeFootChase.sqf - server-side
 //
-// Stops a patrol car, dismounts both officers, and chases the
-// target on foot until knockout/capture or timeout.
-//
-// Previous behaviour: the patrol just issued doMove on the
-// mounted unit, which kept the driver cruising at LIMITED speed
-// past the target; the partner never disembarked at all because
-// AI never autonomously dismounts to engage civilians (engine
-// civilian-friend=1 relation suppresses it).
-//
-// Engagement is non-lethal melee (applyMeleeHit accumulates 3
-// hits → applyKnockout → captive). Players go via the dedicated
-// capture-transport truck (spawnCaptureTransport) like the rest
-// of the project's player-capture flow; NPC civilians get loaded
-// into the patrol car and driven to detention by transportToDetention.
+// Stops a patrol car, claims both officers through the engagement
+// arbiter, dismounts them, then runs a real pursuit using:
+//   - fn_chaseMove for predicted intercept movement;
+//   - fn_proximityTackle for sustained close-contact grabs;
+//   - fn_alertPublish/fn_searchBehavior for last-known-position memory.
 //
 // Params:
-//   _grp   - patrol group
-//   _car   - patrol vehicle (Offroad)
-//   _target - civ/player to chase
+//   _grp    - patrol group
+//   _car    - patrol vehicle (objNull for foot patrols)
+//   _target - civilian/player to chase
 // ============================================================
 params ["_grp", "_car", "_target"];
 
 if (!isServer) exitWith {};
-if (isNull _grp || isNull _car || isNull _target) exitWith {};
+if (isNull _grp || isNull _target) exitWith {};
+// Foot patrols and groups whose car got destroyed chase on foot.
+if (!isNull _car && !alive _car) then { _car = objNull };
 if (_grp getVariable ["CO_policeFootChaseActive", false]) exitWith {};
 _grp setVariable ["CO_policeFootChaseActive", true, false];
 
-private _allUnits = (units _grp) select { alive _x };
-if (count _allUnits == 0) exitWith {
+private _isPlayer = isPlayer _target;
+private _priority = if (_isPlayer) then { 70 } else { 50 };
+private _targetKey = netId _target;
+if (_targetKey == "") then { _targetKey = str _target };
+private _token = format ["police_chase_%1_%2", _targetKey, floor (time * 10)];
+
+private _claimedUnits = [];
+{
+    if (alive _x && { [_x, _token, _priority, 45] call co_main_fnc_claimUnit }) then {
+        _claimedUnits pushBack _x;
+    };
+} forEach (units _grp);
+
+if (_claimedUnits isEqualTo []) exitWith {
     _grp setVariable ["CO_policeFootChaseActive", false, false];
 };
 
-// --- Stop the car ---
-private _drv = driver _car;
-_car forceSpeed 0;
-if (!isNull _drv) then {
-    doStop _drv;
-    _drv setBehaviour "SAFE";
-    _drv setCombatMode "BLUE";
+_target setVariable ["CO_captureInProgress", true, true];
+[_target] call co_main_fnc_installNonLethalDamage;
+[_target, getPosATL _target, "police_chase", _priority] call co_main_fnc_alertPublish;
+[_target, "PURSUIT", "police_chase", _priority, _grp] call co_main_fnc_setEscalationState;
+["police_foot_chase_started"] call co_main_fnc_kpi;
+if (!isNull _car) then {
+    _car setVariable ["CO_responseActive", true, true];
+    [_car] call co_main_fnc_policeResponseFX;
+
+    // Stop the car and keep the driver from resuming waypoints mid-dismount.
+    _car forceSpeed 0;
+    private _drv = driver _car;
+    if (!isNull _drv) then {
+        doStop _drv;
+        _drv setBehaviour "SAFE";
+        _drv setCombatMode "BLUE";
+    };
 };
 
-// --- Force everyone out and switch to hunting posture ---
 {
     private _u = _x;
     _u allowGetIn false;
@@ -51,109 +65,244 @@ if (!isNull _drv) then {
     _u enableAI "MOVE";
     _u enableAI "PATH";
     _u setUnitPos "UP";
+
     if (vehicle _u != _u) then {
+        private _veh = vehicle _u;
         unassignVehicle _u;
-        _u action ["GetOut", _car];
+        _u action ["GetOut", _veh];
         doGetOut _u;
-        // Hard fallback if the engine refuses to dismount in 1.2s
-        [_u, _car] spawn {
+        [_u, _veh] spawn {
             params ["_uu", "_cc"];
             sleep 1.2;
             if (alive _uu && vehicle _uu == _cc) then {
                 moveOut _uu;
                 if (vehicle _uu == _cc) then {
                     _uu setPosATL ((getPosATL _cc) vectorAdd [
-                        (random 4) - 2, (random 4) - 2, 0
+                        (random 4) - 2,
+                        (random 4) - 2,
+                        0
                     ]);
                 };
             };
         };
     };
-} forEach _allUnits;
+} forEach _claimedUnits;
 
 sleep 1.4;
 
-// --- Foot chase ---
-private _deadline   = time + 75;
-private _melee      = "co_main_fnc_applyMeleeHit";
-private _isPlayer   = isPlayer _target;
-private _captured   = false;
+private _captured = false;
+private _escaped = false;
+private _lastKnownPos = getPosATL _target;
+private _lostSightAt = -1;
+private _lastAlertAt = 0;
+private _deadline = time + (missionNamespace getVariable ["CO_police_chaseDeadline", 180]);
+private _backupRequested = false;
+private _nextVolleyAt = 0;
+
+private _captureTarget = {
+    params [["_attacker", objNull]];
+
+    private _wl = (_target getVariable ["CO_wantedLevel", 0]) + 20;
+    _target setVariable ["CO_wantedLevel", _wl min 100, true];
+
+    if (_isPlayer) then {
+        private _result = [_target, 20] call co_main_fnc_runWrangle;
+
+        // Another controller owns the grab or the player is gone —
+        // hold the cordon and let the loop try again.
+        if (_result in ["busy", "dead"]) exitWith { false };
+
+        if (_result == "captured") exitWith {
+            _target setCaptive true;
+            _target setUnconscious false;
+            _target setVariable ["CO_knockedOut", false, true];
+            // Kneel-and-load beat (guard is already at tackle range).
+            [_target, _grp] call co_main_fnc_detainSequence;
+            diag_log format ["[CO] Police foot chase detained player %1.", name _target];
+            true
+        };
+
+        _target setVariable ["CO_tackleImmuneUntil", time + 6, true];
+        ["You broke the grab - run or hide."] remoteExecCall ["systemChat", _target];
+        sleep 2;
+        false
+    } else {
+        if (isNull _attacker) then {
+            private _liveAttackers = _claimedUnits select { alive _x && vehicle _x == _x };
+            if !(_liveAttackers isEqualTo []) then { _attacker = _liveAttackers select 0 };
+        };
+        if (!isNull _attacker) then {
+            [_attacker, _target, 60, true] call co_main_fnc_applyKnockout;
+        };
+        _target setCaptive true;
+        _target setVariable ["CO_captureInProgress", false, true];
+        [_target, _grp] spawn co_main_fnc_transportToDetention;
+        diag_log format ["[CO] Police foot chase captured NPC %1.", _target];
+        true
+    }
+};
 
 while {
-    alive _target && !captive _target &&
+    alive _target &&
+    !captive _target &&
     !(_target getVariable ["CO_knockedOut", false]) &&
     time < _deadline &&
     !_captured &&
-    { alive _x && vehicle _x == _x } count (units _grp) > 0
+    !_escaped
 } do {
-    private _live = (units _grp) select { alive _x && vehicle _x == _x };
-    if (count _live == 0) exitWith {};
-    private _sorted = [_live, [], { _x distance2D _target }, "ASCEND"] call BIS_fnc_sortBy;
-
-    {
-        _x doMove (getPosATL _target);
-        if ((_x distance _target) < 3.0) then {
-            [_x, _target] call co_main_fnc_applyMeleeHit;
-        };
-    } forEach _sorted;
-
-    // Knockout → handoff
-    if (_target getVariable ["CO_knockedOut", false]) then {
-        _target setCaptive true;
-        _target setVariable ["CO_captureInProgress", false, true];
-        if (_isPlayer) then {
-            _target setUnconscious false;
-            _target setVariable ["CO_knockedOut", false, true];
-            [_target, _grp] spawn co_main_fnc_spawnCaptureTransport;
-            diag_log format ["[CO] Police foot-chase captured player %1 → dedicated transport.", name _target];
-        } else {
-            [_target, _grp] spawn co_main_fnc_transportToDetention;
-            diag_log format ["[CO] Police foot-chase captured NPC %1 → transportToDetention.", _target];
-        };
-        _captured = true;
+    private _live = _claimedUnits select {
+        alive _x &&
+        vehicle _x == _x &&
+        { [_x, _token, _priority, 30] call co_main_fnc_claimUnit }
     };
-    sleep 1.0;
-};
+    if (_live isEqualTo []) exitWith {};
 
-// --- Reboard the car if it survived ---
-if (alive _car) then {
-    private _drvNow = driver _car;
-    if (isNull _drvNow) then {
-        private _alive = (units _grp) select { alive _x };
-        if (count _alive > 0) then {
-            (_alive select 0) moveInDriver _car;
-        };
-    };
+    [_live, _target] call co_main_fnc_chaseMove;
+
+    private _hasSight = false;
     {
-        if (alive _x && vehicle _x == _x) then {
-            _x allowGetIn true;
-            _x assignAsCargo _car;
-            [_x] orderGetIn true;
+        if ((_x distance2D _target) < 90) then {
+            private _vis = [vehicle _x, "VIEW"] checkVisibility [eyePos _x, eyePos _target];
+            if (_vis > 0.15) exitWith { _hasSight = true };
         };
-    } forEach (units _grp);
+    } forEach _live;
 
-    // Resume cruise after a short reboard window
-    [_grp, _car] spawn {
-        params ["_g", "_v"];
-        sleep 12;
-        // Stragglers — force-board
-        {
-            if (alive _x && vehicle _x == _x) then {
-                _x moveInCargo _v;
+    if (_hasSight) then {
+        _lastKnownPos = getPosATL (vehicle _target);
+        _lostSightAt = -1;
+        if ((time - _lastAlertAt) > 5) then {
+            [_target, _lastKnownPos, "police_chase", _priority] call co_main_fnc_alertPublish;
+            _lastAlertAt = time;
+        };
+    } else {
+        if (_lostSightAt < 0) then { _lostSightAt = time };
+        if ((time - _lostSightAt) > 10) then {
+            private _found = [
+                _live,
+                _lastKnownPos,
+                missionNamespace getVariable ["CO_search_duration", 120],
+                _target,
+                _token,
+                _priority
+            ] call co_main_fnc_searchBehavior;
+
+            if (isNull _found) then {
+                _escaped = true;
+            } else {
+                _lostSightAt = -1;
+                _lastKnownPos = getPosATL _target;
+                [_target, _lastKnownPos, "police_respotted", _priority] call co_main_fnc_alertPublish;
             };
-        } forEach (units _g);
-        _v forceSpeed -1;
-        _g setBehaviour "SAFE";
-        _g setSpeedMode "LIMITED";
-        private _wpCount = count (waypoints _g);
-        if (_wpCount > 0) then {
-            _g setCurrentWaypoint [_g, 0];
         };
+    };
+
+    // Is the fugitive actively shooting? (fired within the return-fire
+    // window). Drives the firefight-vs-detain decision below.
+    private _fireWindow = missionNamespace getVariable ["CO_police_returnFireWindow", 10];
+    private _recentlyFired = (time - (_target getVariable ["CO_lastFireTime", -999])) < _fireWindow;
+
+    // Tackle/detain ONLY when the target is not mid-firefight — you
+    // don't walk up to grab someone who's shooting at you.
+    if (!_recentlyFired && vehicle _target == _target && { [_live, _target] call co_main_fnc_proximityTackle }) then {
+        private _sorted = [_live, [], { _x distance _target }, "ASCEND"] call BIS_fnc_sortBy;
+        private _attacker = _sorted select 0;
+        _captured = [_attacker] call _captureTarget;
+        if (_captured) then { ["police_foot_chase_caught"] call co_main_fnc_kpi };
+    };
+
+    if (!_backupRequested && (time > (_deadline - 150))) then {
+        _backupRequested = true;
+        private _near = allGroups select {
+            _x != _grp &&
+            (_x getVariable ["CO_faction", ""]) == "POLICE" &&
+            !(_x getVariable ["CO_vehiclePursuitActive", false]) &&
+            !(_x getVariable ["CO_policeFootChaseActive", false]) &&
+            (leader _x distance2D _target) < 900
+        };
+        if !(_near isEqualTo []) then {
+            private _bGrp = _near select 0;
+            private _bCar = _bGrp getVariable ["CO_policePatrolCar", objNull];
+            if (!isNull _bCar && alive _bCar) then {
+                [_bGrp, _bCar, _target, "police_backup"] spawn co_main_fnc_policeVehiclePursuit;
+            };
+        };
+    };
+
+    // ---- Return-fire vs. detain -----------------------------------
+    // The fugitive is shooting → trade fire back (rounds are kept
+    // non-lethal by fn_installNonLethalDamage: stun → downed → capture)
+    // at ANY range, for as long as they keep firing. When they stop for
+    // the whole window, officers holster and drop straight back to the
+    // chase/tackle/detain posture above. This is the "shoot back until
+    // you stop shooting" behavior.
+    if (_recentlyFired) then {
+        [_target, "WEAPONS", "police_firefight", 85, _grp] call co_main_fnc_setEscalationState;
+        if (_hasSight && time > _nextVolleyAt) then {
+            private _byDist = [_live, [], { _x distance _target }, "ASCEND"] call BIS_fnc_sortBy;
+            {
+                _x reveal [_target, 4];
+                _x doTarget _target;
+                _x setCombatMode "RED";
+                _x fireAtTarget [_target];
+            } forEach (_byDist select [0, 3 min count _byDist]);
+            _nextVolleyAt = time + 2.5;
+        };
+    } else {
+        // Firefight lull — holster and return to arrest posture.
+        if ((_target getVariable ["CO_escalationState", ""]) == "WEAPONS") then {
+            {
+                if (alive _x) then {
+                    _x setCombatMode "YELLOW";
+                    _x doTarget objNull;
+                };
+            } forEach _live;
+            [_target, "PURSUIT", "police_chase", 70, _grp] call co_main_fnc_setEscalationState;
+        };
+        // Persistent high-wanted / armed-fugitive stays flagged WEAPONS-
+        // eligible so the next shot re-opens the firefight instantly.
+        if ((_target getVariable ["CO_wantedLevel", 0]) >= 90) then {
+            [_target, "WEAPONS", "police_escalation", 85, _grp] call co_main_fnc_setEscalationState;
+        };
+    };
+
+    sleep 0.7;
+};
+
+if (!_captured && !_escaped && alive _target && !captive _target) then {
+    private _live = _claimedUnits select {
+        alive _x &&
+        vehicle _x == _x &&
+        { [_x, _token, _priority, 20] call co_main_fnc_claimUnit }
+    };
+    if !(_live isEqualTo []) then {
+        private _found = [
+            _live,
+            _lastKnownPos,
+            missionNamespace getVariable ["CO_search_duration", 120],
+            _target,
+            _token,
+            _priority
+        ] call co_main_fnc_searchBehavior;
+        if (isNull _found) then { _escaped = true };
     };
 };
 
-// Cleanup capture-in-progress flag in case the chase failed.
-if (alive _target && !(_target getVariable ["CO_knockedOut", false])) then {
+if (_escaped) then { ["police_foot_chase_lost"] call co_main_fnc_kpi };
+
+if (alive _target && !(_target getVariable ["CO_knockedOut", false]) && !_captured) then {
     _target setVariable ["CO_captureInProgress", false, true];
 };
+
+// Resume patrol while the claim is still held so no ambient controller
+// steals an officer during the handoff. Shared epilogue handles both
+// car reboarding and foot-patrol posture restore (R1-e).
+if (!isNull _car) then {
+    _car setVariable ["CO_responseActive", false, true];
+};
+[_grp, _car] call co_main_fnc_policeResumePatrol;
+
+{
+    [_x, _token] call co_main_fnc_releaseUnit;
+} forEach _claimedUnits;
+
 _grp setVariable ["CO_policeFootChaseActive", false, false];

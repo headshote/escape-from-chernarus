@@ -142,7 +142,7 @@ All set in `CO_adminDefaults.sqf`, broadcast with `publicVariable`.
 | `CO_rus_unitsPerWave` | Number | Infantry per wave |
 | `CO_police_carStopChance` | Number | 0–1 probability per traffic check |
 | `CO_police_active` | Bool | Enable/disable police patrols |
-| `CO_adminUIDs` | Array | Steam64 UIDs allowed to open admin panel |
+| `CO_adminUIDs` | String array | Steam64 UIDs allowed to open admin panel |
 
 Per-player variables (set via `setVariable`):
 - `CO_wantedLevel` (0–100, broadcast true)
@@ -200,6 +200,13 @@ every 10 s. If >500 m from `CO_rus_advanceFront` X-coord, marks as deserter.
 | CO_WrangleDialog | 9201 | `ui/wrangle_dialog.hpp` |
 | CO_LockpickDialog | 9202 | `ui/lockpick_dialog.hpp` |
 | CO_AdminPanel | 9300 | `ui/admin_panel.hpp` |
+| CO_ThreatHUD (RscTitles) | 9400 | `ui/threat_hud.hpp` |
+
+`CO_ThreatHUD` is not a dialog: it is a persistent `RscTitles` layer shown via
+`cutRsc` on the `CO_ThreatHUDLayer` BIS layer by `fn_heatHud`. Its single
+structured-text control (idc 9401) is positioned at runtime with safezone
+coordinates and re-cut automatically if the display is lost (respawn/load).
+Transition toasts use a second layer, `CO_ToastLayer` (`fn_chaseStinger`).
 
 Dialog references use `uiNamespace getVariable` to retrieve the display object
 set in `onLoad`. Example: `uiNamespace getVariable "CO_AdminPanelDlg"`.
@@ -278,6 +285,239 @@ VS Code will show false-positive CBA namespace errors. These do not affect build
 4. Rebuild `co_main.pbo`.
 
 ---
+
+## Round R10 — Krasnostav siege (persistent Russian assault)
+
+- **Problem:** the Russian advance spread each wave across north/central/south lanes and
+  marched the central/south lanes west to Chernogorsk, spending the global unit budget far
+  from Krasnostav. Combined with the westward-marching `CO_rus_advanceFront` abstraction and
+  the per-death `+1` replacement competing for the same cap, players deploying to the front
+  later in a match often found Krasnostav deserted.
+- **`fn_russianAdvance` reworked into a siege maintainer.** Defines the zone
+  (`CO_rus_zoneCenter` [11400,12650] / `CO_rus_zoneRadius` 1500 = town + airstrip),
+  pins the front-line marker on Krasnostav, and every `CO_rus_waveCooldown` (25 s) calls
+  the wave spawner. No westward march, no town-fall cascade.
+- **`fn_spawnRussianWave` is now a deficit top-up.** Counts live RUS_ADV infantry in-zone,
+  spawns only `min(target − inZone, perWaveMax, globalRoom)` back up to `CO_rus_zoneTarget`
+  (45) under the hard `CO_rus_maxActive` (95) cap. Spawns on the north/east approaches, in
+  ~6-man squads, plus MRAP/APC/MBT on their cadences (each gated on remaining global room).
+  Groups are `createGroup [east, true]` so wiped squads auto-reclaim (no east-side group
+  leak). Per-death replacement EHs removed — the maintainer is the single, bounded
+  repopulation path (`fn_spawnRussianReplacement` is now unwired).
+- **`fn_russianAdvanceWaypoints` rewritten** so every group assaults in then perpetually
+  SAD-patrols the town↔airstrip line (CYCLE), instead of the old lane routes to Chernogorsk.
+- New tunables in `CO_adminDefaults.sqf`: `CO_rus_zoneTarget`; `CO_rus_waveCooldown` 70→25,
+  `CO_rus_unitsPerWave` 42→20, `CO_rus_maxActive` 120→95, `CO_rus_armorFrequency` 1→2.
+
+## Round R9 — TCK pursuit commitment + capture lock
+
+- **Target-lock hysteresis (`fn_tckAcquireTarget`, new).** TCK escorts and foot
+  patrols used to re-pick "nearest valid civilian right now" on a short timer, so a
+  pack thrashed between victims and never committed. The new shared selector LOCKS
+  onto one victim — **players always preferred over NPCs** — and only breaks the lock
+  when the target becomes un-huntable, OR an NPC-holder sees a player in range, OR
+  **all three** of: a rival is closer by `CO_tck_switchMargin` (18 m), the pursuit has
+  been fruitless for `CO_tck_fruitlessTime` (20 s), and the locked target has opened the
+  gap by `CO_tck_loseGroundGap` (8 m) past the chaser's closest approach. Per-hunter
+  lock state (`CO_huntForId/huntMinDist/huntProgressAt`) lives on the unit. Callers
+  invoke it on a **2.5 s throttle** (not per 0.7 s tick) so scanning cost stays bounded.
+  Wired into `fn_tckGlobalAggression` (chase thread now re-selects with hysteresis
+  instead of holding one target 60 s blindly) and `fn_busAgroLoop` escort hunters
+  (replaced the 30 s hard re-pick).
+- **Map-wide capture lock.** `fn_runWrangle` now sets `CO_captureInProgress` on the
+  target the moment it wins the wrangle mutex and clears it unless the grab lands (the
+  detain/transport chain owns it on success). Every TCK chase loop drops a target the
+  instant `CO_captureInProgress` is set, so units stop piling onto — and stop endlessly
+  chasing — a victim who is already being taken. `fn_stateWatchdog`'s 180 s stuck-flag
+  clear remains the backstop. (Police/checkpoint already set this flag at engagement
+  start; only the TCK paths were missing it.)
+- **Detain stays proximity-only.** Confirmed all detain triggers gate on
+  `fn_proximityTackle` (≤ `CO_chase_tackleRange` 2.2 m, sustained ~1.5 s) — TCK, bus,
+  police, and checkpoint. `fn_detainSequence` additionally requires an officer to reach
+  arm's length (≤5 m) or it aborts and frees the target. No detainment at range.
+
+## Round R8 — Police reaction, return-fire, physical detain
+
+- **Melee on a cop → non-lethal police chase-and-detain (no shooting).**
+  `fn_applyMeleeHit` applies damage via `setHitPointDamage`, which NEVER fires the "Hit"
+  event handler — so punching a cop was invisible to the retaliation system (knocked-out
+  cops woke amnesiac; partners ignored it). Punching a **POLICE** unit now marks the
+  victim's squad AND any police group within 60 m with `CO_retaliateTarget`, which
+  `fn_policeBrain` consumes as a chase-and-DETAIN order (it only returns fire if the
+  *player* is shooting). It deliberately does NOT call `fn_reportCrime` — that "wound"
+  path armed every nearby CRN_ENF/POLICE group with LETHAL gunfire retaliation and bumped
+  wanted, which was making TCK open fire on you for a fist fight. TCK are left out
+  entirely; a punched TCK is re-detained by the normal proximity loop, without gunfire.
+- **Knocked-out officers remember.** `fn_applyKnockout` records `CO_lastKnockoutBy`;
+  on wake-up a **POLICE** officer re-arms his squad's chase-and-detain against a
+  player/civilian assailant still nearby (POLICE-only: the marker is a lethal order for
+  TCK, and melee must never escalate to shooting).
+- **Police retaliation response.** `fn_policeBrain` gained a top-priority block that
+  consumes `CO_retaliateTarget` (POLICE were excluded from tckGlobalAggression, so
+  nothing was reading it): partner-down / squad-assaulted → chase-and-DETAIN via
+  `fn_policeFootChase` (or vehicle pursuit), within 260 m.
+- **Return-fire window.** `fn_policeFootChase` now keys the firefight on the player's
+  last shot: while they've fired within `CO_police_returnFireWindow` (10 s) officers
+  trade fire back (non-lethal-filtered) at any range and the tackle is suppressed; once
+  they stop shooting for the whole window officers holster and drop back to
+  chase/tackle/detain. Replaces the old WEAPONS-only >18 m volley.
+- **`fn_detainSequence`** (new): the physical arrest beat — an officer must be at arm's
+  reach (walks up to a target downed at range; aborts and frees the target if none can
+  reach), the detainee is forced to a kneeling pose (`Acts_ExecutionVictim_Loop`), and
+  is held there **continuously** — a brief visible beat, then `fn_spawnCaptureTransport`
+  is dispatched and the kneel is re-asserted every 0.4 s until the player is actually
+  seated in the van (or direct-delivered to training). This closes the earlier ~2-3 s
+  free-run window between releasing the pose and the van seating them. No telekinetic
+  grabs. Wired into every conscious player-capture path: police foot chase, checkpoint
+  (tackle + downed-at-range), bus hunter (tackle + downed), TCK global aggression, and
+  the transport-breakout recapture. NPC capture paths (bus loading, transportToDetention)
+  are unchanged. New flag `CO_detainInProgress` (cleared by the state watchdog and the
+  respawn wipe).
+
+## Round R7 — Transport overhaul, breakout, town garrisons, formation restored
+
+- **`fn_spawnCaptureTransport` rebuilt.** (a) The crew is now spawned FRESH in its own
+  group and claimed at priority 90 — the old version borrowed the driver from the
+  capturing group, whose controller kept re-tasking him (even moveInCargo'ing him back
+  into his TCK truck mid-route) and whose waypoints the transport overwrote. (b) The
+  stuck-watchdog no longer teleports the van: ladder = re-issue route → reverse out →
+  after the 3rd failure ONE fallback, the accepted dismount-and-deliver-to-training
+  flow (same as flipped/destroyed vans, which still work as before). (c) The drive
+  loop resolves to explicit outcomes: arrived / escaped / rescued (crew killed frees
+  the captive) / failsafe / dead. (d) Captive rides in **locked cargo**; escaping
+  clears the transport state, adds wanted +20, sets SEARCH, publishes the LKP, and the
+  crew chases for 45 s (tackle → re-transport). Vans/crews despawn when unobserved.
+- **`fn_breakoutMinigame`** (new, client): "Force the cargo latch" self-action while
+  in a capture transport — 5-key lockpick-style sequence (reuses CO_LockpickDialog);
+  success sets `CO_breakoutAt`, consumed by the transport drive loop; failure = 8 s
+  cooldown. Action installed in `fn_initClient` (re-added on respawn).
+- **Town TCK behavior** (`fn_spawnAllBuses` / `fn_spawnBusOnRoute` / `fn_busAgroLoop`):
+  buses sharing a route get ROTATED route starts (the guaranteed town trucks used to
+  all spawn at waypoint 0 nose-to-tail and gridlock into permanent idling); the first
+  bus per intra-town route becomes the **town garrison** (`CO_busGarrison`): parks,
+  driver stays, squad released as a permanent foot-harassment patrol driven by
+  tckGlobalAggression; and the lost `CO_bus_patrolStopInterval` behavior is restored —
+  cruising trucks periodically pull over near pedestrians and jump the squad out
+  through the normal dismount/hunt/reboard cycle.
+- **`fn_tckGlobalAggression`** now refuses to touch units holding a claim of
+  priority ≥ 60 (transport crews, AWOL detain squads) — including via the
+  retaliation path, which bypasses normal claim acquisition.
+- **Parade formation restored.** The training-escape sentinel was drafting the
+  saluting recruit dummies and the drill instructor (both CRN_ENF) into pursuits,
+  marching the whole formation off the map. They're excluded now, and both anim
+  loops self-heal (walk back + re-disable MOVE if displaced).
+
+## Round R6 — Boot camp props, escape leash, AWOL fate roll, respawn wipe
+
+- **Boot camp props are persistent world objects** (`fn_buildTrainingGround`), not
+  per-quest-run spawns. Root cause of the vanishing/smoking crate: the old rack was
+  created each run at [10,-16] — the exact position of a firing-line sandbag — so it
+  clipped, blew up (the smoke), and was also deleted whenever stage 2 ended. Now:
+  indestructible rifle rack at [6,-28] (`CO_bootCampRack`/`CO_bootCampRackPos`,
+  JIP-persistent pickup action), grenade crate at the pit (`CO_bootCampGrenadeCrate`,
+  "Take grenades" action, 500 HandGrenades cargo), wreck + barrel targets at the
+  impact area, and two armed range wardens (firing line + pit). Firing-line sandbags
+  rotated to dir 90 — parallel to the target line. `fn_bootCampQuest` no longer
+  creates or deletes any of these.
+- **Training escape leash tunable:** `CO_training_escapeRadius` (default 250 m,
+  clamped to the old airfield+30 value) replaces the fixed 380 m in
+  `fn_trainingPhase`'s perimeter sentinel.
+- **`fn_awolConfrontation`** (new server loop, 2 s tick, launched in `fn_initServer`):
+  when armed CRN_ENF/POLICE stand within 12 m of a live AWOL for ~2 s, the squad
+  rolls the deserter's fate once (`CO_awol_detainChance`, default 0.5):
+  *detain* — cease fire, wipe AWOL/cleared/graduated/escape flags, knockout,
+  `spawnCaptureTransport` back to NWAF → `fn_trainingPhase` restarts (the
+  conscription loop is fully cyclical); *execute* — deliberate point-blank volley,
+  with `CO_awolExecution` lifting the non-lethal damage cap in
+  `fn_installNonLethalDamage` so the execution can actually kill.
+- **Respawn slate wipe:** server `EntityRespawned` mission EH (in `fn_initServer`)
+  resets every per-player state var (AWOL, cleared, detain phase, boot camp, wanted,
+  heat, escalation, captureInProgress, captive) on the new body — death is a clean
+  restart.
+
+## Round R5 — Situational HUD + police uniform fix
+
+- **`fn_policeLoadout`** (new): shared police gear applicator; resolves the uniform
+  via `isClass` over `U_B_GEN_Soldier_F` → `U_B_GendarmerieSuit_01_F` → guerilla
+  fallback, verifies the result (never underwear), caches in
+  `CO_policeUniformClass`, installs crime-witness EHs. Used by all three police
+  spawners.
+- **`fn_threatInfoLoop`** (new, launched in `fn_initServer`): 4 s server loop; one
+  `allGroups` classification pass per tick, then per player broadcasts
+  `CO_threatNear = [nearestPoliceDist, nearestOccupationDist]` (CRN_ENF covers TCK +
+  checkpoints + border).
+- **`fn_heatHud`** rewritten as a phase-aware display driven by
+  `CO_detainPhase` / `CO_isAWOL` / `CO_isCleared` / `CO_bootCampActive`:
+  free (POLICE + TCK/BORDER tiles, escalation split by `CO_escalationSource`
+  prefix), detained/transport, training (uses new `CO_bootCampStage` broadcasts
+  from `fn_bootCampQuest`), frontline (minimal), AWOL (banner + both tiles).
+- Removed the dead `CO_fnc_policeInspection` global block from `fn_policeBrain`
+  (superseded by `fn_policeOrderInspection` in the R3/R4 commit).
+
+## Round R2 — Make it legible (repair plan Phase R2)
+
+- **Persistent threat HUD.** `ui/threat_hud.hpp` (RscTitles `CO_ThreatHUD`, idd 9400)
+  + new `RscStructuredText` base class in `config.cpp`. `fn_heatHud` rewritten: renders
+  stamina + WANTED stars (wanted only) + a colored posture chip (CALM / COOLING /
+  WATCHED / ID CHECK / PURSUIT / HUNTED / WEAPONS FREE / SHOOT TO KILL) on a dedicated
+  always-visible cutRsc layer. No more `hintSilent` (which faded out and fought the
+  hint channel). `fn_enduranceBar` keeps writing `CO_enduranceHudText`; only the HUD
+  renders it.
+- **Server-authoritative escalation lifecycle (audit R2-17).** Expiry of escalation
+  states and heat decay moved into the `fn_stateWatchdog` maintenance loop (30 s tick,
+  half of `CO_heat_decayPerMinute` per tick). `fn_getEscalationState` is now a pure
+  read (treats expired as CLEAR without writing) — previously decay only ran inside
+  the local player's HUD loop, so nothing expired on a dedicated server.
+- **Transition toasts.** `fn_chaseStinger` (invoked by `fn_setEscalationState` only on
+  real transitions) shows a 4-second auto-fading toast on `CO_ToastLayer`
+  (serial-guarded so rapid transitions don't clip newer toasts) plus the throttled
+  music stinger.
+- **Siren sound sanity (R2-c).** `fn_policeResponseFX` resolves the siren path once at
+  runtime via `fileExists` over a candidate list (cached in `CO_sirenSoundPath`,
+  logged); if none resolves it falls back to periodic horn blasts using the vehicle's
+  config-defined horn weapon. `fn_civilianPanic` only plays audio when the path
+  resolved.
+
+## Round R1 — Make the city react (repair plan Phase R1)
+
+- **Crime & witness system.** `fn_installCrimeWitness` (applied by
+  `fn_initHostileUnit` + both police spawners) adds Hit/Killed/FiredNear EHs feeding
+  `fn_reportCrime`: witnessed kills/wounds of TCK/police raise wanted (+60/+40),
+  set WEAPONS/PURSUIT escalation, bump a per-town alert level (`CO_townAlertLevels`,
+  10 min expiry), and arm every CRN_ENF/POLICE group within 200 m — bus groups get a
+  `CO_busEmergency*` order. Unwitnessed kills stay free (stealth is viable).
+- **Bus under-fire doctrine.** `fn_busAgroLoop` main loop consumes the bus emergency:
+  full escort dismount (no held-back guard), hunters seeded with the attacker at
+  claim priority 90, weapons-free (`fireAtTarget` stun volleys through the
+  non-lethal filter) when blood was drawn.
+- **Bus captive-cap deadlock fixed.** Cap reached → forced detention delivery (or
+  forced reboard when dismounted) instead of `continue`-ing past the state machine.
+- **State watchdog.** `fn_stateWatchdog` (30 s tick, launched first in
+  `fn_initServer`) recovers stuck `CO_captureInProgress`, stale wrangle locks, dead
+  police chase flags, ghost sirens, parked patrol cars, and frozen bus states; every
+  recovery logs `[CO][WATCHDOG]` — a healthy RPT has none.
+- **Police lifecycle.** Shared `fn_policeBrain` (suspicion sweep, hails, random ID
+  checks via `CO_police_carStopChance`, alert-net response, AWOL handling, town-alert
+  scaling) drives BOTH car patrols (`fn_policePatrols`) and urban foot police
+  (`fn_spawnUrbanFootPatrols` — previously brainless). `fn_policeResumePatrol` is the
+  mandatory epilogue for `fn_policeFootChase` (now car-optional) and
+  `fn_policeVehiclePursuit` (which also replaces dead drivers mid-pursuit).
+- **Serialized wrangle.** `fn_runWrangle` mutexes the minigame (`CO_wrangleActive`);
+  police/checkpoint/bus grabs all route through it — concurrent grabs no longer
+  auto-capture via a failed createDialog.
+- **Arbiter cap fixed.** `fn_claimUnit` chase cap actually rejects now (the old
+  `exitWith`-in-`then{}` fall-through granted claims anyway); player-priority (>= 70)
+  chases are exempt from the cap. Bus hunters share one token per dismount event.
+- **Checkpoint chases.** `fn_checkpointAlert` posture set once (AWARE, not per-tick
+  COMBAT/RED spam), 250 m leash (`CO_checkpoint_chaseLeash`) with alert-net handoff,
+  return-to-post epilogue, and vehicle fire aimed at the driver instead of the hull.
+- **Target weighting.** `fn_tckGlobalAggression` and bus hunters score targets
+  (players −40, heat −0.5/pt, armed −25) instead of picking the nearest civ; TCK
+  retaliation now runs before the mounted-unit skip (mounted units dismount to fight).
+- New functions registered in `CfgFunctions`: `reportCrime`, `installCrimeWitness`,
+  `runWrangle`, `stateWatchdog`, `policeBrain`, `policeResumePatrol`. New tunables in
+  `CO_adminDefaults.sqf`: `CO_crime_killWanted/woundWanted/gunfireWanted`,
+  `CO_checkpoint_chaseLeash`, `CO_police_chaseDeadline`.
 
 ## Round 9 � Population caps + dismount fixes
 

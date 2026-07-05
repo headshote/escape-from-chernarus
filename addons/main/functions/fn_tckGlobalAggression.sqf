@@ -13,8 +13,9 @@
 //
 // What this loop does
 // -------------------
-// Every 4 s on the server, walk every group whose CO_faction is
-// "CRN_ENF" or "POLICE". For each foot-mobile unit in that group:
+// Every 3 s on the server, walk every group whose CO_faction is
+// "CRN_ENF". Police have their own controller and are intentionally
+// excluded so this failsafe cannot distract an officer mid-chase.
 //
 //   1. If a non-female civilian or player is within 22 m AND in
 //      line-of-sight ish (we use nearEntities which already does
@@ -55,13 +56,13 @@ diag_log "[CO] tckGlobalAggression: starting global failsafe loop (radius=60m, t
         _heartbeat = _heartbeat + 1;
         if (_heartbeat % 20 == 0) then {
             private _grpCount = count (allGroups select {
-                (_x getVariable ["CO_faction", ""]) in ["CRN_ENF", "POLICE"]
+                (_x getVariable ["CO_faction", ""]) == "CRN_ENF"
             });
             diag_log format ["[CO] tckGlobalAggression heartbeat: %1 eligible groups.", _grpCount];
         };
 
         private _groups = allGroups select {
-            (_x getVariable ["CO_faction", ""]) in ["CRN_ENF", "POLICE"]
+            (_x getVariable ["CO_faction", ""]) == "CRN_ENF"
         };
 
         {
@@ -82,13 +83,24 @@ diag_log "[CO] tckGlobalAggression: starting global failsafe loop (radius=60m, t
             {
                 private _u = _x;
                 if (isNull _u || !alive _u) then { continue };
-                if (vehicle _u != _u) then { continue };  // skip mounted
                 if (_u getVariable ["CO_knockedOut", false]) then { continue };
                 if (_u getVariable ["CO_vehicleChaseDriver", false]) then { continue };
 
-                // Short retaliation window after the group is attacked.
-                // This adds the missing "shoot back" response players
-                // expect when they gun down TCK/police at close-mid range.
+                // Respect high-priority claims (capture-transport crews,
+                // AWOL detain squads): those units belong to another
+                // controller and must never be yanked — even by
+                // retaliation, which bypasses the normal claim attempt.
+                private _claim = _u getVariable ["CO_claim", []];
+                if (
+                    !(_claim isEqualTo []) &&
+                    { (_claim select 2) > time && (_claim select 1) >= 60 }
+                ) then { continue };
+
+                // Retaliation FIRST, before the mounted skip (audit R2-7):
+                // units shot at while sitting in a vehicle dismount and
+                // return fire instead of staring through the windshield.
+                // (Bus escort groups are skipped above — fn_busAgroLoop's
+                // emergency dismount owns their under-fire response.)
                 private _retUntil = _grp getVariable ["CO_retaliateUntil", 0];
                 private _retTarget = _grp getVariable ["CO_retaliateTarget", objNull];
                 if (
@@ -98,6 +110,14 @@ diag_log "[CO] tckGlobalAggression: starting global failsafe loop (radius=60m, t
                     !captive _retTarget &&
                     (_u distance2D _retTarget) < 140
                 ) then {
+                    [_retTarget] call co_main_fnc_installNonLethalDamage;
+                    if (vehicle _u != _u) then {
+                        private _v = vehicle _u;
+                        unassignVehicle _u;
+                        _u action ["GetOut", _v];
+                        doGetOut _u;
+                        moveOut _u;
+                    };
                     _u setBehaviour "COMBAT";
                     _u setCombatMode "RED";
                     _u enableAI "AUTOTARGET";
@@ -108,6 +128,8 @@ diag_log "[CO] tckGlobalAggression: starting global failsafe loop (radius=60m, t
                     _u fireAtTarget [_retTarget, currentWeapon _u];
                     continue;
                 };
+
+                if (vehicle _u != _u) then { continue };  // skip mounted
 
                 // TRAINING SAFE ZONE: units physically standing inside the
                 // NWAF airfield (= training staff: drill instructor, minders,
@@ -151,14 +173,27 @@ diag_log "[CO] tckGlobalAggression: starting global failsafe loop (radius=60m, t
                 };
                 if (count _cands == 0) then { continue };
 
-                private _sorted = [_cands, [], { _x distance2D _u }, "ASCEND"] call BIS_fnc_sortBy;
+                // Weighted pick (R1-g): players, hot suspects, and armed men
+                // out-rank the nearest random NPC civilian, so patrols stop
+                // being statistically blind to players in crowded towns.
+                private _sorted = [_cands, [], {
+                    private _score = _x distance2D _u;
+                    if (isPlayer _x) then { _score = _score - 40 };
+                    _score = _score - (((_x getVariable ["CO_heatLevel", 0]) * 0.5) min 40);
+                    if (primaryWeapon _x != "" || handgunWeapon _x != "") then { _score = _score - 25 };
+                    _score
+                }, "ASCEND"] call BIS_fnc_sortBy;
                 private _target = _sorted select 0;
+                private _token = format ["tck_global_%1_%2", netId _u, floor (time * 10)];
+                private _priority = 40;
+                if (!([_u, _token, _priority, 45] call co_main_fnc_claimUnit)) then { continue };
 
                 _u setVariable ["CO_lastAggressionAt", time, false];
+                [_target, getPosATL _target, "tck_global", _priority] call co_main_fnc_alertPublish;
 
-                [_u, _target] spawn {
-                    params ["_u", "_t"];
-                    if (isNull _u || isNull _t) exitWith {};
+                [_u, _target, _token, _priority] spawn {
+                    params ["_u", "_myTarget", "_token", "_priority"];
+                    if (isNull _u) exitWith {};
 
                     // Switch the unit into an aware/aggressive posture so it
                     // actually moves and faces the target (CARELESS units
@@ -169,29 +204,78 @@ diag_log "[CO] tckGlobalAggression: starting global failsafe loop (radius=60m, t
                     _u enableAI "PATH";
                     _u setUnitPos "UP";
 
-                    private _deadline = time + 25;
+                    private _deadline      = time + 90;
+                    private _nextSelAt     = time + 3;   // honour the initial pick briefly
+                    private _noTargetSince = -1;
+                    private _captured      = false;
+                    private _ended         = false;
+
                     while {
-                        alive _u && alive _t &&
-                        !captive _t &&
-                        !(_t getVariable ["CO_knockedOut", false]) &&
-                        time < _deadline &&
+                        alive _u && time < _deadline && !_captured && !_ended &&
                         (vehicle _u == _u) &&
-                        (vehicle _t == _t)
+                        { [_u, _token, _priority, 25] call co_main_fnc_claimUnit }
                     } do {
-                        _u doMove (getPosATL _t);
-                        if ((_u distance _t) < TCK_MELEE_RANGE) then {
-                            [_u, _t] call co_main_fnc_applyMeleeHit;
-                            sleep 1.0;
-                        } else {
-                            sleep 1.5;
+                        // Cheap per-tick invalidation: never keep chasing a
+                        // victim who is gone, already captured, or being
+                        // captured by someone else.
+                        if (!isNull _myTarget && {
+                            !alive _myTarget || captive _myTarget ||
+                            (vehicle _myTarget != _myTarget) ||
+                            (_myTarget getVariable ["CO_knockedOut", false]) ||
+                            (_myTarget getVariable ["CO_captureInProgress", false])
+                        }) then { _myTarget = objNull };
+
+                        // Throttled (re)selection with commitment hysteresis.
+                        if (time > _nextSelAt) then {
+                            _nextSelAt = time + 2.5;
+                            private _picked = [_u, _myTarget, TCK_SCAN_RADIUS] call co_main_fnc_tckAcquireTarget;
+                            if (!(_picked isEqualTo _myTarget)) then {
+                                _myTarget = _picked;
+                                if (!isNull _myTarget) then {
+                                    [_myTarget, getPosATL _myTarget, "tck_global", _priority] call co_main_fnc_alertPublish;
+                                };
+                            };
                         };
+
+                        if (isNull _myTarget) then {
+                            if (_noTargetSince < 0) then { _noTargetSince = time };
+                            if ((time - _noTargetSince) > 6) then { _ended = true };
+                        } else {
+                            _noTargetSince = -1;
+                            [[_u], _myTarget] call co_main_fnc_chaseMove;
+                            if ([[_u], _myTarget] call co_main_fnc_proximityTackle) then {
+                                if (isPlayer _myTarget) then {
+                                    private _result = [_myTarget, 20] call co_main_fnc_runWrangle;
+                                    if (_result == "captured") then {
+                                        _myTarget setCaptive true;
+                                        // Kneel-and-load beat (at tackle range).
+                                        [_myTarget, group _u] call co_main_fnc_detainSequence;
+                                        _captured = true;
+                                    };
+                                    if (_result == "escaped") then {
+                                        _myTarget setVariable ["CO_tackleImmuneUntil", time + 6, true];
+                                        sleep 2;
+                                    };
+                                } else {
+                                    [_u, _myTarget, 60, true] call co_main_fnc_applyKnockout;
+                                    if (_myTarget getVariable ["CO_knockedOut", false]) then {
+                                        _myTarget setCaptive true;
+                                        [_u, _myTarget] spawn co_main_fnc_dispatchCaptureTransport;
+                                        _captured = true;
+                                    };
+                                };
+                            };
+                        };
+                        sleep 0.7;
                     };
 
                     // After knockout: try to summon transport
-                    if (alive _t && (_t getVariable ["CO_knockedOut", false])) then {
-                        _t setCaptive true;
-                        [_u, _t] spawn co_main_fnc_dispatchCaptureTransport;
+                    if (alive _myTarget && (_myTarget getVariable ["CO_knockedOut", false])) then {
+                        _myTarget setCaptive true;
+                        [_u, _myTarget] spawn co_main_fnc_dispatchCaptureTransport;
                     };
+
+                    [_u, _token] call co_main_fnc_releaseUnit;
                 };
             } forEach (units _grp);
         } forEach _groups;

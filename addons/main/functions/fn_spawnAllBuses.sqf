@@ -50,10 +50,30 @@ for "_i" from 1 to _remaining do {
 };
 
 {
-    private _route = (_x select 0) select 0;
+    private _routeEntry = _x select 0;
+    private _route = _routeEntry select 0;
+    private _priority = _routeEntry param [1, 1];
     private _count = _x select 1;
+    private _n = count _route;
     for "_spawnIndex" from 1 to _count do {
-        [_route, _hostilesPerBus] call co_main_fnc_spawnBusOnRoute;
+        // Rotate the route per bus so trucks sharing one route start at
+        // DIFFERENT waypoints and cruise staggered segments — the old
+        // behavior seeded every bus at waypoint 0, so the 3 guaranteed
+        // town trucks spawned nose-to-tail on the same street and
+        // gridlocked each other into permanent idling.
+        private _wps = _route;
+        if (_count > 1 && _n > 1) then {
+            private _rot = ((_spawnIndex - 1) * ((_n / _count) max 1)) mod _n;
+            _rot = floor _rot;
+            if (_rot > 0) then {
+                _wps = (_route select [_rot, _n - _rot]) + (_route select [0, _rot]);
+            };
+        };
+        // The FIRST bus on each intra-town (priority 4) route becomes the
+        // town garrison: it parks at spawn and dumps its squad as a
+        // permanent foot-harassment patrol (driver stays at the wheel).
+        private _garrison = (_priority == 4 && _spawnIndex == 1);
+        [_wps, _hostilesPerBus, _garrison] call co_main_fnc_spawnBusOnRoute;
         // Yield between spawns so the engine registers each vehicle
         // before the next findEmptyPosition runs. Without this, multiple
         // trucks on the same route pick overlapping road candidates and

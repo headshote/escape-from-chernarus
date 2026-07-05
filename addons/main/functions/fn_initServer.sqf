@@ -1,5 +1,8 @@
 // fn_initServer.sqf — revised call order
-// CO_adminDefaults.sqf is executed from mission init.sqf before this runs
+// CO_adminDefaults.sqf is executed from mission init.sqf before this runs.
+// Apply profile tuning before broadcasting globals.
+[] call co_main_fnc_applyDifficultyPreset;
+
 // Globals should already be set; broadcast them again for connected clients.
 {
     publicVariable _x;
@@ -8,7 +11,7 @@
     "CO_checkpoint_includeSmall","CO_checkpoint_fortTemplate",
     "CO_bus_totalCruising","CO_bus_hostilesPerBus","CO_bus_townGuaranteed","CO_bus_vehiclePool",
     "CO_rus_waveCooldown","CO_rus_unitsPerWave","CO_rus_armorFrequency","CO_rus_firstWaveDelay","CO_rus_spawnX",
-    "CO_rus_spawnXNorth","CO_rus_tankFrequency","CO_rus_maxActive","CO_awolRadius","CO_awolGrace",
+    "CO_rus_spawnXNorth","CO_rus_tankFrequency","CO_rus_maxActive","CO_awolRadius","CO_frontSafeZones","CO_awolGrace",
     "CO_front_initialStrength","CO_front_lineSpacingY","CO_front_depthRows","CO_front_rowSpacing",
     "CO_border_postSpacing","CO_border_includeCoast","CO_border_includeLand","CO_border_patrolDensity",
     "CO_westBorderCampCount","CO_westBorderCampGuardsMin","CO_westBorderCampGuardsMax",
@@ -19,9 +22,58 @@
     "CO_airfield_guardCount","CO_airfield_gateGuards",
     "CO_conscript_detainTime","CO_conscript_trainTime",
     "CO_police_carStopChance","CO_police_active",
+    "CO_difficultyPreset","CO_suspicion_baseRate","CO_search_duration",
+    "CO_chase_speedCoef","CO_chase_aiStaminaDrain","CO_chase_tackleRange","CO_chase_tackleTime",
+    "CO_tracker_speedCoef","CO_checkpoint_maxCount","CO_border_innerJitter","CO_heat_decayPerMinute",
+    "CO_kpiLogInterval","CO_maxSimultaneousChases",
+    "CO_crime_killWanted","CO_crime_woundWanted","CO_crime_gunfireWanted",
+    "CO_checkpoint_chaseLeash","CO_police_chaseDeadline","CO_police_returnFireWindow",
+    "CO_lockdown_extraPatrols","CO_lockdown_duration",
+    "CO_training_escapeRadius","CO_trainingArrivalRadius","CO_awol_detainChance",
     "CO_adminUIDs"
 ];
 sleep 0.5;
+
+// ---- Death wipes the slate (server-authoritative) --------------------
+// A fresh body must not inherit AWOL/wanted/heat/pipeline state from the
+// corpse — respawn is the "new civilian" reset. (Playtest: AWOL status
+// survived a respawn.) EntityRespawned fires on the server for every
+// player respawn and gives us the new unit to scrub.
+addMissionEventHandler ["EntityRespawned", {
+    params ["_newUnit", "_oldUnit"];
+    if (!isPlayer _newUnit) exitWith {};
+
+    _newUnit setCaptive false;
+    {
+        _newUnit setVariable [_x select 0, _x select 1, true];
+    } forEach [
+        ["CO_isAWOL", false],
+        ["CO_isCleared", false],
+        ["CO_awolExecution", false],
+        ["CO_awolSource", ""],
+        ["CO_deserterWanted", false],
+        ["CO_detainPhase", ""],
+        ["CO_trainingEscape", false],
+        ["CO_hotHostile", 0],
+        ["CO_bootCampActive", false],
+        ["CO_bootCampGraduated", false],
+        ["CO_bootCampStage", ""],
+        ["CO_wantedLevel", 0],
+        ["CO_heatLevel", 0],
+        ["CO_escalationState", "UNAWARE"],
+        ["CO_escalationSource", ""],
+        ["CO_escalationUntil", 0],
+        ["CO_captureInProgress", false],
+        ["CO_detainInProgress", false],
+        ["CO_knockedOut", false],
+        ["CO_hasFiredWeapon", false],
+        ["CO_threatNear", [99999, 99999]]
+    ];
+    _newUnit setVariable ["CO_wrangleActive", 0, false];
+    _newUnit setVariable ["CO_awolFate", ["", -999], false];
+    _newUnit setVariable ["CO_awolCloseSince", -1, false];
+    diag_log format ["[CO] Respawn slate wipe for %1.", name _newUnit];
+}];
 
 // Each init step is wrapped so an SQF error in one subsystem cannot silently
 // abort downstream subsystems. We track per-step status in
@@ -95,8 +147,14 @@ sleep 0.5;
 // civilian density, and patrol behaviour. 6x runs a 24h Chernarus day in 4h.
 setTimeMultiplier 6;
 
+// Watchdog first: it recovers stuck flags/vehicles from every other
+// subsystem, so it must survive even if a later step fails.
+["stateWatchdog", { [] call co_main_fnc_stateWatchdog; }] call _launchStep;
+["threatInfoLoop", { [] call co_main_fnc_threatInfoLoop; }] call _launchStep;
+["awolConfrontation", { [] call co_main_fnc_awolConfrontation; }] call _launchStep;
 ["spawnAllBuses", { [] call co_main_fnc_spawnAllBuses; }] call _launchStep;
 ["tckGlobalAggression", { [] call co_main_fnc_tckGlobalAggression; }] call _launchStep;
+["russianAssaultBrain", { [] call co_main_fnc_russianAssaultBrain; }] call _launchStep;
 ["civilianAI", { [] call co_main_fnc_civilianAI; }] call _launchStep;
 ["trafficSystem", { [] call co_main_fnc_trafficSystem; }] call _launchStep;
 ["policePatrols", { [] call co_main_fnc_policePatrols; }] call _launchStep;
@@ -109,6 +167,7 @@ setTimeMultiplier 6;
 ["swBorderFort", { [] call co_main_fnc_buildSWBorderFort; }] call _launchStep;
 ["perimeterBorderForts", { [] call co_main_fnc_buildBorderForts; }] call _launchStep;
 ["borderRovingPatrols", { [] call co_main_fnc_borderPatrol; }] call _launchStep;
+["borderLayeredZone", { [] call co_main_fnc_borderZone; }] call _launchStep;
 ["frontSystem", {
     [] call co_main_fnc_buildEasternFront;
     [] call co_main_fnc_frontMilitary;

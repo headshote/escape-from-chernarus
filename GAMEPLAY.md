@@ -169,23 +169,36 @@ the recognition threshold needed for pursuit.
 
 ---
 
-## Russian Advance
+## Russian Advance — the Krasnostav siege
 
-Abstract east-to-west front, modelled by `CO_rus_advanceFront` (X coordinate).
+Rather than an east-to-west marching front, the Russians run a **permanent siege of
+Krasnostav and the airstrip just north of it** — the exact ground where cleared
+conscripts deploy — so the front is always hot when a player arrives.
 
-Each wave (`fn_spawnRussianWave`):
-- `CO_rus_unitsPerWave` infantry + every `CO_rus_armorFrequency` waves one APC.
-- Front advances 120 m per wave (abstract).
-- Town objectives checked west-to-east: Berezino → Elektrozavodsk → Chernogorsk → Balota.
-- When a town falls: `fn_enforcerRetreatFromTown` (ENF groups within 1500 m retreat west),
-  `fn_updateFrontLine` redraws the `co_frontline` map marker.
-- If `CO_front_unitsRemaining ≤ 10`: `fn_frontCollapse`.
-- Deserters (soldiers moving >500 m from front): detected by `fn_desertionMonitor`.
+`fn_russianAdvance` (server) sets the zone (`CO_rus_zoneCenter` [11400,12650], radius
+`CO_rus_zoneRadius` 1500, covering town + airstrip) and runs a top-up loop every
+`CO_rus_waveCooldown` (25 s):
 
-**Population cap.** `CO_rus_maxActive` (default 80) limits the live RUS_ADV unit count.
-Both `fn_spawnRussianWave` and `fn_spawnRussianReplacement` skip spawning when at or above
-the cap. This prevents unbounded growth that was producing severe FPS drops near Krasnostav
-(replacement spawns +1 per kill, wave spawns +30 every 100 s, combined with no cleanup).
+- `fn_spawnRussianWave` counts live RUS_ADV infantry in-zone and spawns only the
+  **deficit** back up to `CO_rus_zoneTarget` (45), capped per top-up by
+  `CO_rus_unitsPerWave` (20) and globally by `CO_rus_maxActive` (95, server-safety).
+- Units spawn on the **north/east approaches** (over the airstrip) and are handed the
+  town↔airstrip patrol by `fn_russianAdvanceWaypoints` — SAD/COMBAT waypoints ending in
+  a CYCLE, so they assault in and never march off west.
+- Armor: an armed MRAP every top-up (room permitting), an APC every
+  `CO_rus_armorFrequency` (2) top-ups, an MBT every `CO_rus_tankFrequency` (3).
+- `fn_russianAssaultBrain` (4 s loop) feeds RUS groups valid deployed-conscript /
+  CRN_FRONT targets (engine relations otherwise ignore civilian-slot players) and
+  re-anchors idle groups onto the Krasnostav patrol points.
+
+**Why it's bounded.** Presence is maintained by deficit top-up (spawn only what died) to
+a fixed in-zone target under a hard global cap — never the old unbounded "+1 per kill"
+replacement. Groups are created `deleteWhenEmpty` so wiped squads reclaim their slot.
+The old per-death `fn_spawnRussianReplacement` is no longer wired in.
+
+Deserters (deployed conscripts leaving the Krasnostav safe zone) are still detected by
+`fn_desertionMonitor` / `fn_awolMonitor`; `CO_front_unitsRemaining ≤ 10` still triggers
+`fn_frontCollapse`.
 
 **Hostility tick throttle.** `fn_russianHostilityTick` (the per-player loop that forces
 RUS_ADV to engage cleared conscripts despite the engine `civilian setFriend [west,1]`
@@ -228,6 +241,7 @@ Sliders broadcast globals via `publicVariable` on change. Key tunables:
 In game, an approved admin now gets an `Open Admin Panel` action on their player.
 If the action does not appear, the player's Steam64 UID is not currently listed in
 `missions/ChernOccupation.Chernarus/CO_adminDefaults.sqf` under `CO_adminUIDs`.
+Store UIDs as strings, e.g. `["76561198054336866"]`.
 
 | Control | Global | Default |
 |---------|--------|---------|
@@ -298,6 +312,117 @@ All defaults live in `missions/ChernOccupation.Chernarus/CO_adminDefaults.sqf`.
 - **Day/night cycle.** Server sets `setTimeMultiplier 6` so a Chernarus day is ~4 real hours.
   Clients start with `ItemMap`, `ItemCompass`, `ItemWatch` only — `ItemGPS`, `ItemRadio`,
   `B_UavTerminal` are stripped on init (per spec point 16).
+
+## Round R8 Changes — cops that react, and real arrests
+
+- **Assaulting police gets you chased and arrested — not shot.** Punch a cop and his
+  partner (and any police nearby who saw it) come after you to *detain* you; knock him
+  out and he gets up and joins the chase. It never turns into a gunfight and it no
+  longer drags the TCK into shooting at you over a fist fight.
+- **Firefights, then arrests.** If you draw a weapon and shoot, police shoot back for
+  as long as you keep firing — they won't walk into your muzzle to grab you. Stop
+  shooting for ~10 seconds and they holster and close in to detain you instead.
+- **No more telekinetic arrests.** Getting detained now requires an officer to actually
+  walk up to you: you're forced to your knees and held there until the transport truck
+  pulls up and takes you — no more being released to run around for a couple of seconds
+  first. If they shoot you down from range, a guard has to reach your body before any
+  truck appears — and if nobody can get to you, you're not taken at all. The same
+  applies to TCK snatch squads: no grabbing you from across the street.
+
+## Round R7 Changes — prisoner transports and living towns
+
+- **Prisoner vans actually drive now** — dedicated crews that no other system can
+  hijack, and no more teleport-hopping around Chernogorsk. A van that genuinely can't
+  move (blocked, flipped, destroyed) falls back once to the familiar
+  dismount-and-deliver at the training camp.
+- **You ride locked in the cargo hold** — and the scroll menu offers *Force the cargo
+  latch*: a 5-key lockpick puzzle. Crack it and you're dumped on the road as a hunted
+  fugitive (wanted +20, SEARCH posture, the escort chases for a while). If someone
+  shoots the crew dead, you're simply free. Escaping properly clears the
+  "DETAINED — IN TRANSPORT" state.
+- **Towns feel occupied:** TCK trucks disperse along staggered patrol routes instead
+  of idling nose-to-tail; one truck per big town parks and permanently dumps its
+  squad as a foot-harassment patrol (driver stays at the wheel); cruising trucks
+  periodically pull over near pedestrians and jump out to grab someone. NPC civilians
+  still get caught, loaded, and shipped to the training camp exactly as before.
+- **The parade formation is back** — recruits saluting in front of the flag with the
+  drill sergeant facing them. (They'd been getting drafted into escape pursuits and
+  marched off the map; they're props again, permanently.)
+
+## Round R6 Changes — boot camp works, deserters get a second chance
+
+- **The rifle rack and grenade crate are always at the range now** (indestructible,
+  never despawn — the old crate spawned inside a sandbag and blew itself up). The
+  grenade pit has visible targets (a wreck and barrels), the firing-line sandbags
+  actually face downrange, and two armed wardens watch the range and the pit.
+- **Escaping training is riskier:** the escape line is much tighter (250 m from the
+  airfield center, tunable), and the new range wardens are close enough to shoot
+  immediately.
+- **Cornered deserters face a fate roll (50/50, tunable):** stand point-blank in
+  front of the hunters and the squad either executes you on the spot — for real, the
+  stun cap is lifted — or decides you're worth more alive: they knock you out, your
+  AWOL status is wiped, and a truck hauls you back to boot camp. Train, desert, get
+  caught, train again — the loop is endless.
+- **Death is a clean slate:** respawning clears AWOL, wanted, heat, and every
+  pipeline flag. A fresh body is a fresh civilian.
+
+## Round R5 Changes — the HUD follows your story
+
+- **The threat display now matches your situation:**
+  - *Free civilian:* two tiles — **POLICE** (how close they are, your WANTED stars,
+    their current posture) and **TCK/BORDER** (how close the occupation forces are,
+    and a red **TARGETED — RUN OR HIDE** when a snatch squad is actually on you).
+    TCK don't care about your wanted level — that's why their tile shows presence
+    and targeting instead of stars.
+  - *Detained / in transport:* a single DETAINED tile (with the lockpick hint in cells).
+  - *Conscript training:* a CONSCRIPT TRAINING tile with your current drill
+    (1/3 obstacle course → 2/3 rifle range → 3/3 grenade pit); if the camp guards go
+    active on you mid-escape you'll see **GUARDS ALERTED** / **GUARDS WEAPONS FREE**.
+  - *Frontline:* just a FRONTLINE tag — you're a soldier, wanted levels don't apply.
+  - *AWOL:* a red **AWOL — DESERTER** banner, and both threat tiles come back.
+- **Police finally wear uniforms.** The gendarmerie uniform classname was wrong, so
+  the game silently dropped it — that's why your cops patrolled in underwear. Fixed
+  with a verified classname chain and a guaranteed fallback.
+
+## Round R2 Changes — you can read the threat
+
+- **Always-on threat HUD** (top right): your stamina bar, your **WANTED stars**
+  (persistent legal standing — crimes and captures), and a colored **posture chip**
+  showing what the security forces are doing about you *right now*: CALM, COOLING
+  (residual attention draining), WATCHED, ID CHECK, PURSUIT, HUNTED — HIDE,
+  WEAPONS FREE, SHOOT TO KILL. It never fades out — the old flashing tooltip is gone.
+- **Toasts on every threat transition** ("PURSUIT — run or hide!", "You've broken
+  contact — stay out of sight.", "The heat has died down.") plus the music stinger.
+- **Heat now actually cools down** on dedicated servers (decay runs server-side), so
+  the chip honestly returns to CALM after you lie low.
+- **Sirens are audible everywhere**: the siren sound is verified at load and falls
+  back to horn blasts if the audio asset is missing, so a responding police car is
+  never silent.
+
+## Round R1 Changes — the city reacts
+
+- **Violence has consequences.** Killing or wounding TCK/police *in view of a witness*
+  (any security unit or NPC civilian with line-of-sight within 140 m) raises wanted
+  (+60 kill / +40 wound), triggers an armed response from every security group within
+  200 m — including full weapons-free dismounts from nearby TCK trucks — and raises the
+  town's alert level for ~10 minutes (faster suspicion, more ID checks). Unwitnessed
+  takedowns remain clean: stealth is a real playstyle.
+- **Gunfire is heard.** Shots near any TCK/police unit report the shooter (small wanted
+  bump, SUSPICIOUS state, alert-net entry) even without line-of-sight.
+- **TCK trucks fight back.** Shooting at a truck's squad dumps the entire escort,
+  weapons-free, hunting the shooter (stun rounds — the capture pipeline, not a kill).
+  Full trucks now drive to detention instead of freezing in place.
+- **Police act like police.** Foot gendarmerie pairs now run the same brain as patrol
+  cars: suspicion, hails, pursuit, and — new — **random document checks** of players
+  (a compliant check is a 15-second tension beat; fleeing one is +20 wanted and a
+  chase). Cars always resume their patrol route after an engagement, and a server-side
+  watchdog un-sticks any patrol/vehicle/flag a failed script leaves behind.
+- **Checkpoint guards keep their post.** Chases leash at 250 m; beyond that the
+  runner's position is radioed to mobile units instead of the checkpoint emptying
+  itself. Guards return to their posts after every engagement.
+- **Fair grabs.** Only one squad can wrangle you at a time (no more instant captures
+  from overlapping grabs), and patrols now prefer players/armed/hot suspects over the
+  nearest random NPC civilian.
 
 ## Round 9 Changes
 

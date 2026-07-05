@@ -15,6 +15,26 @@ if (isNil "CO_airfieldCenter") then {
 CO_trainingFieldPos = (CO_airfieldCenter vectorAdd [60, 0, 0]);
 publicVariable "CO_trainingFieldPos";
 
+// ---------------------------------------------------------------
+// Pacify training staff (issue: guards opened fire on the recruit
+// when he shot the RANGE targets). Every armed member of the camp
+// staff is flagged CO_trainingStaff and dropped to combatMode BLUE
+// (never fire) with autotargeting off, so a stray training round —
+// or even a warden wandering into the firing lane — never provokes
+// return fire at the (captive) recruit. The perimeter sentinel in
+// fn_trainingPhase re-arms them explicitly (setCombatMode RED +
+// enableAI AUTOTARGET + fireAtTarget) the instant a recruit breaches
+// the wire, so escape resistance is unaffected. The CO_trainingStaff
+// flag also makes fn_installCrimeWitness a no-op for these units, so
+// they never post a retaliation marker over range fire.
+private _pacifyStaff = {
+    params ["_u"];
+    if (isNull _u) exitWith {};
+    _u setVariable ["CO_trainingStaff", true, true];
+    _u setCombatMode "BLUE";
+    _u disableAI "AUTOTARGET";
+};
+
 // --- Drill instructor group ---
 private _drillGrp = createGroup west;
 _drillGrp setVariable ["CO_faction", "CRN_ENF"];
@@ -27,13 +47,23 @@ _instructor setName "Drill Instructor";
 _instructor setDir 180;
 _instructor disableAI "MOVE"; // stay at podium
 _instructor setVariable ["CO_drillInstructor", true, true];
+[_instructor] call _pacifyStaff;
 
-// Whistle-shout loop so the parade ground reads as live
-[_instructor] spawn {
-    params ["_inst"];
+// Whistle-shout loop so the parade ground reads as live. Also
+// self-heals the podium pose: if any aggression loop re-enabled
+// his movement AI, he walks back and plants himself again.
+[_instructor, CO_trainingFieldPos] spawn {
+    params ["_inst", "_podium"];
     while { alive _inst } do {
         sleep (20 + random 30);
         if (alive _inst) then {
+            if ((_inst distance2D _podium) > 8) then {
+                _inst enableAI "MOVE";
+                _inst doMove _podium;
+            } else {
+                _inst disableAI "MOVE";
+                _inst setDir 180;
+            };
             [_inst, "GestureGo"] remoteExec ["playActionNow", 0];
         };
     };
@@ -60,11 +90,21 @@ for "_row" from 0 to 2 do {
         _r disableAI "TARGET";
         _r allowFleeing 0;
         _r setVariable ["CO_isRecruitDummy", true, true];
+        [_r] call _pacifyStaff;
 
-        // Idle drill: switchMove between attention and parade rest
-        [_r] spawn {
-            params ["_u"];
+        // Idle drill: switchMove between attention and parade rest.
+        // Re-asserts disableAI MOVE + formation spot every cycle so no
+        // aggression loop can permanently march the dummy away.
+        [_r, _rPos] spawn {
+            params ["_u", "_spot"];
             while { alive _u } do {
+                if ((_u distance2D _spot) > 5) then {
+                    _u enableAI "MOVE";
+                    _u doMove _spot;
+                    sleep 6;
+                };
+                _u disableAI "MOVE";
+                _u setDir 90;
                 _u playMoveNow "AmovPercMstpSnonWnonDnon_Salute";
                 sleep (4 + random 3);
                 if (!alive _u) exitWith {};
@@ -83,12 +123,135 @@ for "_i" from 0 to 3 do {
     _target setDir 0;
 };
 
-// Range firing line (sandbags)
+// Range firing line (sandbags). Targets are EAST (+x), so the wall's
+// long axis must run north-south (dir 90) — parallel to the target
+// line — with shooters firing east over it. The old dir 0 left the
+// bags pointing downrange like little fences to nowhere.
 for "_b" from 0 to 3 do {
     private _bagPos = CO_trainingFieldPos vectorAdd [10, -20 + (_b * 4), 0];
     private _bag = "Land_BagFence_Long_F" createVehicle _bagPos;
-    _bag setDir 0;
+    _bag setDir 90;
 };
+
+// ---------------------------------------------------------------
+// PERSISTENT range props (was: spawned/deleted per quest run by
+// fn_bootCampQuest, at coordinates INSIDE the sandbag line — the
+// crate clipped a sandbag on spawn, physics blew it up (the smoke),
+// and it vanished whenever the quest stage ended).
+// ---------------------------------------------------------------
+
+// Weapon rack: behind the south end of the firing line, clear of
+// every sandbag, indestructible, never deleted.
+private _rackPos = CO_trainingFieldPos vectorAdd [6, -28, 0];
+private _rack = createVehicle ["Box_NATO_WpsSpecial_F", _rackPos, [], 0, "CAN_COLLIDE"];
+_rack setPos _rackPos;
+_rack setDir 90;
+_rack allowDamage false;
+clearWeaponCargoGlobal _rack;
+clearMagazineCargoGlobal _rack;
+clearItemCargoGlobal _rack;
+clearBackpackCargoGlobal _rack;
+_rack addWeaponCargoGlobal   ["arifle_AKM_F", 900];
+_rack addMagazineCargoGlobal ["30Rnd_762x39_Mag_F", 100000];
+_rack addBackpackCargoGlobal ["B_AssaultPack_rgr", 1000];
+_rack addItemCargoGlobal     ["V_HarnessO_brn", 1000];
+missionNamespace setVariable ["CO_bootCampRack", _rack, true];
+missionNamespace setVariable ["CO_bootCampRackPos", _rackPos, true];
+
+// One persistent JIP action — condition gates it to active recruits.
+[
+    _rack,
+    [
+        "<t color='#00ff00'>Pick up training rifle</t>",
+        {
+            params ["_target", "_caller"];
+            if (!(_caller getVariable ["CO_bootCampActive", false])) exitWith {};
+            if ("arifle_AKM_F" in (weapons _caller)) exitWith {
+                hint "You already have the training rifle.";
+            };
+            _caller addWeapon "arifle_AKM_F";
+            _caller addMagazine "30Rnd_762x39_Mag_F";
+            _caller addMagazine "30Rnd_762x39_Mag_F";
+            _caller addMagazine "30Rnd_762x39_Mag_F";
+            _caller selectWeapon "arifle_AKM_F";
+            hint "Training rifle issued.\nDestroy the three wooden targets downrange.";
+        },
+        nil, 1.5, true, true, "",
+        "_this distance _target < 3 && (_this getVariable ['CO_bootCampActive', false])"
+    ]
+] remoteExec ["addAction", 0, true];
+
+// Grenade pit: crate behind the throwing line + visible targets at
+// the impact area so the stage-3 marker points at something real.
+private _grenadeCratePos = CO_trainingFieldPos vectorAdd [-30, 52, 0];
+private _gCrate = createVehicle ["Box_East_AmmoOrd_F", _grenadeCratePos, [], 0, "CAN_COLLIDE"];
+_gCrate setPos _grenadeCratePos;
+_gCrate allowDamage false;
+clearWeaponCargoGlobal _gCrate;
+clearMagazineCargoGlobal _gCrate;
+clearItemCargoGlobal _gCrate;
+clearBackpackCargoGlobal _gCrate;
+_gCrate addMagazineCargoGlobal ["HandGrenade", 500];
+missionNamespace setVariable ["CO_bootCampGrenadeCrate", _gCrate, true];
+
+[
+    _gCrate,
+    [
+        "<t color='#00ff00'>Take grenades (x3)</t>",
+        {
+            params ["_target", "_caller"];
+            if (!(_caller getVariable ["CO_bootCampActive", false])) exitWith {};
+            _caller addMagazine "HandGrenade";
+            _caller addMagazine "HandGrenade";
+            _caller addMagazine "HandGrenade";
+            hint "Grenades issued.\nDetonate TWO inside the marked pit.";
+        },
+        nil, 1.5, true, true, "",
+        "_this distance _target < 3 && (_this getVariable ['CO_bootCampActive', false])"
+    ]
+] remoteExec ["addAction", 0, true];
+
+// Impact-area dressing: a wreck plus barrels — durable static props.
+private _pitCenter = CO_trainingFieldPos vectorAdd [-30, 90, 0];
+private _wreck = createVehicle ["Land_Wreck_Skodovka_F", _pitCenter, [], 0, "CAN_COLLIDE"];
+_wreck setPos _pitCenter;
+_wreck setDir (random 360);
+{
+    private _barrel = createVehicle ["Land_MetalBarrel_F", _pitCenter getPos [4 + random 3, _x], [], 0, "CAN_COLLIDE"];
+    _barrel setDir (random 360);
+} forEach [0, 90, 180, 270];
+
+// ---------------------------------------------------------------
+// Range wardens: two armed guards physically AT the range/pit so an
+// escape attempt meets resistance immediately instead of only at the
+// distant perimeter (the sentinel in fn_trainingPhase issues their
+// fire orders — they just need to exist nearby).
+// ---------------------------------------------------------------
+{
+    _x params ["_gPos", "_patrolTo"];
+    private _wGrp = createGroup west;
+    _wGrp setVariable ["CO_faction", "CRN_ENF"];
+    private _w = _wGrp createUnit ["B_Soldier_TL_F", _gPos, [], 0, "FORM"];
+    [_w] call co_main_fnc_initHostileUnit;
+    [_w] call _pacifyStaff;
+    private _wp1 = _wGrp addWaypoint [_gPos, 4];
+    _wp1 setWaypointType "MOVE";
+    _wp1 setWaypointSpeed "LIMITED";
+    private _wp2 = _wGrp addWaypoint [_patrolTo, 4];
+    _wp2 setWaypointType "MOVE";
+    _wp2 setWaypointSpeed "LIMITED";
+    private _wpC = _wGrp addWaypoint [_gPos, 4];
+    _wpC setWaypointType "CYCLE";
+} forEach [
+    // Firing-line warden patrols WEST of / behind the firing line (x<=6),
+    // never crossing the shooter->target lane. The old [16,-32]->[16,0]
+    // route walked him straight through the downrange target band
+    // (targets sit at ~x+55, y -24..-16), so he ate the recruit's
+    // training rounds AND could body-block shots so the target never
+    // registered a hit, stalling the range stage.
+    [CO_trainingFieldPos vectorAdd [4, -34, 0], CO_trainingFieldPos vectorAdd [4, -6, 0]],    // firing line (behind shooters)
+    [CO_trainingFieldPos vectorAdd [-38, 48, 0], CO_trainingFieldPos vectorAdd [-20, 70, 0]]  // grenade pit
+];
 
 // --- Inner perimeter trainers / minders so recruits can't just sprint out ---
 private _minderRadius = 70;
@@ -99,6 +262,7 @@ for "_i" from 0 to 3 do {
     _grp setVariable ["CO_faction", "CRN_ENF"];
     private _u = _grp createUnit ["B_Soldier_TL_F", _minderPos, [], 0, "FORM"];
     [_u] call co_main_fnc_initHostileUnit;
+    [_u] call _pacifyStaff;
     // Wider scan radius so they intercept escaping conscripts
     [_grp, _minderPos, 55, "CRN_ENF"] call co_main_fnc_guardAggroLoop;
 };
