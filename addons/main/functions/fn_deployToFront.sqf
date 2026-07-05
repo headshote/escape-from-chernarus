@@ -26,6 +26,15 @@ _conscript setVariable ["CO_isCleared", true, true];
 _conscript setVariable ["CO_isAWOL", false, true];
 _conscript setVariable ["CO_faction", "CRN_FRONT", true];
 
+// Renegade buffer. Russian kills already score positive (see the asymmetric
+// civilian<->east rating in fn_factionRelations), but the front is a melee of
+// Russians and friendly west conscripts — a stray round into an allied
+// conscript is still friendly fire and chips the rating down. Seed a large
+// positive rating so incidental friendly fire can never push a deployed
+// player past the -2000 renegade threshold and turn the whole line against
+// them. Cosmetic effect only (end-of-round score).
+_conscript addRating 25000;
+
 // ---- Teleport to Krasnostav north (front-line jump-off) ----
 private _krasnostav = [11200, 12300, 0];
 private _deployPos = _krasnostav vectorAdd [(random 200) - 100, 220 + random 80, 0];
