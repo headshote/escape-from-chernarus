@@ -15,6 +15,26 @@ if (isNil "CO_airfieldCenter") then {
 CO_trainingFieldPos = (CO_airfieldCenter vectorAdd [60, 0, 0]);
 publicVariable "CO_trainingFieldPos";
 
+// ---------------------------------------------------------------
+// Pacify training staff (issue: guards opened fire on the recruit
+// when he shot the RANGE targets). Every armed member of the camp
+// staff is flagged CO_trainingStaff and dropped to combatMode BLUE
+// (never fire) with autotargeting off, so a stray training round —
+// or even a warden wandering into the firing lane — never provokes
+// return fire at the (captive) recruit. The perimeter sentinel in
+// fn_trainingPhase re-arms them explicitly (setCombatMode RED +
+// enableAI AUTOTARGET + fireAtTarget) the instant a recruit breaches
+// the wire, so escape resistance is unaffected. The CO_trainingStaff
+// flag also makes fn_installCrimeWitness a no-op for these units, so
+// they never post a retaliation marker over range fire.
+private _pacifyStaff = {
+    params ["_u"];
+    if (isNull _u) exitWith {};
+    _u setVariable ["CO_trainingStaff", true, true];
+    _u setCombatMode "BLUE";
+    _u disableAI "AUTOTARGET";
+};
+
 // --- Drill instructor group ---
 private _drillGrp = createGroup west;
 _drillGrp setVariable ["CO_faction", "CRN_ENF"];
@@ -27,6 +47,7 @@ _instructor setName "Drill Instructor";
 _instructor setDir 180;
 _instructor disableAI "MOVE"; // stay at podium
 _instructor setVariable ["CO_drillInstructor", true, true];
+[_instructor] call _pacifyStaff;
 
 // Whistle-shout loop so the parade ground reads as live. Also
 // self-heals the podium pose: if any aggression loop re-enabled
@@ -69,6 +90,7 @@ for "_row" from 0 to 2 do {
         _r disableAI "TARGET";
         _r allowFleeing 0;
         _r setVariable ["CO_isRecruitDummy", true, true];
+        [_r] call _pacifyStaff;
 
         // Idle drill: switchMove between attention and parade rest.
         // Re-asserts disableAI MOVE + formation spot every cycle so no
@@ -211,6 +233,7 @@ _wreck setDir (random 360);
     _wGrp setVariable ["CO_faction", "CRN_ENF"];
     private _w = _wGrp createUnit ["B_Soldier_TL_F", _gPos, [], 0, "FORM"];
     [_w] call co_main_fnc_initHostileUnit;
+    [_w] call _pacifyStaff;
     private _wp1 = _wGrp addWaypoint [_gPos, 4];
     _wp1 setWaypointType "MOVE";
     _wp1 setWaypointSpeed "LIMITED";
@@ -220,7 +243,13 @@ _wreck setDir (random 360);
     private _wpC = _wGrp addWaypoint [_gPos, 4];
     _wpC setWaypointType "CYCLE";
 } forEach [
-    [CO_trainingFieldPos vectorAdd [16, -32, 0], CO_trainingFieldPos vectorAdd [16, 0, 0]],   // firing line
+    // Firing-line warden patrols WEST of / behind the firing line (x<=6),
+    // never crossing the shooter->target lane. The old [16,-32]->[16,0]
+    // route walked him straight through the downrange target band
+    // (targets sit at ~x+55, y -24..-16), so he ate the recruit's
+    // training rounds AND could body-block shots so the target never
+    // registered a hit, stalling the range stage.
+    [CO_trainingFieldPos vectorAdd [4, -34, 0], CO_trainingFieldPos vectorAdd [4, -6, 0]],    // firing line (behind shooters)
     [CO_trainingFieldPos vectorAdd [-38, 48, 0], CO_trainingFieldPos vectorAdd [-20, 70, 0]]  // grenade pit
 ];
 
@@ -233,6 +262,7 @@ for "_i" from 0 to 3 do {
     _grp setVariable ["CO_faction", "CRN_ENF"];
     private _u = _grp createUnit ["B_Soldier_TL_F", _minderPos, [], 0, "FORM"];
     [_u] call co_main_fnc_initHostileUnit;
+    [_u] call _pacifyStaff;
     // Wider scan radius so they intercept escaping conscripts
     [_grp, _minderPos, 55, "CRN_ENF"] call co_main_fnc_guardAggroLoop;
 };

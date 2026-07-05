@@ -23,6 +23,10 @@ _unit setVariable ["CO_crimeWitnessInstalled", true, false];
 
 _unit addEventHandler ["Hit", {
     params ["_victim", "_source", "_damage", "_instigator"];
+    // Training-camp staff never post crimes — a recruit shooting the
+    // range targets (and occasionally clipping a warden) must not arm a
+    // retaliation marker. Escape is handled by the perimeter sentinel.
+    if (_victim getVariable ["CO_trainingStaff", false]) exitWith {};
     private _src = if (!isNull _instigator) then { _instigator } else { _source };
     if (isNull _src || _src == _victim || !alive _src) exitWith {};
     // Resolve vehicle kills to the actual man behind the wheel/trigger.
@@ -52,6 +56,7 @@ _unit addEventHandler ["Hit", {
 
 _unit addEventHandler ["Killed", {
     params ["_killed", "_killer", "_instigator"];
+    if (_killed getVariable ["CO_trainingStaff", false]) exitWith {};
     private _src = if (!isNull _instigator) then { _instigator } else { _killer };
     if (isNull _src || _src == _killed) exitWith {};
     if (!(_src isKindOf "CAManBase")) then {
@@ -79,6 +84,7 @@ _unit addEventHandler ["Killed", {
 // for the "gunshots in town" pressure effect.
 _unit addEventHandler ["FiredNear", {
     params ["_unit", "_firer", "_distance"];
+    if (_unit getVariable ["CO_trainingStaff", false]) exitWith {};
     if ((time - (_unit getVariable ["CO_nextFiredNearAt", -999])) < 0) exitWith {};
     if (isNull _firer || _firer == _unit) exitWith {};
     private _man = _firer;

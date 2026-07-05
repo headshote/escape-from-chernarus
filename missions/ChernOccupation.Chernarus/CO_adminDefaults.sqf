@@ -108,6 +108,7 @@ CO_lockdown_duration            = 600;    // seconds
 
 // --- Training / AWOL ---
 CO_training_escapeRadius        = 250;    // metres from airfield center before a recruit counts as escaping
+CO_trainingArrivalRadius        = 150;    // capture-transport delivers (teleports recruit to the field) once the van is within this many metres of the camp, so it never has to climb the hill / get stuck at the base
 CO_awol_detainChance            = 0.5;    // chance a squad detains (vs executes) a cornered deserter
 
 // --- Admin ---
@@ -140,6 +141,6 @@ CO_adminUIDs                    = ["76561198054336866"];   // add Steam64 UIDs a
     "CO_crime_killWanted","CO_crime_woundWanted","CO_crime_gunfireWanted",
     "CO_checkpoint_chaseLeash","CO_police_chaseDeadline","CO_police_returnFireWindow",
     "CO_lockdown_extraPatrols","CO_lockdown_duration",
-    "CO_training_escapeRadius","CO_awol_detainChance",
+    "CO_training_escapeRadius","CO_trainingArrivalRadius","CO_awol_detainChance",
     "CO_adminUIDs"
 ];

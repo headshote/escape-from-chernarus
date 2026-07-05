@@ -62,6 +62,31 @@ player addEventHandler ["Fired", {
     };
 };
 
+// ISSUE 3: active transport-destination marker. While being driven to
+// the training camp (CO_detainPhase == "transport"), draw a live on-
+// screen icon at the destination with the remaining drive distance —
+// the classic Arma "active mark". The server stamps CO_transportDest
+// (a position) on the player when they are loaded and blanks it on
+// arrival / escape / rescue / death; the detainPhase gate makes the
+// marker vanish the instant the ride ends even before that broadcast
+// lands. Bound to the mission (not the unit), so it survives respawn.
+addMissionEventHandler ["Draw3D", {
+    if (isNull player || !alive player) exitWith {};
+    if ((player getVariable ["CO_detainPhase", ""]) != "transport") exitWith {};
+    private _dest = player getVariable ["CO_transportDest", []];
+    if (!(_dest isEqualType []) || { count _dest < 2 }) exitWith {};
+    private _iconPos = [_dest select 0, _dest select 1, ((_dest select 2) max 0) + 3];
+    private _dist = round (player distance2D _dest);
+    drawIcon3D [
+        "\A3\ui_f\data\map\markers\military\objective_CA.paa",
+        [0.25, 0.85, 1, 1],
+        _iconPos,
+        1.1, 1.1, 0,
+        format ["TRAINING CAMP  %1 m", _dist],
+        1, 0.032, "PuristaMedium", "center"
+    ];
+}];
+
 // Breakout self-action: visible only while locked in a capture
 // transport. Runs the latch minigame; success is consumed by the
 // transport's drive loop on the server.

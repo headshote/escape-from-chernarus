@@ -39,6 +39,12 @@ if (isServer) then {
             min (CO_airfieldRadius + 30);
         private _outside = false;
         private _outsideSince = -1;
+        // Settle grace: a just-delivered conscript may need a beat for the
+        // teleport-to-field to register server-side. Never judge them as
+        // "escaping" during this window, so a fresh arrival can't be
+        // instantly branded AWOL and gunned down (the "dropped at the base
+        // of the hill, killed as a deserter" report).
+        private _graceUntil = time + 6;
 
         while {
             alive _c &&
@@ -46,6 +52,7 @@ if (isServer) then {
         } do {
             sleep 1.5;
             if (!alive _c) exitWith {};
+            if (time < _graceUntil) then { continue };
 
             private _d = _c distance2D CO_airfieldCenter;
             if (_d > _escapeRadius) then {
@@ -99,6 +106,11 @@ if (isServer) then {
                     !(_x getVariable ["CO_drillInstructor", false])
                 };
                 {
+                    // Re-arm the pacified staff: they sit at combatMode
+                    // BLUE with autotargeting off during drills, so lift
+                    // both before issuing fire orders or they won't shoot.
+                    _x enableAI "AUTOTARGET";
+                    _x enableAI "TARGET";
                     _x reveal [_c, 4];
                     _x doWatch _c;
                     _x doTarget _c;
@@ -124,7 +136,17 @@ if (isServer) then {
                         _c setVariable ["CO_hotHostile", 0, true];
                         _c setVariable ["CO_trainingEscape", false, true];
                         {
-                            if (alive _x) then { _x doWatch objNull };
+                            if (alive _x) then {
+                                _x doWatch objNull;
+                                // Re-pacify the range staff so they go back
+                                // to ignoring training fire.
+                                if (_x getVariable ["CO_trainingStaff", false]) then {
+                                    _x doTarget objNull;
+                                    _x setCombatMode "BLUE";
+                                    _x setBehaviour "SAFE";
+                                    _x disableAI "AUTOTARGET";
+                                };
+                            };
                         } forEach ((CO_airfieldCenter nearEntities [["Man"], 900]) select {
                             ((group _x) getVariable ["CO_faction", ""]) == "CRN_ENF"
                         });

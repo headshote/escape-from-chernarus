@@ -65,11 +65,23 @@ _captive setCaptive true;
         CO_trainingFieldPos = [2160, 12800, 0];
     };
     private _dest = +CO_trainingFieldPos;
+    // ISSUE 2: deliver from further out. The training field sits on the
+    // NWAF plateau; the road tops out at the base of the hill, so a van
+    // told to reach 45 m of the field would grind/stick at the bottom
+    // (the "dropped at the base of the hill, killed as AWOL" report).
+    // Once the van is within this radius we hand the recruit straight to
+    // the camp (teleport-to-field via trainingPhase), so it never has to
+    // climb. Delivery always lands them on the field, well inside the
+    // escape leash, so the perimeter sentinel never mistakes an arrival
+    // for a breakout.
+    private _arrivalRadius = missionNamespace getVariable ["CO_trainingArrivalRadius", 150];
 
     // Shared: hand the captive to the training camp directly. This is
     // the ACCEPTED fallback (same as the long-standing flipped-truck
     // behavior): dismount + teleport + trainingPhase.
     private _deliverDirect = {
+        // Marker off: the drive is over however we got here.
+        _captive setVariable ["CO_transportDest", [], true];
         if (alive _captive) then {
             if (!isNull (objectParent _captive)) then { moveOut _captive };
             _captive setPosATL (_dest vectorAdd [4 + random 4, random 8 - 4, 0]);
@@ -129,7 +141,37 @@ _captive setCaptive true;
     private _dy = (_dest select 1) - (_spawnPos select 1);
     _veh setDir (_dx atan2 _dy);
     _veh setVariable ["CO_isCaptureTransport", true, true];
+    _veh setVariable ["CO_transportReleasing", false, true];
     [_veh] spawn { params ["_v"]; sleep 8; if (!isNull _v && alive _v) then { _v allowDamage true } };
+
+    // ---- ISSUE 4: hard captive lock ---------------------------------
+    // The captive must NOT be able to bail out on their own. lockCargo
+    // (set once loaded) removes the Get-Out action, and this handler is
+    // the guarantee: any unsanctioned exit by the locked captive — a
+    // manual eject, a physics pop from a jolting van, a knockout state
+    // clearing — is instantly reversed by re-seating them. The only
+    // sanctioned exits set CO_transportReleasing=true first: arrival
+    // (crew + captive disembark), a successful breakout minigame, a
+    // crew wipe (rescued), and the stuck/flipped failsafe. The crew are
+    // never the locked captive, so they can always get in and out.
+    _veh addEventHandler ["GetOut", {
+        params ["_veh", "_role", "_unit"];
+        // Server owns the re-seat: it holds the authoritative
+        // CO_transportReleasing (set synchronously before any sanctioned
+        // moveOut), so no networked-flag lag can fight a legitimate exit.
+        if (!isServer) exitWith {};
+        if (isNull _veh) exitWith {};
+        if (_veh getVariable ["CO_transportReleasing", false]) exitWith {};
+        private _locked = _veh getVariable ["CO_lockedCaptive", objNull];
+        if (isNull _locked || _unit != _locked || !alive _unit) exitWith {};
+        _unit setUnconscious false;
+        _unit setVariable ["CO_knockedOut", false, true];
+        _unit assignAsCargo _veh;
+        _unit moveInCargo _veh;
+        if (isPlayer _unit) then {
+            [_unit, _veh] remoteExec ["moveInCargo", _unit];
+        };
+    }];
 
     // ---- 4. DEDICATED crew: fresh group, claimed at 90 --------
     private _crewGrp = createGroup [west, true];
@@ -238,6 +280,13 @@ _captive setCaptive true;
     _captive setVariable ["CO_breakoutAt", -1, true];
     _veh lockCargo true;
     _veh setVariable ["CO_busCaptives", [_captive], true];
+    // Bind the lock handler to THIS captive and arm the on-screen
+    // destination marker (ISSUE 3): a live "TRAINING CAMP — N m" icon
+    // rendered client-side while CO_detainPhase == "transport". It
+    // clears on arrival / escape / rescue / death (detainPhase changes
+    // and every resolution branch blanks CO_transportDest).
+    _veh setVariable ["CO_lockedCaptive", _captive, true];
+    _captive setVariable ["CO_transportDest", _dest, true];
 
     if (isPlayer _captive) then {
         [_captive] remoteExecCall ["co_main_fnc_showDetentionHUD", _captive];
@@ -348,7 +397,7 @@ _captive setCaptive true;
             if (_captive in _veh) then { _ejectFails = 0 };
         };
 
-        if (_result == "" && (_veh distance2D _dest) < 45) then { _result = "arrived" };
+        if (_result == "" && (_veh distance2D _dest) < _arrivalRadius) then { _result = "arrived" };
         if (_result == "" && time > (_tripStart + 600)) then {
             diag_log format ["[CO] Capture transport %1 trip timeout — direct delivery.", netId _veh];
             _result = "failsafe";
@@ -410,6 +459,10 @@ _captive setCaptive true;
     switch (_result) do {
 
         case "arrived": {
+            // Sanctioned disembark — let the captive out of the lock and
+            // drop the destination marker.
+            _veh setVariable ["CO_transportReleasing", true, true];
+            _captive setVariable ["CO_transportDest", [], true];
             _veh forceSpeed 0;
             if (!isNull (driver _veh)) then { doStop (driver _veh) };
             sleep 1;
@@ -468,6 +521,8 @@ _captive setCaptive true;
         };
 
         case "escaped": {
+            _veh setVariable ["CO_transportReleasing", true, true];
+            _captive setVariable ["CO_transportDest", [], true];
             _veh forceSpeed 0;
             _veh lockCargo false;
             if (_captive in _veh) then {
@@ -532,6 +587,8 @@ _captive setCaptive true;
         };
 
         case "rescued": {
+            _veh setVariable ["CO_transportReleasing", true, true];
+            _captive setVariable ["CO_transportDest", [], true];
             _veh lockCargo false;
             if (alive _captive && _captive in _veh) then {
                 unassignVehicle _captive;
@@ -552,12 +609,18 @@ _captive setCaptive true;
         };
 
         case "dead": {
+            _veh setVariable ["CO_transportReleasing", true, true];
+            _captive setVariable ["CO_transportDest", [], true];
             call _releaseCrew;
             call _despawnCrewAndVan;
             _captive setVariable ["CO_transportInProgress", false, true];
         };
 
         default {  // "failsafe": destroyed / flipped / stuck / timeout
+            // Auto-disembark everyone (existing accepted behaviour) and
+            // teleport the captive to the field. Release flag first so the
+            // GetOut lock doesn't fight the sanctioned crew/captive exit.
+            _veh setVariable ["CO_transportReleasing", true, true];
             {
                 if (alive _x && vehicle _x != _x) then {
                     unassignVehicle _x;
